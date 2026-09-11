@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_variety_chart/flutter_variety_chart.dart';
@@ -36,6 +37,29 @@ Future<void> pinchOut(WidgetTester tester, Offset centre, double spread) async {
   await a.up();
   await b.up();
   await tester.pumpAndSettle();
+}
+
+/// Scrolls the mouse wheel at the global [position] by [delta] logical pixels.
+Future<void> wheel(WidgetTester tester, Offset position, double delta) async {
+  final TestPointer pointer = TestPointer(1, PointerDeviceKind.mouse);
+  pointer.hover(position);
+  await tester.sendEventToBinding(pointer.scroll(Offset(0, delta)));
+  await tester.pumpAndSettle();
+}
+
+/// The primary-axis value painted under the local x pixel [dx].
+double xValueAt(dynamic geometry, double dx) {
+  final Rect plot = geometry.plotRect as Rect;
+  return geometry.xMinimum +
+      (dx - plot.left) / plot.width * (geometry.xMaximum - geometry.xMinimum);
+}
+
+/// The secondary-axis value painted under the local y pixel [dy]. The vertical
+/// axis grows upwards, so the top of the plot holds the maximum.
+double yValueAt(dynamic geometry, double dy) {
+  final Rect plot = geometry.plotRect as Rect;
+  return geometry.yMaximum -
+      (dy - plot.top) / plot.height * (geometry.yMaximum - geometry.yMinimum);
 }
 
 Future<void> pumpChart(
@@ -125,9 +149,10 @@ void main() {
     final double yMinBefore = zoomed.yMinimum;
 
     // Drag left and down: the content follows the finger, so the visible
-    // window slides towards later categories and smaller values. The first
-    // move resolves the gesture arena, so the pan itself starts from the
-    // second move on.
+    // window slides towards later categories and larger values (the vertical
+    // axis grows upwards, so following the finger down reveals higher values).
+    // The first move resolves the gesture arena, so the pan itself starts from
+    // the second move on.
     final TestGesture finger = await tester.startGesture(centre);
     await tester.pump(const Duration(milliseconds: 120));
     await finger.moveBy(const Offset(40, 40));
@@ -139,6 +164,63 @@ void main() {
 
     final dynamic panned = currentGeometry(tester);
     expect(panned.xMinimum, greaterThan(xMinBefore));
-    expect(panned.yMinimum, lessThan(yMinBefore));
+    expect(panned.yMinimum, greaterThan(yMinBefore));
+  });
+
+  testWidgets('the wheel zooms both ways and restores the full range',
+      (WidgetTester tester) async {
+    await pumpChart(tester);
+    final Offset centre = tester.getCenter(chartCanvas());
+    final dynamic before = currentGeometry(tester);
+    final double xSpanBefore = before.xMaximum - before.xMinimum;
+    final double ySpanBefore = before.yMaximum - before.yMinimum;
+
+    for (int i = 0; i < 6; i++) {
+      await wheel(tester, centre, -100);
+    }
+    final dynamic zoomed = currentGeometry(tester);
+    expect(zoomed.xMaximum - zoomed.xMinimum, lessThan(xSpanBefore * 0.6));
+    expect(zoomed.yMaximum - zoomed.yMinimum, lessThan(ySpanBefore * 0.6));
+
+    // Zooming back out must be measured against the full range, not against
+    // the window the wheel started from.
+    for (int i = 0; i < 6; i++) {
+      await wheel(tester, centre, 100);
+    }
+    final dynamic restored = currentGeometry(tester);
+    expect(
+      restored.xMaximum - restored.xMinimum,
+      moreOrLessEquals(xSpanBefore, epsilon: xSpanBefore * 1e-6),
+    );
+    expect(
+      restored.yMaximum - restored.yMinimum,
+      moreOrLessEquals(ySpanBefore, epsilon: ySpanBefore * 1e-6),
+    );
+  });
+
+  testWidgets('the wheel pins the value under the pointer on both axes',
+      (WidgetTester tester) async {
+    await pumpChart(tester);
+    final dynamic before = currentGeometry(tester);
+    final Rect plot = before.plotRect as Rect;
+    // Deliberately off-centre on both axes: a mirrored anchor would be
+    // invisible at the centre of the plot.
+    final Offset local = Offset(
+      plot.left + plot.width * 0.25,
+      plot.top + plot.height * 0.2,
+    );
+    final Offset global = tester.getTopLeft(chartCanvas()) + local;
+    final double xBefore = xValueAt(before, local.dx);
+    final double yBefore = yValueAt(before, local.dy);
+
+    await wheel(tester, global, -100);
+
+    final dynamic after = currentGeometry(tester);
+    expect(
+      after.xMaximum - after.xMinimum,
+      lessThan(before.xMaximum - before.xMinimum),
+    );
+    expect(xValueAt(after, local.dx), moreOrLessEquals(xBefore, epsilon: 1e-6));
+    expect(yValueAt(after, local.dy), moreOrLessEquals(yBefore, epsilon: 1e-6));
   });
 }

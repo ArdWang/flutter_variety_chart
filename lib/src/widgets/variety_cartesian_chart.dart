@@ -190,17 +190,42 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   (double, double)? _lastPrimaryRange;
   (double, double)? _lastSecondaryRange;
 
+  // Zoom state, held the same way Syncfusion holds it: every axis keeps a
+  // normalised window made of a `factor` (the visible fraction of the full
+  // range, 1 meaning fully zoomed out) and a `position` (where that window
+  // starts, as a fraction of the full range). Gestures only ever touch those
+  // two numbers, so the focal point of a pinch stays pinned while it applies.
+  double _xZoomFactor = 1;
+  double _xZoomPosition = 0;
+  double _yZoomFactor = 1;
+  double _yZoomPosition = 0;
+
+  // The full, un-zoomed range of each axis. Zoom gestures are always measured
+  // against this, never against the current window, otherwise zooming back out
+  // would be clamped to the window the gesture started from.
+  double _baseXMin = 0;
+  double _baseXMax = 1;
+  double _baseYMin = 0;
+  double _baseYMax = 1;
+
+  // The data-space windows projected from the normalised state during build.
   (double, double)? _zoomX;
   (double, double)? _zoomY;
   VarietyCartesianGeometry? _display;
 
-  double? _scaleStartSpan;
-  (double, double)? _scaleStartZoom;
-  double? _scaleStartSpanY;
-  (double, double)? _scaleStartZoomY;
-  Offset _lastFocal = Offset.zero;
+  // Magnification captured for each axis when the current pinch began, the
+  // counterpart of Syncfusion's `_previousScale`.
+  double? _startScaleX;
+  double? _startScaleY;
+  int _scalePointerCount = 0;
+  Offset _previousPanPosition = Offset.zero;
+  bool _panStarted = false;
+  bool _gestureChanged = false;
   Offset? _selectionStart;
   Rect? _selectionRect;
+
+  /// Whether either axis currently shows a zoomed window.
+  bool get _hasZoom => _xZoomFactor < 1 || _yZoomFactor < 1;
 
   List<VarietySeries> get _items {
     final List<VarietySeries> all = widget.series
@@ -459,8 +484,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final Size size = Size(constraints.maxWidth, constraints.maxHeight);
-        final (VarietyCartesianGeometry base, VarietyCartesianGeometry display) =
-            _geometries(size);
+        final (_, VarietyCartesianGeometry display) = _geometries(size);
         _display = display;
         final Widget canvas = CustomPaint(
           size: size,
@@ -499,13 +523,13 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
               onLongPressEnd: (_) => _onLongPressEnd(),
               onDoubleTapDown: doubleTapEnabled
                   ? (TapDownDetails details) =>
-                      _onDoubleTap(details.localPosition, base, display)
+                      _onDoubleTap(details.localPosition, display)
                   : null,
-              onScaleStart:
-                  zoomEnabled ? (ScaleStartDetails details) => _onScaleStart(details, base) : null,
-              onScaleUpdate: zoomEnabled
-                  ? (ScaleUpdateDetails details) => _onScaleUpdate(details, base, display)
+              onScaleStart: zoomEnabled
+                  ? (ScaleStartDetails details) => _onScaleStart(details)
                   : null,
+              onScaleUpdate:
+                  zoomEnabled ? (ScaleUpdateDetails details) => _onScaleUpdate(details) : null,
               onScaleEnd: zoomEnabled ? (_) => _onScaleEnd() : null,
               child: Stack(
                 children: <Widget>[
@@ -570,6 +594,12 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       dataLabelResolver: _resolveDataLabel,
       secondaryYAxes: widget.secondaryYAxes,
     );
+    _baseXMin = base.xMinimum;
+    _baseXMax = base.xMaximum;
+    _baseYMin = base.yMinimum;
+    _baseYMax = base.yMaximum;
+    _zoomX = _windowFor(_baseXMin, _baseXMax, _xZoomPosition, _xZoomFactor);
+    _zoomY = _windowFor(_baseYMin, _baseYMax, _yZoomPosition, _yZoomFactor);
     final VarietyCartesianGeometry display = VarietyCartesianGeometry(
       series: _items,
       xAxis: widget.primaryXAxis,
@@ -689,20 +719,6 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   // ---------------------------------------------------------------------------
   // Pointer handling
   // ---------------------------------------------------------------------------
-
-  double _axisXFor(Offset position, VarietyCartesianGeometry geometry) {
-    final double ratio =
-        ((position.dx - geometry.plotRect.left) / math.max(geometry.plotRect.width, 1))
-            .clamp(0.0, 1.0);
-    return geometry.xMinimum + ratio * (geometry.xMaximum - geometry.xMinimum);
-  }
-
-  double _axisYFor(Offset position, VarietyCartesianGeometry geometry) {
-    final double ratio =
-        ((position.dy - geometry.plotRect.top) / math.max(geometry.plotRect.height, 1))
-            .clamp(0.0, 1.0);
-    return geometry.yMinimum + ratio * (geometry.yMaximum - geometry.yMinimum);
-  }
 
   void _onHover(PointerHoverEvent event) {
     _reveal();
@@ -907,17 +923,18 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     if (geometry == null) {
       return;
     }
-    final bool zoomIn = event.scrollDelta.dy < 0;
-    _applyZoom(
-      geometry,
-      zoomIn ? 0.75 : 1.33,
+    // Mirror Syncfusion: one wheel notch is a quarter of a magnification step
+    // applied at the pointer, so the value under the cursor stays put and the
+    // chart can be zoomed back out again.
+    _zoomInAndOut(
+      event.scrollDelta.dy > 0 ? -0.25 : 0.25,
       event.localPosition,
+      geometry,
     );
   }
 
   void _onDoubleTap(
     Offset position,
-    VarietyCartesianGeometry base,
     VarietyCartesianGeometry display,
   ) {
     // The user might just want to know a point was double-clicked; honour
@@ -937,114 +954,272 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
         !behavior.enableDoubleTapZooming) {
       return;
     }
-    if (_zoomX != null || _zoomY != null) {
-      setState(() {
-        _zoomX = null;
-        _zoomY = null;
-      });
-      widget.zoomPanBehavior?.onZoomEnd?.call(
-        VarietyZoomDetails(
-          axis: widget.primaryXAxis,
-          minimum: base.xMinimum,
-          maximum: base.xMaximum,
-          factor: 1,
-        ),
-      );
+    if (_hasZoom) {
+      _resetZoom(display);
       return;
     }
-    _applyZoom(display, 0.5, position);
+    _zoomInAndOut(0.5, position, display);
   }
 
-  void _applyZoom(
-    VarietyCartesianGeometry geometry,
+  // ---------------------------------------------------------------------------
+  // Zoom maths
+  //
+  // Ported from Syncfusion's `ZoomPanBehavior` (behaviors/zooming.dart). The
+  // helpers keep the same names and semantics as the original so the two
+  // implementations can be compared side by side.
+  // ---------------------------------------------------------------------------
+
+  double _minMax(double value, double min, double max) =>
+      value > max ? max : (value < min ? min : value);
+
+  /// The smallest window a gesture may leave behind, as a fraction of the full
+  /// range. Syncfusion spells this `maximumZoomLevel`.
+  double get _maxZoomInFactor =>
+      _minMax(widget.zoomPanBehavior!.minimumZoomLevel, 1e-4, 1);
+
+  /// The largest window a gesture may leave behind.
+  double get _maxZoomOutFactor =>
+      _minMax(widget.zoomPanBehavior!.maximumZoomLevel, 1e-4, 1);
+
+  /// Converts a zoom window into the magnification the maths works with: a
+  /// factor of 0.5 shows half the range, which is a scale of 2. This is
+  /// Syncfusion's `_toScaleValue`.
+  double _toScaleValue(double zoomFactor) =>
+      math.max(1 / _minMax(zoomFactor, 1e-6, 1), 1);
+
+  /// Projects a normalised window back onto the full range of an axis.
+  (double, double)? _windowFor(
+    double min,
+    double max,
+    double position,
     double factor,
-    Offset focal,
+  ) {
+    final double span = max - min;
+    if (span <= 0 || !factor.isFinite || factor <= 0 || factor >= 1) {
+      return null;
+    }
+    final double start = min + position * span;
+    return (start, start + factor * span);
+  }
+
+  /// Applies a cumulative magnification to a window, keeping [origin] fixed.
+  /// This is Syncfusion's `_zoom`; [origin] is the fraction of the plot under
+  /// the gesture, measured from the minimum end of the axis.
+  (double, double) _zoomWindow({
+    required double factor,
+    required double position,
+    required double origin,
+    required double cumulativeZoomLevel,
+  }) {
+    if (cumulativeZoomLevel <= 1) {
+      // Pinching back past the full range always restores it exactly.
+      return (1, 0);
+    }
+    final double nextFactor = _minMax(
+      1 / cumulativeZoomLevel,
+      _maxZoomInFactor,
+      _maxZoomOutFactor,
+    );
+    final double nextPosition = position + (factor - nextFactor) * origin;
+    return (nextFactor, _minMax(nextPosition, 0, 1 - nextFactor));
+  }
+
+  /// The fraction of the plot under [position], measured from the minimum end
+  /// of the primary axis.
+  double _originForX(Offset position, VarietyCartesianGeometry geometry) {
+    final Rect plot = geometry.plotRect;
+    final double fromLeft = plot.width <= 0
+        ? 0.5
+        : ((position.dx - plot.left) / plot.width).clamp(0.0, 1.0);
+    return geometry.xAxis.isInversed ? 1 - fromLeft : fromLeft;
+  }
+
+  /// The same fraction for the secondary axis. The vertical axis grows
+  /// upwards, so the distance is counted from the bottom of the plot.
+  double _originForY(Offset position, VarietyCartesianGeometry geometry) {
+    final Rect plot = geometry.plotRect;
+    final double fromTop = plot.height <= 0
+        ? 0.5
+        : ((position.dy - plot.top) / plot.height).clamp(0.0, 1.0);
+    return geometry.yAxis.isInversed ? fromTop : 1 - fromTop;
+  }
+
+  /// Zooms both axes by a fixed magnification step around [origin], the
+  /// counterpart of Syncfusion's `_zoomInAndOut`.
+  void _zoomInAndOut(
+    double zoomLevel,
+    Offset origin,
+    VarietyCartesianGeometry geometry,
   ) {
     final VarietyZoomPanBehavior behavior = widget.zoomPanBehavior!;
-    final double baseMin = geometry.xMinimum;
-    final double baseMax = geometry.xMaximum;
-    final double baseSpan = math.max(baseMax - baseMin, 1e-9);
-    final double currentMin = _zoomX?.$1 ?? baseMin;
-    final double currentMax = _zoomX?.$2 ?? baseMax;
-    final double currentSpan = currentMax - currentMin;
-    final double targetSpan =
-        (currentSpan * factor).clamp(baseSpan * behavior.minimumZoomLevel, baseSpan * behavior.maximumZoomLevel);
-    final double anchor = _axisXFor(focal, geometry);
-    final double ratio =
-        currentSpan <= 0 ? 0.5 : ((anchor - currentMin) / currentSpan).clamp(0.0, 1.0);
-    if (behavior.axisMode != VarietyZoomAxisMode.x) {
-      _zoomSecondary(factor, geometry);
-    }
-    double newMin = anchor - targetSpan * ratio;
-    double newMax = newMin + targetSpan;
-    if (newMin < baseMin) {
-      newMin = baseMin;
-      newMax = baseMin + targetSpan;
-    }
-    if (newMax > baseMax) {
-      newMax = baseMax;
-      newMin = baseMax - targetSpan;
-    }
+    final double maxScale = _toScaleValue(_maxZoomInFactor);
+    final bool zoomX = behavior.axisMode != VarietyZoomAxisMode.y;
+    final bool zoomY = behavior.axisMode != VarietyZoomAxisMode.x;
+    final double originX = _originForX(origin, geometry);
+    final double originY = _originForY(origin, geometry);
     setState(() {
-      if (targetSpan >= baseSpan * 0.999) {
-        _zoomX = null;
-      } else {
-        _zoomX = (newMin, newMax);
+      if (zoomX) {
+        final double level = _minMax(
+          _toScaleValue(_xZoomFactor) + zoomLevel,
+          1,
+          maxScale,
+        );
+        final (double, double) next = _zoomWindow(
+          factor: _xZoomFactor,
+          position: _xZoomPosition,
+          origin: originX,
+          cumulativeZoomLevel: level,
+        );
+        _xZoomFactor = next.$1;
+        _xZoomPosition = next.$2;
+      }
+      if (zoomY) {
+        final double level = _minMax(
+          _toScaleValue(_yZoomFactor) + zoomLevel,
+          1,
+          maxScale,
+        );
+        final (double, double) next = _zoomWindow(
+          factor: _yZoomFactor,
+          position: _yZoomPosition,
+          origin: originY,
+          cumulativeZoomLevel: level,
+        );
+        _yZoomFactor = next.$1;
+        _yZoomPosition = next.$2;
       }
     });
-    behavior.onZoomEnd?.call(
-      VarietyZoomDetails(
-        axis: widget.primaryXAxis,
-        minimum: newMin,
-        maximum: newMax,
-        factor: targetSpan / baseSpan,
-      ),
+    _gestureChanged = true;
+    _notifyZoom(geometry);
+  }
+
+  /// Restores both axes to their full range.
+  void _resetZoom(VarietyCartesianGeometry geometry) {
+    setState(() {
+      _xZoomFactor = 1;
+      _xZoomPosition = 0;
+      _yZoomFactor = 1;
+      _yZoomPosition = 0;
+    });
+    _notifyZoom(geometry);
+  }
+
+  /// Reports the visible window to the behaviour's zoom callbacks.
+  void _notifyZoom(VarietyCartesianGeometry geometry, {bool start = false}) {
+    final VarietyZoomPanBehavior? behavior = widget.zoomPanBehavior;
+    if (behavior == null) {
+      return;
+    }
+    final (double, double)? window = _windowFor(
+      _baseXMin,
+      _baseXMax,
+      _xZoomPosition,
+      _xZoomFactor,
     );
+    final VarietyZoomDetails details = VarietyZoomDetails(
+      axis: widget.primaryXAxis,
+      minimum: window?.$1 ?? _baseXMin,
+      maximum: window?.$2 ?? _baseXMax,
+      factor: _xZoomFactor,
+    );
+    if (start) {
+      behavior.onZoomStart?.call(details);
+    } else {
+      behavior.onZoomEnd?.call(details);
+    }
   }
 
-  /// Applies the same zoom factor to the secondary axis.
-  void _zoomSecondary(double factor, VarietyCartesianGeometry geometry) {
-    final double baseMin = geometry.yMinimum;
-    final double baseMax = geometry.yMaximum;
-    final double baseSpan = math.max(baseMax - baseMin, 1e-9);
-    final double currentMin = _zoomY?.$1 ?? baseMin;
-    final double currentMax = _zoomY?.$2 ?? baseMax;
-    final double span = math.max(currentMax - currentMin, 1e-9);
-    final double target = (span * factor).clamp(baseSpan * 0.02, baseSpan);
-    final double center = (currentMin + currentMax) / 2;
-    double newMin = center - target / 2;
-    double newMax = center + target / 2;
-    if (newMin < baseMin) {
-      newMin = baseMin;
-      newMax = baseMin + target;
+  /// Pans a zoomed axis by a pixel delta, the counterpart of Syncfusion's
+  /// `_toPanValue` and `_pan`. [delta] is `previous - current`, so the content
+  /// follows the finger on both axes.
+  void _pan(Offset position, VarietyCartesianGeometry geometry) {
+    if (!_panStarted) {
+      _previousPanPosition = position;
+      _panStarted = true;
+      return;
     }
-    if (newMax > baseMax) {
-      newMax = baseMax;
-      newMin = baseMax - target;
+    final Offset delta = _previousPanPosition - position;
+    _previousPanPosition = position;
+    if (delta == Offset.zero) {
+      return;
     }
-    setState(() => _zoomY = target >= baseSpan * 0.999 ? null : (newMin, newMax));
+    final VarietyZoomPanBehavior behavior = widget.zoomPanBehavior!;
+    final Rect plot = geometry.plotRect;
+    final bool panX = behavior.axisMode != VarietyZoomAxisMode.y &&
+        _xZoomFactor < 1 &&
+        plot.width > 0;
+    final bool panY = behavior.axisMode != VarietyZoomAxisMode.x &&
+        _yZoomFactor < 1 &&
+        plot.height > 0;
+    if (!panX && !panY) {
+      return;
+    }
+    double nextX = _xZoomPosition;
+    double nextY = _yZoomPosition;
+    if (panX) {
+      final double offset = (delta.dx / plot.width) / _toScaleValue(_xZoomFactor);
+      nextX = _minMax(
+        geometry.xAxis.isInversed
+            ? _xZoomPosition - offset
+            : _xZoomPosition + offset,
+        0,
+        1 - _xZoomFactor,
+      );
+    }
+    if (panY) {
+      final double offset =
+          (delta.dy / plot.height) / _toScaleValue(_yZoomFactor);
+      nextY = _minMax(
+        geometry.yAxis.isInversed
+            ? _yZoomPosition + offset
+            : _yZoomPosition - offset,
+        0,
+        1 - _yZoomFactor,
+      );
+    }
+    if (nextX == _xZoomPosition && nextY == _yZoomPosition) {
+      return;
+    }
+    setState(() {
+      _xZoomPosition = nextX;
+      _yZoomPosition = nextY;
+    });
+    _gestureChanged = true;
   }
 
-  void _onScaleStart(ScaleStartDetails details, VarietyCartesianGeometry base) {
-    _lastFocal = details.localFocalPoint;
-    final double baseSpan = base.xMaximum - base.xMinimum;
-    _scaleStartSpan = _zoomX == null ? baseSpan : _zoomX!.$2 - _zoomX!.$1;
-    _scaleStartZoom = _zoomX;
-    final double baseSpanY = base.yMaximum - base.yMinimum;
-    _scaleStartSpanY = _zoomY == null ? baseSpanY : _zoomY!.$2 - _zoomY!.$1;
-    _scaleStartZoomY = _zoomY;
+  void _onScaleStart(ScaleStartDetails details) {
+    _scalePointerCount = 0;
+    _panStarted = false;
+    _gestureChanged = false;
+    _previousPanPosition = details.localFocalPoint;
+    _startScaleX = _toScaleValue(_xZoomFactor);
+    _startScaleY = _toScaleValue(_yZoomFactor);
     if (_isRubberBand && details.pointerCount == 1) {
       _selectionStart = details.localFocalPoint;
       setState(() => _selectionRect = null);
     }
+    final VarietyCartesianGeometry? geometry = _display;
+    if (geometry != null) {
+      _notifyZoom(geometry, start: true);
+    }
   }
 
-  void _onScaleUpdate(
-    ScaleUpdateDetails details,
-    VarietyCartesianGeometry base,
-    VarietyCartesianGeometry display,
-  ) {
+  void _onScaleUpdate(ScaleUpdateDetails details) {
     final VarietyZoomPanBehavior behavior = widget.zoomPanBehavior!;
+    final VarietyCartesianGeometry? geometry = _display;
+    if (geometry == null) {
+      return;
+    }
+
+    // Re-baseline whenever a finger is added or lifted so neither the pinch
+    // nor the pan ever sees a jump in its reference frame.
+    if (details.pointerCount != _scalePointerCount) {
+      _scalePointerCount = details.pointerCount;
+      _startScaleX = _toScaleValue(_xZoomFactor);
+      _startScaleY = _toScaleValue(_yZoomFactor);
+      _panStarted = false;
+    }
+
     if (_isRubberBand) {
       final Offset? start = _selectionStart;
       if (start != null) {
@@ -1054,142 +1229,115 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       }
       return;
     }
+
     if (details.pointerCount >= 2 && behavior.enablePinchZooming) {
-      final double baseSpan = base.xMaximum - base.xMinimum;
-      final double startSpan = _scaleStartSpan ?? baseSpan;
-      final double targetSpan = (startSpan / math.max(details.scale, 1e-3)).clamp(
-        baseSpan * behavior.minimumZoomLevel,
-        baseSpan * behavior.maximumZoomLevel,
-      );
-      final double anchor = _axisXFor(details.localFocalPoint, display);
-      final (double, double) startZoom =
-          _scaleStartZoom ?? (base.xMinimum, base.xMaximum);
-      final double ratio = startSpan <= 0
-          ? 0.5
-          : ((anchor - startZoom.$1) / startSpan).clamp(0.0, 1.0);
-      double newMin = anchor - targetSpan * ratio;
-      double newMax = newMin + targetSpan;
-      if (newMin < base.xMinimum) {
-        newMin = base.xMinimum;
-        newMax = base.xMinimum + targetSpan;
-      }
-      if (newMax > base.xMaximum) {
-        newMax = base.xMaximum;
-        newMin = base.xMaximum - targetSpan;
-      }
-      // The secondary axis zooms around the same focal point so a pinch
-      // scales both axes at once, mirroring the primary-axis maths.
-      (double, double)? nextY;
-      if (behavior.axisMode != VarietyZoomAxisMode.x) {
-        final double baseSpanY = math.max(base.yMaximum - base.yMinimum, 1e-9);
-        final double startSpanY = _scaleStartSpanY ?? baseSpanY;
-        final double targetSpanY =
-            (startSpanY / math.max(details.scale, 1e-3)).clamp(
-          baseSpanY * behavior.minimumZoomLevel,
-          baseSpanY * behavior.maximumZoomLevel,
-        );
-        final double anchorY = _axisYFor(details.localFocalPoint, display);
-        final (double, double) startZoomY =
-            _scaleStartZoomY ?? (base.yMinimum, base.yMaximum);
-        final double ratioY = startSpanY <= 0
-            ? 0.5
-            : ((anchorY - startZoomY.$1) / startSpanY).clamp(0.0, 1.0);
-        double newMinY = anchorY - targetSpanY * ratioY;
-        double newMaxY = newMinY + targetSpanY;
-        if (newMinY < base.yMinimum) {
-          newMinY = base.yMinimum;
-          newMaxY = base.yMinimum + targetSpanY;
-        }
-        if (newMaxY > base.yMaximum) {
-          newMaxY = base.yMaximum;
-          newMinY = base.yMaximum - targetSpanY;
-        }
-        nextY = targetSpanY >= baseSpanY * 0.999 ? null : (newMinY, newMaxY);
-      }
+      final bool both = behavior.axisMode == VarietyZoomAxisMode.xy;
+      final bool zoomX = behavior.axisMode != VarietyZoomAxisMode.y;
+      final bool zoomY = behavior.axisMode != VarietyZoomAxisMode.x;
+      final double maxScale = _toScaleValue(_maxZoomInFactor);
+      final double originX = _originForX(details.localFocalPoint, geometry);
+      final double originY = _originForY(details.localFocalPoint, geometry);
+      // Syncfusion multiplies the magnification captured when the pinch began
+      // by the gesture's scale, which keeps the window stable across frames.
+      final double rawScaleX =
+          (_startScaleX ?? 1) * (both ? details.scale : details.horizontalScale);
+      final double rawScaleY =
+          (_startScaleY ?? 1) * (both ? details.scale : details.verticalScale);
       setState(() {
-        _zoomX = targetSpan >= baseSpan * 0.999 ? null : (newMin, newMax);
-        if (behavior.axisMode != VarietyZoomAxisMode.x) {
-          _zoomY = nextY;
+        if (zoomX) {
+          final (double, double) next = _zoomWindow(
+            factor: _xZoomFactor,
+            position: _xZoomPosition,
+            origin: originX,
+            cumulativeZoomLevel: _minMax(rawScaleX, 1, maxScale),
+          );
+          _xZoomFactor = next.$1;
+          _xZoomPosition = next.$2;
+        }
+        if (zoomY) {
+          final (double, double) next = _zoomWindow(
+            factor: _yZoomFactor,
+            position: _yZoomPosition,
+            origin: originY,
+            cumulativeZoomLevel: _minMax(rawScaleY, 1, maxScale),
+          );
+          _yZoomFactor = next.$1;
+          _yZoomPosition = next.$2;
         }
       });
-      _lastFocal = details.localFocalPoint;
+      _panStarted = false;
+      _gestureChanged = true;
       return;
     }
+
     if (!behavior.enablePanning) {
-      _lastFocal = details.localFocalPoint;
+      _panStarted = false;
       return;
     }
-    final Offset delta = details.localFocalPoint - _lastFocal;
-    _lastFocal = details.localFocalPoint;
-    if (delta == Offset.zero) {
-      return;
-    }
-    (double, double)? nextX;
-    if (_zoomX != null) {
-      final double baseSpan = base.xMaximum - base.xMinimum;
-      final double span = _zoomX!.$2 - _zoomX!.$1;
-      if (span < baseSpan * 0.999) {
-        final double shift = -delta.dx / math.max(display.plotRect.width, 1) * span;
-        double newMin = _zoomX!.$1 + shift;
-        double newMax = _zoomX!.$2 + shift;
-        if (newMin < base.xMinimum) {
-          newMin = base.xMinimum;
-          newMax = newMin + span;
-        }
-        if (newMax > base.xMaximum) {
-          newMax = base.xMaximum;
-          newMin = newMax - span;
-        }
-        nextX = (newMin, newMax);
-      }
-    }
-    (double, double)? nextY;
-    if (_zoomY != null && behavior.axisMode != VarietyZoomAxisMode.x) {
-      final double baseSpanY = base.yMaximum - base.yMinimum;
-      final double spanY = _zoomY!.$2 - _zoomY!.$1;
-      if (spanY < baseSpanY * 0.999) {
-        final double shiftY =
-            -delta.dy / math.max(display.plotRect.height, 1) * spanY;
-        double newMinY = _zoomY!.$1 + shiftY;
-        double newMaxY = _zoomY!.$2 + shiftY;
-        if (newMinY < base.yMinimum) {
-          newMinY = base.yMinimum;
-          newMaxY = newMinY + spanY;
-        }
-        if (newMaxY > base.yMaximum) {
-          newMaxY = base.yMaximum;
-          newMinY = newMaxY - spanY;
-        }
-        nextY = (newMinY, newMaxY);
-      }
-    }
-    if (nextX == null && nextY == null) {
-      return;
-    }
-    setState(() {
-      if (nextX != null) {
-        _zoomX = nextX;
-      }
-      if (nextY != null) {
-        _zoomY = nextY;
-      }
-    });
+    _pan(details.localFocalPoint, geometry);
   }
 
   void _onScaleEnd() {
     final Rect? rect = _selectionRect;
-    final VarietyCartesianGeometry? display = _display;
+    final VarietyCartesianGeometry? geometry = _display;
+    final bool wasChanged = _gestureChanged;
+    _scalePointerCount = 0;
+    _panStarted = false;
+    _gestureChanged = false;
     _selectionStart = null;
-    if (rect == null || display == null || rect.width < 12) {
+    _previousPanPosition = Offset.zero;
+    if (_isRubberBand && rect != null && geometry != null) {
+      _applySelectionZoom(rect, geometry);
+    }
+    if (rect != null) {
       setState(() => _selectionRect = null);
+    }
+    if (geometry != null && (wasChanged || rect != null)) {
+      _notifyZoom(geometry);
+    }
+  }
+
+  /// Converts the rubber band into a new window, the same way Syncfusion's
+  /// `_drawSelectionZoomRect` does.
+  void _applySelectionZoom(Rect rect, VarietyCartesianGeometry geometry) {
+    final VarietyZoomPanBehavior behavior = widget.zoomPanBehavior!;
+    final Rect plot = geometry.plotRect;
+    final bool zoomX = behavior.axisMode != VarietyZoomAxisMode.y &&
+        plot.width > 0 &&
+        rect.width >= 12;
+    final bool zoomY = behavior.axisMode != VarietyZoomAxisMode.x &&
+        plot.height > 0 &&
+        rect.height >= 12;
+    if (!zoomX && !zoomY) {
       return;
     }
-    final double left = _axisXFor(Offset(rect.left, 0), display);
-    final double right = _axisXFor(Offset(rect.right, 0), display);
     setState(() {
-      _selectionRect = null;
-      _zoomX = (math.min(left, right), math.max(left, right));
+      if (zoomX) {
+        final double factor = _minMax(
+          _xZoomFactor * rect.width / plot.width,
+          _maxZoomInFactor,
+          _maxZoomOutFactor,
+        );
+        final double position = _xZoomPosition +
+            ((rect.left - plot.left) / plot.width) * _xZoomFactor;
+        _xZoomFactor = factor;
+        _xZoomPosition = _minMax(position, 0, 1 - factor);
+      }
+      if (zoomY) {
+        final double factor = _minMax(
+          _yZoomFactor * rect.height / plot.height,
+          _maxZoomInFactor,
+          _maxZoomOutFactor,
+        );
+        // The vertical window is measured from the bottom of the plot, so the
+        // offset is the distance from the band's bottom edge.
+        final double position = _yZoomPosition +
+            ((plot.bottom - rect.bottom) / plot.height) * _yZoomFactor;
+        _yZoomFactor = factor;
+        _yZoomPosition = _minMax(position, 0, 1 - factor);
+      }
     });
+    _gestureChanged = true;
   }
 
   // ---------------------------------------------------------------------------

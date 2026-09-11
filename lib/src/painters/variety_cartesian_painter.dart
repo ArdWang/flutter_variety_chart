@@ -359,6 +359,7 @@ class VarietyCartesianPainter extends CustomPainter {
         Paint()
           ..color = geometry.yAxis.axisLineColor ?? theme.axisLineColor
           ..strokeWidth = geometry.yAxis.axisLineWidth
+          ..style = PaintingStyle.stroke
           ..isAntiAlias = true,
       );
     }
@@ -371,6 +372,7 @@ class VarietyCartesianPainter extends CustomPainter {
         Paint()
           ..color = geometry.xAxis.axisLineColor ?? theme.axisLineColor
           ..strokeWidth = geometry.xAxis.axisLineWidth
+          ..style = PaintingStyle.stroke
           ..isAntiAlias = true,
       );
     }
@@ -425,6 +427,7 @@ class VarietyCartesianPainter extends CustomPainter {
       final Paint linePaint = Paint()
         ..color = axis.axisLineColor ?? theme.axisLineColor
         ..strokeWidth = axis.axisLineWidth
+        ..style = PaintingStyle.stroke
         ..isAntiAlias = true;
       if (axis.showAxisLine) {
         canvas.drawLine(
@@ -518,7 +521,8 @@ class VarietyCartesianPainter extends CustomPainter {
           Offset(axisX + sign * geometry.yAxis.tickLength, y),
           Paint()
             ..color = geometry.yAxis.axisLineColor ?? theme.axisLineColor
-            ..strokeWidth = 1,
+            ..strokeWidth = 1
+            ..style = PaintingStyle.stroke,
         );
       }
     }

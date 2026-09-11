@@ -299,6 +299,11 @@ class VarietyElementRenderer {
 
   /// Draws a line, honouring an optional dash pattern.
   void drawLine(Canvas canvas, Offset from, Offset to, Paint paint, List<double> dash) {
+    // A line is always a stroked primitive. Callers build paints inline
+    // without setting a style; the fill default would silently drop
+    // strokeWidth and rasterize the guide (grid, trackball, crosshair)
+    // as a ~1px hairline regardless of the configured width.
+    paint.style = PaintingStyle.stroke;
     if (dash.isEmpty) {
       canvas.drawLine(from, to, paint);
       return;
