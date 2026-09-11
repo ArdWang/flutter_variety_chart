@@ -204,7 +204,8 @@ void main() {
       expect(find.byType(VarietyCartesianChart), findsOneWidget);
     });
 
-    testWidgets('a chart without extra axes still renders', (WidgetTester tester) async {
+    testWidgets('a chart without extra axes still renders',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         host(
           VarietyCartesianChart(

@@ -541,7 +541,8 @@ class VarietyAxis {
       showTicks: showTicks ?? this.showTicks,
       tickLength: tickLength ?? this.tickLength,
       tickPosition: tickPosition ?? this.tickPosition,
-      minorTicksPerInterval: minorTicksPerInterval ?? this.minorTicksPerInterval,
+      minorTicksPerInterval:
+          minorTicksPerInterval ?? this.minorTicksPerInterval,
       opposedPosition: opposedPosition ?? this.opposedPosition,
       isInversed: isInversed ?? this.isInversed,
       rangePadding: rangePadding ?? this.rangePadding,

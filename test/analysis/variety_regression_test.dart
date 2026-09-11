@@ -14,7 +14,8 @@ void main() {
 
     test('returns null for a single point', () {
       expect(
-        varietyFitTrendline(const <(double, double)>[(0, 1)], const VarietyTrendline()),
+        varietyFitTrendline(
+            const <(double, double)>[(0, 1)], const VarietyTrendline()),
         isNull,
       );
     });
@@ -98,7 +99,8 @@ void main() {
           (6, 36),
           (7, 49),
         ],
-        const VarietyTrendline(type: VarietyTrendlineType.polynomial, order: 99),
+        const VarietyTrendline(
+            type: VarietyTrendlineType.polynomial, order: 99),
       );
       expect(fit, isNotNull);
       expect(fit!(2), closeTo(4, 0.5));
@@ -137,7 +139,8 @@ void main() {
 
     test('returns null for a non-positive period', () {
       expect(
-        varietyMovingAverage(const <double>[1, 2, 3], 0).every((double? v) => v == null),
+        varietyMovingAverage(const <double>[1, 2, 3], 0)
+            .every((double? v) => v == null),
         isTrue,
       );
     });

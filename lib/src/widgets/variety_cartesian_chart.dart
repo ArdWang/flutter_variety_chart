@@ -95,7 +95,8 @@ class VarietyCartesianChart extends StatefulWidget {
   final TextStyle? legendTextStyle;
 
   /// Builds custom legend items.
-  final Widget Function(BuildContext context, VarietySeries series, int index)? legendBuilder;
+  final Widget Function(BuildContext context, VarietySeries series, int index)?
+      legendBuilder;
 
   /// The single-point tooltip configuration.
   final VarietyTooltipBehavior tooltipBehavior;
@@ -150,7 +151,8 @@ class VarietyCartesianChart extends StatefulWidget {
   /// Lets an application rewrite, or suppress, a data label before it is drawn.
   ///
   /// Return `null` to keep the default caption, or an empty string to drop it.
-  final String? Function(VarietyDataLabelRenderDetails details)? onDataLabelRender;
+  final String? Function(VarietyDataLabelRenderDetails details)?
+      onDataLabelRender;
 
   /// Called when a tick label is tapped.
   final void Function(VarietyAxisLabelTapDetails details)? onAxisLabelTapped;
@@ -182,6 +184,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     }
     return longest;
   }
+
   VarietyHitResult? _hit;
   List<VarietyHitResult> _trackballHits = const <VarietyHitResult>[];
   // Auto-hides the trackball [VarietyTrackballBehavior.hideDelay] after a tap
@@ -250,17 +253,26 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       widget.renderingMode == VarietyRenderingMode.onLoading || _revealed;
 
   bool get _zooming =>
-      widget.zoomPanBehavior != null && widget.zoomPanBehavior!.enabled;
+      widget.zoomPanBehavior != null &&
+      widget.zoomPanBehavior!.enabled &&
+      widget.zoomPanBehavior!.mode != VarietyZoomMode.none;
 
-  bool get _isRubberBand =>
-      _zooming && widget.zoomPanBehavior!.mode == VarietyZoomMode.selection;
+  /// Whether a long press may drag out a zoom region. Syncfusion drives
+  /// selection zooming from a long press and pans from a plain drag, which is
+  /// what lets pinch, pan and selection all stay live at the same time.
+  bool get _selectionZoomEnabled =>
+      _zooming &&
+      (widget.zoomPanBehavior!.mode == VarietyZoomMode.selection ||
+          widget.zoomPanBehavior!.mode == VarietyZoomMode.both);
 
   @override
   void initState() {
     super.initState();
     widget.selectionController?.addListener(_syncSelectionFromController);
-    _selected = widget.selectionController?.selected ?? const <VarietyHitResult>[];
-    _controller = AnimationController(vsync: this, duration: _effectiveAnimationDuration());
+    _selected =
+        widget.selectionController?.selected ?? const <VarietyHitResult>[];
+    _controller = AnimationController(
+        vsync: this, duration: _effectiveAnimationDuration());
     if (widget.enableAnimation && _shouldAnimate) {
       _controller.forward();
     } else {
@@ -276,7 +288,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.series != widget.series ||
         oldWidget.animationDuration != widget.animationDuration ||
-          oldWidget.series.length != widget.series.length) {
+        oldWidget.series.length != widget.series.length) {
       _hit = null;
       _trackballHits = const <VarietyHitResult>[];
       _trackballSlot = null;
@@ -426,15 +438,18 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     final List<VarietySeries> items = _items;
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        final bool bounded = constraints.hasBoundedHeight && constraints.hasBoundedWidth;
+        final bool bounded =
+            constraints.hasBoundedHeight && constraints.hasBoundedWidth;
         final List<Widget> column = <Widget>[];
         if (widget.title != null && widget.title!.isNotEmpty) {
-          column.add(VarietyChartTitle(text: widget.title!, textStyle: widget.titleStyle));
+          column.add(VarietyChartTitle(
+              text: widget.title!, textStyle: widget.titleStyle));
         }
         final bool wantsLegend =
             widget.showLegend && items.any((VarietySeries s) => s.name != null);
-        final bool legendOnSide = widget.legendPosition == VarietyLegendPosition.left ||
-            widget.legendPosition == VarietyLegendPosition.right;
+        final bool legendOnSide =
+            widget.legendPosition == VarietyLegendPosition.left ||
+                widget.legendPosition == VarietyLegendPosition.right;
         final Widget? legend = wantsLegend
             ? VarietyLegend(
                 series: widget.series
@@ -448,7 +463,8 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
                 onItemTap: _handleLegendTap,
               )
             : null;
-        if (legend != null && widget.legendPosition == VarietyLegendPosition.top) {
+        if (legend != null &&
+            widget.legendPosition == VarietyLegendPosition.top) {
           column.add(legend);
         }
         final Widget plot = AnimatedBuilder(
@@ -461,9 +477,11 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  if (widget.legendPosition == VarietyLegendPosition.left) legend,
+                  if (widget.legendPosition == VarietyLegendPosition.left)
+                    legend,
                   Expanded(child: plot),
-                  if (widget.legendPosition == VarietyLegendPosition.right) legend,
+                  if (widget.legendPosition == VarietyLegendPosition.right)
+                    legend,
                 ],
               ),
             ),
@@ -471,7 +489,8 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
         } else {
           column.add(Expanded(child: plot));
         }
-        if (legend != null && widget.legendPosition == VarietyLegendPosition.bottom) {
+        if (legend != null &&
+            widget.legendPosition == VarietyLegendPosition.bottom) {
           column.add(legend);
         }
         final Widget body = Column(
@@ -509,19 +528,22 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
           ),
         );
         // Gesture recognisers are only attached when the behaviour that needs them
-      // is enabled. Registering the double tap recogniser unconditionally would
-      // delay every single tap by the double tap timeout.
-      final VarietyZoomPanBehavior? zoom = widget.zoomPanBehavior;
-      final bool zoomEnabled = zoom != null && zoom.enabled;
-      final bool doubleTapEnabled = zoomEnabled && zoom.enableDoubleTapZooming;
-      return Listener(
+        // is enabled. Registering the double tap recogniser unconditionally would
+        // delay every single tap by the double tap timeout.
+        final VarietyZoomPanBehavior? zoom = widget.zoomPanBehavior;
+        final bool zoomEnabled =
+            zoom != null && zoom.enabled && zoom.mode != VarietyZoomMode.none;
+        final bool doubleTapEnabled =
+            zoomEnabled && zoom.enableDoubleTapZooming;
+        return Listener(
           onPointerSignal: _onPointerSignal,
           child: MouseRegion(
             onHover: _onHover,
             onExit: (_) => _clearPointerState(),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTapUp: (TapUpDetails details) => _onTap(details.localPosition, display),
+              onTapUp: (TapUpDetails details) =>
+                  _onTap(details.localPosition, display),
               onLongPressStart: (LongPressStartDetails details) =>
                   _onLongPressStart(details.localPosition, display),
               onLongPressMoveUpdate: (LongPressMoveUpdateDetails details) =>
@@ -534,8 +556,9 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
               onScaleStart: zoomEnabled
                   ? (ScaleStartDetails details) => _onScaleStart(details)
                   : null,
-              onScaleUpdate:
-                  zoomEnabled ? (ScaleUpdateDetails details) => _onScaleUpdate(details) : null,
+              onScaleUpdate: zoomEnabled
+                  ? (ScaleUpdateDetails details) => _onScaleUpdate(details)
+                  : null,
               onScaleEnd: zoomEnabled ? (_) => _onScaleEnd() : null,
               child: Stack(
                 children: <Widget>[
@@ -544,7 +567,8 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
                   // the series, so it is wrapped in an IgnorePointer.
                   if (!_paintsSeries && widget.loadingBuilder != null)
                     Positioned.fill(
-                      child: IgnorePointer(child: widget.loadingBuilder!(context)),
+                      child:
+                          IgnorePointer(child: widget.loadingBuilder!(context)),
                     ),
                   ..._overlayWidgets(theme),
                 ],
@@ -589,7 +613,8 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       safe.height - insets.bottom,
     );
     if (plotRect.width <= 8 || plotRect.height <= 8) {
-      plotRect = Rect.fromLTWH(0, 0, math.max(safe.width, 1), math.max(safe.height, 1));
+      plotRect = Rect.fromLTWH(
+          0, 0, math.max(safe.width, 1), math.max(safe.height, 1));
     }
     final VarietyCartesianGeometry base = VarietyCartesianGeometry(
       series: _items,
@@ -638,7 +663,8 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     if (probe.xAxisType == VarietyAxisType.category ||
         probe.xAxisType == VarietyAxisType.dateTimeCategory) {
       for (final String caption in probe.categories) {
-        bottom = math.max(bottom, _rotatedHeight(caption, xStyle, rotation) + 8);
+        bottom =
+            math.max(bottom, _rotatedHeight(caption, xStyle, rotation) + 8);
       }
     } else if (probe.xAxisType == VarietyAxisType.dateTime) {
       for (final DateTime tick in probe.dateTimeTicks) {
@@ -652,9 +678,10 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       final int steps = math.max(probe.xAxis.desiredIntervals, 1);
       for (int i = 0; i <= steps; i++) {
         final double value = probe.xMinimum + span * i / steps;
-        final String caption =
-            probe.xAxis.labelFormatter?.call(value) ?? varietyFormatNumber(value);
-        bottom = math.max(bottom, _rotatedHeight(caption, xStyle, rotation) + 8);
+        final String caption = probe.xAxis.labelFormatter?.call(value) ??
+            varietyFormatNumber(value);
+        bottom =
+            math.max(bottom, _rotatedHeight(caption, xStyle, rotation) + 8);
       }
     }
     if ((probe.xAxis.title ?? '').isNotEmpty) {
@@ -687,8 +714,9 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       if (!axis.visible) {
         continue;
       }
-      final TextStyle style =
-          axis.labelStyle ?? TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface);
+      final TextStyle style = axis.labelStyle ??
+          TextStyle(
+              fontSize: 11, color: Theme.of(context).colorScheme.onSurface);
       double width = 0;
       for (final double tick in probe.yTicksOn(i)) {
         width = math.max(
@@ -795,7 +823,8 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       } else {
         final bool alreadySelected = _selected.contains(hit);
         if (selection.enableMultiSelection) {
-          final List<VarietyHitResult> next = List<VarietyHitResult>.of(_selected);
+          final List<VarietyHitResult> next =
+              List<VarietyHitResult>.of(_selected);
           if (alreadySelected) {
             next.remove(hit);
           } else {
@@ -804,7 +833,9 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
           _applySelection(next);
         } else {
           _applySelection(
-            alreadySelected ? const <VarietyHitResult>[] : <VarietyHitResult>[hit],
+            alreadySelected
+                ? const <VarietyHitResult>[]
+                : <VarietyHitResult>[hit],
           );
         }
       }
@@ -829,6 +860,13 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   void _onLongPressStart(Offset position, VarietyCartesianGeometry geometry) {
     _reveal();
+    // Selection zooming owns the long press whenever it is enabled, so a
+    // long-press trackball would never see the gesture.
+    if (_selectionZoomEnabled) {
+      _selectionStart = position;
+      setState(() => _selectionRect = null);
+      return;
+    }
     final VarietyTrackballBehavior? ball = widget.trackballBehavior;
     if (ball != null &&
         ball.enabled &&
@@ -846,12 +884,20 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       if (s < rows.length && p < rows[s].length) {
         geometry.series[s].onPointLongPress?.call(rows[s][p], p);
       } else {
-        geometry.series[s].onPointLongPress?.call(geometry.series[s].data[p.clamp(0, geometry.series[s].data.length - 1)], p);
+        geometry.series[s].onPointLongPress?.call(
+            geometry
+                .series[s].data[p.clamp(0, geometry.series[s].data.length - 1)],
+            p);
       }
     }
   }
 
   void _onLongPressMove(Offset position, VarietyCartesianGeometry geometry) {
+    final Offset? start = _selectionStart;
+    if (start != null) {
+      setState(() => _selectionRect = Rect.fromPoints(start, position));
+      return;
+    }
     final VarietyTrackballBehavior? ball = widget.trackballBehavior;
     if (ball != null && ball.enabled && _trackballHits.isNotEmpty) {
       _updateTrackball(position, geometry);
@@ -861,6 +907,16 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
 
   void _onLongPressEnd() {
+    final Rect? rect = _selectionRect;
+    final VarietyCartesianGeometry? geometry = _display;
+    _selectionStart = null;
+    if (rect != null && geometry != null) {
+      setState(() => _selectionRect = null);
+      if (_applySelectionZoom(rect, geometry)) {
+        _notifyZoom(geometry);
+      }
+      return;
+    }
     if (!widget.tooltipBehavior.enabled && _trackballHits.isEmpty) {
       setState(() => _hit = null);
     }
@@ -940,7 +996,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       // fl_chart style activation radius: a tap landing farther than
       // activationDistance from every point counts as a blank tap and
       // dismisses the trackball instead of moving it.
-      if ((hits.first.position - position).distance > ball!.activationDistance) {
+      if ((hits.first.position - position).distance > ball.activationDistance) {
         _clearTrackball();
         return;
       }
@@ -967,7 +1023,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   void _onPointerSignal(PointerSignalEvent event) {
     final VarietyZoomPanBehavior? behavior = widget.zoomPanBehavior;
     if (behavior == null ||
-        !behavior.enabled ||
+        !_zooming ||
         !behavior.enableMouseWheelZooming ||
         event is! PointerScrollEvent) {
       return;
@@ -1210,7 +1266,8 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     double nextX = _xZoomPosition;
     double nextY = _yZoomPosition;
     if (panX) {
-      final double offset = (delta.dx / plot.width) / _toScaleValue(_xZoomFactor);
+      final double offset =
+          (delta.dx / plot.width) / _toScaleValue(_xZoomFactor);
       nextX = _minMax(
         geometry.xAxis.isInversed
             ? _xZoomPosition - offset
@@ -1247,10 +1304,6 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     _previousPanPosition = details.localFocalPoint;
     _startScaleX = _toScaleValue(_xZoomFactor);
     _startScaleY = _toScaleValue(_yZoomFactor);
-    if (_isRubberBand && details.pointerCount == 1) {
-      _selectionStart = details.localFocalPoint;
-      setState(() => _selectionRect = null);
-    }
     final VarietyCartesianGeometry? geometry = _display;
     if (geometry != null) {
       _notifyZoom(geometry, start: true);
@@ -1273,13 +1326,9 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       _panStarted = false;
     }
 
-    if (_isRubberBand) {
-      final Offset? start = _selectionStart;
-      if (start != null) {
-        setState(() {
-          _selectionRect = Rect.fromPoints(start, details.localFocalPoint);
-        });
-      }
+    if (_selectionRect != null) {
+      // A long-press selection is in flight; the scale recogniser must not
+      // fight it for the same pointer.
       return;
     }
 
@@ -1292,8 +1341,8 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       final double originY = _originForY(details.localFocalPoint, geometry);
       // Syncfusion multiplies the magnification captured when the pinch began
       // by the gesture's scale, which keeps the window stable across frames.
-      final double rawScaleX =
-          (_startScaleX ?? 1) * (both ? details.scale : details.horizontalScale);
+      final double rawScaleX = (_startScaleX ?? 1) *
+          (both ? details.scale : details.horizontalScale);
       final double rawScaleY =
           (_startScaleY ?? 1) * (both ? details.scale : details.verticalScale);
       setState(() {
@@ -1331,28 +1380,21 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
 
   void _onScaleEnd() {
-    final Rect? rect = _selectionRect;
     final VarietyCartesianGeometry? geometry = _display;
     final bool wasChanged = _gestureChanged;
     _scalePointerCount = 0;
     _panStarted = false;
     _gestureChanged = false;
-    _selectionStart = null;
     _previousPanPosition = Offset.zero;
-    if (_isRubberBand && rect != null && geometry != null) {
-      _applySelectionZoom(rect, geometry);
-    }
-    if (rect != null) {
-      setState(() => _selectionRect = null);
-    }
-    if (geometry != null && (wasChanged || rect != null)) {
+    if (geometry != null && wasChanged) {
       _notifyZoom(geometry);
     }
   }
 
   /// Converts the rubber band into a new window, the same way Syncfusion's
-  /// `_drawSelectionZoomRect` does.
-  void _applySelectionZoom(Rect rect, VarietyCartesianGeometry geometry) {
+  /// `_drawSelectionZoomRect` does. Returns whether anything was zoomed, so a
+  /// stray long press with no drag does not report a zoom.
+  bool _applySelectionZoom(Rect rect, VarietyCartesianGeometry geometry) {
     final VarietyZoomPanBehavior behavior = widget.zoomPanBehavior!;
     final Rect plot = geometry.plotRect;
     final bool zoomX = behavior.axisMode != VarietyZoomAxisMode.y &&
@@ -1362,7 +1404,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
         plot.height > 0 &&
         rect.height >= 12;
     if (!zoomX && !zoomY) {
-      return;
+      return false;
     }
     setState(() {
       if (zoomX) {
@@ -1391,6 +1433,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       }
     });
     _gestureChanged = true;
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -1398,7 +1441,8 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   // ---------------------------------------------------------------------------
 
   List<Widget> _overlayWidgets(VarietyChartTheme theme) {
-    final bool hasTrackball = _trackballHits.isNotEmpty && _trackballSlot != null;
+    final bool hasTrackball =
+        _trackballHits.isNotEmpty && _trackballSlot != null;
     if (hasTrackball) {
       final VarietyTrackballBehavior ball = widget.trackballBehavior!;
       if (!ball.showTooltip) {

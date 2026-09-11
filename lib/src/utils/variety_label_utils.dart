@@ -5,19 +5,53 @@
 library;
 
 const List<String> _monthShort = <String>[
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 const List<String> _monthLong = <String>[
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
-const List<String> _dayShort = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const List<String> _dayShort = <String>[
+  'Mon',
+  'Tue',
+  'Wed',
+  'Thu',
+  'Fri',
+  'Sat',
+  'Sun'
+];
 
 const List<String> _dayLong = <String>[
-  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
 ];
 
 /// Formats a numeric value into a compact caption.
@@ -89,7 +123,8 @@ String varietyFormatPattern(double value, String pattern) {
       }
       buffer.write(digits[i]);
     }
-    text = '${negative ? '-' : ''}$buffer${parts.length > 1 ? '.${parts[1]}' : ''}';
+    text =
+        '${negative ? '-' : ''}$buffer${parts.length > 1 ? '.${parts[1]}' : ''}';
   }
   return percent ? '$text%' : text;
 }
@@ -128,8 +163,26 @@ String varietyFormatDateTime(DateTime value, String pattern) {
 
 String? _matchToken(String pattern, int index) {
   const List<String> tokens = <String>[
-    'yyyy', 'yy', 'MMMM', 'MMM', 'MM', 'M', 'EEEE', 'EEE',
-    'dd', 'd', 'HH', 'H', 'hh', 'h', 'mm', 'm', 'ss', 's', 'SSS', 'a',
+    'yyyy',
+    'yy',
+    'MMMM',
+    'MMM',
+    'MM',
+    'M',
+    'EEEE',
+    'EEE',
+    'dd',
+    'd',
+    'HH',
+    'H',
+    'hh',
+    'h',
+    'mm',
+    'm',
+    'ss',
+    's',
+    'SSS',
+    'a',
   ];
   for (final String token in tokens) {
     if (pattern.startsWith(token, index)) {
@@ -225,9 +278,7 @@ String _trim(double value) {
   }
   String text = value.toStringAsFixed(2);
   if (text.contains('.')) {
-    text = text
-        .replaceAll(RegExp(r'0+$'), '')
-        .replaceAll(RegExp(r'\.$'), '');
+    text = text.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '');
   }
   return text;
 }

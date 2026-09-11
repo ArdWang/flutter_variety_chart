@@ -72,5 +72,6 @@ class VarietyLegendSettings {
   final TextStyle? textStyle;
 
   /// Builds a custom item for a given series.
-  final Widget Function(BuildContext context, VarietySeries series, int index)? itemBuilder;
+  final Widget Function(BuildContext context, VarietySeries series, int index)?
+      itemBuilder;
 }

@@ -27,7 +27,8 @@ void main() {
     expect(find.text('Sessions'), findsOneWidget);
   });
 
-  testWidgets('renders a doughnut with a centre widget', (WidgetTester tester) async {
+  testWidgets('renders a doughnut with a centre widget',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       host(
         VarietyCircularChart(
@@ -56,7 +57,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('shows a tooltip after tapping a slice', (WidgetTester tester) async {
+  testWidgets('shows a tooltip after tapping a slice',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       host(
         VarietyCircularChart(
@@ -75,7 +77,8 @@ void main() {
         )
         .first;
     final Rect bounds = tester.getRect(canvas);
-    await tester.tapAt(Offset(bounds.center.dx, bounds.center.dy - bounds.height / 5));
+    await tester
+        .tapAt(Offset(bounds.center.dx, bounds.center.dy - bounds.height / 5));
     await tester.pumpAndSettle();
     expect(find.byType(VarietyTooltipCard), findsOneWidget);
   });

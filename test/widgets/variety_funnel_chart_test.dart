@@ -13,7 +13,8 @@ const List<VarietyChartData> stages = <VarietyChartData>[
 void main() {
   testWidgets('renders a funnel chart', (WidgetTester tester) async {
     await tester.pumpWidget(
-      host(VarietyFunnelChart(series: const VarietyFunnelSeries(name: 'Funnel', data: stages))),
+      host(VarietyFunnelChart(
+          series: const VarietyFunnelSeries(name: 'Funnel', data: stages))),
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -22,7 +23,8 @@ void main() {
 
   testWidgets('renders a pyramid chart', (WidgetTester tester) async {
     await tester.pumpWidget(
-      host(VarietyFunnelChart(series: const VarietyPyramidSeries(name: 'Pyramid', data: stages))),
+      host(VarietyFunnelChart(
+          series: const VarietyPyramidSeries(name: 'Pyramid', data: stages))),
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -44,7 +46,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('fires onPointTap for a tapped segment', (WidgetTester tester) async {
+  testWidgets('fires onPointTap for a tapped segment',
+      (WidgetTester tester) async {
     bool called = false;
     VarietyHitResult? tapped;
     await tester.pumpWidget(
@@ -66,7 +69,8 @@ void main() {
         )
         .first;
     final Rect bounds = tester.getRect(canvas);
-    await tester.tapAt(Offset(bounds.center.dx, bounds.top + bounds.height * 0.15));
+    await tester
+        .tapAt(Offset(bounds.center.dx, bounds.top + bounds.height * 0.15));
     await tester.pumpAndSettle();
     expect(called, isTrue);
     expect(tapped, isNotNull);

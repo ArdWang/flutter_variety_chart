@@ -5,7 +5,8 @@ import 'package:flutter_variety_chart/flutter_variety_chart.dart';
 import '../test_helpers.dart';
 
 void main() {
-  testWidgets('renders a line sparkline from raw values', (WidgetTester tester) async {
+  testWidgets('renders a line sparkline from raw values',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       host(
         SizedBox(
@@ -25,7 +26,8 @@ void main() {
         host(
           SizedBox(
             height: 40,
-            child: VarietySparkline.fromValues(<double>[1, -2, 3, 4, -1, 6], type: type),
+            child: VarietySparkline.fromValues(<double>[1, -2, 3, 4, -1, 6],
+                type: type),
           ),
           height: 80,
         ),
@@ -35,7 +37,8 @@ void main() {
     }
   });
 
-  testWidgets('renders high and low point markers', (WidgetTester tester) async {
+  testWidgets('renders high and low point markers',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       host(
         SizedBox(

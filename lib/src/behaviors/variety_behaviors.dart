@@ -129,7 +129,8 @@ class VarietyTrackballBehavior {
   final bool showTooltip;
 
   /// Builds a fully custom tooltip body for all series at the active slot.
-  final Widget Function(BuildContext context, List<VarietyHitResult> results)? builder;
+  final Widget Function(BuildContext context, List<VarietyHitResult> results)?
+      builder;
 
   /// Which guides the trackball draws.
   final VarietyTrackballLineType lineType;
@@ -222,7 +223,13 @@ class VarietyZoomPanBehavior {
   /// Whether zooming reacts to input.
   final bool enabled;
 
-  /// How a zoom gesture is detected.
+  /// Which gestures are accepted. [VarietyZoomMode.none] disables the
+  /// behaviour outright, even when [enabled] is true.
+  ///
+  /// Selection zooming ([VarietyZoomMode.selection] and
+  /// [VarietyZoomMode.both]) is bound to a long press so it can share the
+  /// chart with panning and the trackball. While it is active a long press
+  /// draws the zoom region instead of activating a long-press trackball.
   final VarietyZoomMode mode;
 
   /// Whether the plot can be dragged while zoomed in.

@@ -102,8 +102,9 @@ class VarietySparkline extends StatelessWidget {
   /// Whether the sparkline animates when it first appears.
   final bool animate;
 
-  List<double> get _values =>
-      data.map((VarietyChartData point) => point.y ?? 0).toList(growable: false);
+  List<double> get _values => data
+      .map((VarietyChartData point) => point.y ?? 0)
+      .toList(growable: false);
 
   VarietySparkMarker? get _marker {
     if (!showHighPoint && !showLowPoint) {

@@ -1,3 +1,37 @@
+## 0.0.6
+
+### Gesture zoom and pan aligned with Syncfusion
+
+Pinch, wheel, double-tap, pan and selection zooming now use the normalised
+`(zoomFactor, zoomPosition)` window model that `Syncfusion_flutter_charts`'
+`ZoomPanBehavior` uses, instead of raw data-space minimum/maximum pairs. Each
+axis keeps the visible fraction of the full range plus where that window
+starts, so a gesture only ever touches two numbers and the focal point stays
+pinned while it is applied.
+
+Fixed
+
+* The mouse wheel could zoom in but never back out: the target window was
+  clamped against the already-zoomed window instead of the full range.
+* A pinch anchored the vertical axis at the mirrored position, because the
+  pixel-to-value helper treated the top of the plot as the axis minimum.
+* Dragging vertically panned the plot against the finger. Both axes now move
+  with the content.
+
+Changed
+
+* Selection zooming is driven by a long press, matching upstream's
+  "long-press and drag to select a region". `VarietyZoomMode.both` now really
+  does enable pinch, pan and selection at the same time, and
+  `VarietyZoomMode.selection` keeps drag-to-pan.
+* `VarietyZoomMode.none` now disables every zoom and pan gesture. It was
+  previously ignored, so `mode: none` still zoomed.
+* While selection zooming is active a long press draws the zoom region rather
+  than activating a long-press trackball.
+
+Removed a redundant null assertion in the trackball hit path that tripped
+`unnecessary_non_null_assertion`.
+
 ## 0.5.0
 
 ### CartLineSeries full parity (the last 4)

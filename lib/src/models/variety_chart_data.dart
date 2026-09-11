@@ -124,7 +124,8 @@ class VarietyChartData {
   }
 
   @override
-  String toString() => 'VarietyChartData(x: $x, y: $y, label: $label, isEmpty: $isEmpty)';
+  String toString() =>
+      'VarietyChartData(x: $x, y: $y, label: $label, isEmpty: $isEmpty)';
 }
 
 /// Customizes the captions drawn next to each data point.

@@ -8,14 +8,16 @@ import 'variety_series.dart';
 double _reading(VarietyChartData point) => point.closeValue;
 
 /// Produces a point list whose values equal the simple moving average.
-List<VarietyChartData> simpleMovingAverage(List<VarietyChartData> source, int period) {
+List<VarietyChartData> simpleMovingAverage(
+    List<VarietyChartData> source, int period) {
   return _rolling(source, period, (List<double> window) {
     return window.reduce((double a, double b) => a + b) / window.length;
   });
 }
 
 /// Produces a point list whose values equal the exponential moving average.
-List<VarietyChartData> exponentialMovingAverage(List<VarietyChartData> source, int period) {
+List<VarietyChartData> exponentialMovingAverage(
+    List<VarietyChartData> source, int period) {
   if (source.isEmpty || period <= 0) {
     return const <VarietyChartData>[];
   }
@@ -43,7 +45,8 @@ List<VarietyChartData> exponentialMovingAverage(List<VarietyChartData> source, i
 }
 
 /// Produces a point list whose values equal the weighted moving average.
-List<VarietyChartData> weightedMovingAverage(List<VarietyChartData> source, int period) {
+List<VarietyChartData> weightedMovingAverage(
+    List<VarietyChartData> source, int period) {
   final double weightSum = period * (period + 1) / 2;
   return _rolling(source, period, (List<double> window) {
     double total = 0;
@@ -55,14 +58,16 @@ List<VarietyChartData> weightedMovingAverage(List<VarietyChartData> source, int 
 }
 
 /// Produces a point list whose values equal the triangular moving average.
-List<VarietyChartData> triangularMovingAverage(List<VarietyChartData> source, int period) {
+List<VarietyChartData> triangularMovingAverage(
+    List<VarietyChartData> source, int period) {
   final int half = (period / 2).ceil();
   final List<VarietyChartData> firstPass = simpleMovingAverage(source, half);
   return simpleMovingAverage(firstPass, half);
 }
 
 /// Produces a point list whose values equal the relative strength index.
-List<VarietyChartData> relativeStrengthIndex(List<VarietyChartData> source, int period) {
+List<VarietyChartData> relativeStrengthIndex(
+    List<VarietyChartData> source, int period) {
   if (source.length <= period) {
     return const <VarietyChartData>[];
   }
@@ -92,13 +97,15 @@ List<VarietyChartData> relativeStrengthIndex(List<VarietyChartData> source, int 
       averageLoss = (averageLoss * (period - 1) + down) / period;
     }
     final double rs = averageLoss == 0 ? 100 : averageGain / averageLoss;
-    result.add(source[i].copyWith(y: averageLoss == 0 ? 100 : 100 - 100 / (1 + rs)));
+    result.add(
+        source[i].copyWith(y: averageLoss == 0 ? 100 : 100 - 100 / (1 + rs)));
   }
   return result;
 }
 
 /// Produces a point list whose values equal the average true range.
-List<VarietyChartData> averageTrueRange(List<VarietyChartData> source, int period) {
+List<VarietyChartData> averageTrueRange(
+    List<VarietyChartData> source, int period) {
   if (source.isEmpty) {
     return const <VarietyChartData>[];
   }
@@ -129,7 +136,8 @@ List<VarietyChartData> momentum(List<VarietyChartData> source, int period) {
       result.add(source[i].withValue(null));
       continue;
     }
-    result.add(source[i].copyWith(y: _reading(source[i]) - _reading(source[i - period])));
+    result.add(source[i]
+        .copyWith(y: _reading(source[i]) - _reading(source[i - period])));
   }
   return result;
 }
@@ -144,7 +152,8 @@ List<VarietyChartData> rateOfChange(List<VarietyChartData> source, int period) {
     }
     final double previous = _reading(source[i - period]);
     final double current = _reading(source[i]);
-    result.add(source[i].copyWith(y: previous == 0 ? 0 : (current - previous) / previous * 100));
+    result.add(source[i].copyWith(
+        y: previous == 0 ? 0 : (current - previous) / previous * 100));
   }
   return result;
 }
@@ -194,9 +203,11 @@ class VarietyAdIndicator extends VarietyLineSeries {
 }
 
 /// The rolling standard deviation of a window, used by Bollinger bands.
-List<VarietyChartData> _rollingStdDev(List<VarietyChartData> source, int period) {
+List<VarietyChartData> _rollingStdDev(
+    List<VarietyChartData> source, int period) {
   return _rolling(source, period, (List<double> window) {
-    final double mean = window.reduce((double a, double b) => a + b) / window.length;
+    final double mean =
+        window.reduce((double a, double b) => a + b) / window.length;
     double variance = 0;
     for (final double value in window) {
       variance += math.pow(value - mean, 2).toDouble();
@@ -224,14 +235,16 @@ List<VarietyChartData> _rollingValues(
     return const <VarietyChartData>[];
   }
   final double Function(List<double>) reducer = reduce ??
-      (List<double> window) => window.reduce((double a, double b) => a + b) / window.length;
+      (List<double> window) =>
+          window.reduce((double a, double b) => a + b) / window.length;
   final List<VarietyChartData> result = <VarietyChartData>[];
   for (int i = 0; i < source.length; i++) {
     if (i < period - 1) {
       result.add(source[i].withValue(null));
       continue;
     }
-    result.add(source[i].copyWith(y: reducer(values.sublist(i - period + 1, i + 1))));
+    result.add(
+        source[i].copyWith(y: reducer(values.sublist(i - period + 1, i + 1))));
   }
   return result;
 }
@@ -468,8 +481,10 @@ class VarietyBollingerBandsIndicator {
 
   /// Builds the upper, middle and lower band series.
   List<VarietyLineSeries> build() {
-    final List<VarietyChartData> middle = simpleMovingAverage(source.data, period);
-    final List<VarietyChartData> deviation = _rollingStdDev(source.data, period);
+    final List<VarietyChartData> middle =
+        simpleMovingAverage(source.data, period);
+    final List<VarietyChartData> deviation =
+        _rollingStdDev(source.data, period);
     final List<VarietyChartData> upper = <VarietyChartData>[];
     final List<VarietyChartData> lower = <VarietyChartData>[];
     for (int i = 0; i < middle.length; i++) {
@@ -484,9 +499,17 @@ class VarietyBollingerBandsIndicator {
       lower.add(middle[i].copyWith(y: mean - sd * standardDeviation));
     }
     return <VarietyLineSeries>[
-      VarietyLineSeries(name: '$name Upper', data: upper, strokeWidth: 1.4, dashPattern: const <double>[5, 4]),
+      VarietyLineSeries(
+          name: '$name Upper',
+          data: upper,
+          strokeWidth: 1.4,
+          dashPattern: const <double>[5, 4]),
       VarietyLineSeries(name: '$name Middle', data: middle, strokeWidth: 1.6),
-      VarietyLineSeries(name: '$name Lower', data: lower, strokeWidth: 1.4, dashPattern: const <double>[5, 4]),
+      VarietyLineSeries(
+          name: '$name Lower',
+          data: lower,
+          strokeWidth: 1.4,
+          dashPattern: const <double>[5, 4]),
     ];
   }
 }
@@ -515,20 +538,25 @@ class VarietyMacdIndicator {
 
   /// Builds the MACD line, the signal line and the histogram.
   List<VarietySeries> build() {
-    final List<VarietyChartData> fast = exponentialMovingAverage(source.data, shortPeriod);
-    final List<VarietyChartData> slow = exponentialMovingAverage(source.data, longPeriod);
+    final List<VarietyChartData> fast =
+        exponentialMovingAverage(source.data, shortPeriod);
+    final List<VarietyChartData> slow =
+        exponentialMovingAverage(source.data, longPeriod);
     final List<VarietyChartData> macd = <VarietyChartData>[];
     for (int i = 0; i < source.data.length; i++) {
       final double? a = i < fast.length ? fast[i].y : null;
       final double? b = i < slow.length ? slow[i].y : null;
-      macd.add(source.data[i].copyWith(y: (a == null || b == null) ? null : a - b));
+      macd.add(
+          source.data[i].copyWith(y: (a == null || b == null) ? null : a - b));
     }
-    final List<VarietyChartData> signal = exponentialMovingAverage(macd, signalPeriod);
+    final List<VarietyChartData> signal =
+        exponentialMovingAverage(macd, signalPeriod);
     final List<VarietyChartData> histogram = <VarietyChartData>[];
     for (int i = 0; i < macd.length; i++) {
       final double? a = macd[i].y;
       final double? b = i < signal.length ? signal[i].y : null;
-      histogram.add(macd[i].copyWith(y: (a == null || b == null) ? null : a - b));
+      histogram
+          .add(macd[i].copyWith(y: (a == null || b == null) ? null : a - b));
     }
     return <VarietySeries>[
       VarietyColumnSeries(name: 'MACD', data: histogram, widthFactor: 0.5),
@@ -572,7 +600,8 @@ class VarietyStochasticIndicator {
       }
       final double close = source.data[i].closeValue;
       final double span = highest - lowest;
-      kValues.add(source.data[i].copyWith(y: span == 0 ? 50 : (close - lowest) / span * 100));
+      kValues.add(source.data[i]
+          .copyWith(y: span == 0 ? 50 : (close - lowest) / span * 100));
     }
     return <VarietyLineSeries>[
       VarietyLineSeries(name: '%K', data: kValues, strokeWidth: 1.6),

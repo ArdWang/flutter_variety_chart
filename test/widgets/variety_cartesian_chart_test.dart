@@ -5,7 +5,8 @@ import 'package:flutter_variety_chart/flutter_variety_chart.dart';
 import '../test_helpers.dart';
 
 void main() {
-  testWidgets('renders a chart with a title and a legend', (WidgetTester tester) async {
+  testWidgets('renders a chart with a title and a legend',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       host(
         VarietyCartesianChart(
@@ -46,7 +47,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('fires onPointTap when a column is tapped', (WidgetTester tester) async {
+  testWidgets('fires onPointTap when a column is tapped',
+      (WidgetTester tester) async {
     bool called = false;
     VarietyHitResult? tapped;
     await tester.pumpWidget(
@@ -137,7 +139,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('renders every series kind in one chart', (WidgetTester tester) async {
+  testWidgets('renders every series kind in one chart',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       host(
         VarietyCartesianChart(
@@ -207,7 +210,8 @@ void main() {
     await tester.pumpWidget(
       host(
         VarietyCartesianChart(
-          zoomPanBehavior: const VarietyZoomPanBehavior(mode: VarietyZoomMode.both),
+          zoomPanBehavior:
+              const VarietyZoomPanBehavior(mode: VarietyZoomMode.both),
           series: <VarietySeries>[
             VarietyLineSeries(name: 'A', data: monthly()),
           ],
@@ -225,10 +229,12 @@ void main() {
 }
 
 /// Finds the painting widget owned by the chart under test.
-Finder chartCanvas() => find.descendant(
+Finder chartCanvas() => find
+    .descendant(
       of: find.byType(VarietyCartesianChart),
       matching: find.byType(CustomPaint),
-    ).first;
+    )
+    .first;
 
 /// A thin alias used to widen the "every series kind" smoke test.
 class VarietySplineSeriesLike extends VarietyLineSeries {

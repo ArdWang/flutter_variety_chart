@@ -144,14 +144,16 @@ class VarietyTrackballTooltipCard extends StatelessWidget {
   final VarietyChartTheme theme;
 
   /// Builds a fully custom tooltip body.
-  final Widget Function(BuildContext context, List<VarietyHitResult> results)? builder;
+  final Widget Function(BuildContext context, List<VarietyHitResult> results)?
+      builder;
 
   /// Constraints applied to the card.
   final BoxConstraints constraints;
 
   @override
   Widget build(BuildContext context) {
-    final Widget body = builder?.call(context, results) ?? _defaultBody(context);
+    final Widget body =
+        builder?.call(context, results) ?? _defaultBody(context);
     return ConstrainedBox(
       constraints: constraints,
       child: Material(
@@ -190,7 +192,8 @@ class VarietyTrackballTooltipCard extends StatelessWidget {
     for (final VarietyHitResult result in results) {
       final Color color = result.point.color ??
           result.series.color ??
-          varietyDefaultPalette[result.seriesIndex % varietyDefaultPalette.length];
+          varietyDefaultPalette[
+              result.seriesIndex % varietyDefaultPalette.length];
       rows.add(
         Padding(
           padding: const EdgeInsets.only(top: 2),
@@ -320,9 +323,8 @@ class RenderVarietyAnchoredCard extends RenderProxyBox {
     double left = _anchor.dx - cardSize.width / 2;
     left = left.clamp(0.0, math.max(size.width - cardSize.width, 0.0));
     final bool roomAbove = _anchor.dy - cardSize.height - _gap >= 0;
-    double top = roomAbove
-        ? _anchor.dy - cardSize.height - _gap
-        : _anchor.dy + _gap;
+    double top =
+        roomAbove ? _anchor.dy - cardSize.height - _gap : _anchor.dy + _gap;
     if (top + cardSize.height > size.height) {
       top = math.max(size.height - cardSize.height, 0.0);
     }

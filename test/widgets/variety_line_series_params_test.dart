@@ -25,7 +25,8 @@ void main() {
       );
 
   group('LineSeries extended parameters', () {
-    testWidgets('sortFieldValueMapper overrides x for sorting', (WidgetTester tester) async {
+    testWidgets('sortFieldValueMapper overrides x for sorting',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         chart(<VarietyLineSeries>[
           VarietyLineSeries(
@@ -60,7 +61,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('markerSettings takes effect on a line series', (WidgetTester tester) async {
+    testWidgets('markerSettings takes effect on a line series',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         chart(<VarietyLineSeries>[
           VarietyLineSeries(
@@ -78,7 +80,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('initialIsVisible hides a series from render', (WidgetTester tester) async {
+    testWidgets('initialIsVisible hides a series from render',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         chart(<VarietyLineSeries>[
           VarietyLineSeries(name: 'a', data: points),
@@ -93,7 +96,8 @@ void main() {
         (WidgetTester tester) async {
       await tester.pumpWidget(
         chart(<VarietyLineSeries>[
-          VarietyLineSeries(name: 'a', data: points, legendItemText: 'Series A'),
+          VarietyLineSeries(
+              name: 'a', data: points, legendItemText: 'Series A'),
           VarietyLineSeries(name: 'b', data: points, isVisibleInLegend: false),
         ]),
       );

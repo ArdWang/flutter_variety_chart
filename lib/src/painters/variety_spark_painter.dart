@@ -127,7 +127,8 @@ class VarietySparkPainter extends CustomPainter {
 
   double get _plotHeight => math.max(_plotBottom - _plotTop, 1);
 
-  bool get _isBand => seriesType == VarietySparkSeriesType.bar ||
+  bool get _isBand =>
+      seriesType == VarietySparkSeriesType.bar ||
       seriesType == VarietySparkSeriesType.winLoss;
 
   /// Resolves the internal geometry for a box of [size].
@@ -324,7 +325,8 @@ class VarietySparkPainter extends CustomPainter {
       final Paint paint = Paint()
         ..color = borderColor ?? _baseColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = filled ? (borderWidth > 0 ? borderWidth : strokeWidth) : strokeWidth
+        ..strokeWidth =
+            filled ? (borderWidth > 0 ? borderWidth : strokeWidth) : strokeWidth
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..isAntiAlias = true;
@@ -378,7 +380,8 @@ class VarietySparkPainter extends CustomPainter {
       Color fill;
       // The direction follows the sign of the value, relative to the axis line.
       if (value == axisCrossesAt) {
-        rect = Rect.fromLTRB(x - width / 2, base - 1.5, x + width / 2, base + 1.5);
+        rect =
+            Rect.fromLTRB(x - width / 2, base - 1.5, x + width / 2, base + 1.5);
         fill = tiePointColor ?? negativePointColor ?? _baseColor;
       } else if (value > axisCrossesAt) {
         rect = Rect.fromLTRB(x - width / 2, base - half, x + width / 2, base);
@@ -402,7 +405,8 @@ class VarietySparkPainter extends CustomPainter {
 
   Iterable<int> _markerIndexes() sync* {
     final VarietySparkMarker? config = marker;
-    if (config == null || config.displayMode == VarietySparkMarkerDisplayMode.none) {
+    if (config == null ||
+        config.displayMode == VarietySparkMarkerDisplayMode.none) {
       return;
     }
     switch (config.displayMode) {
@@ -503,11 +507,10 @@ class VarietySparkPainter extends CustomPainter {
   }
 
   void _paintLabels(Canvas canvas) {
-    final TextStyle base =
-        labelStyle ?? const TextStyle(fontSize: 10, fontWeight: FontWeight.w600);
-    final TextStyle style = base.color == null
-        ? base.copyWith(color: theme.labelColor)
-        : base;
+    final TextStyle base = labelStyle ??
+        const TextStyle(fontSize: 10, fontWeight: FontWeight.w600);
+    final TextStyle style =
+        base.color == null ? base.copyWith(color: theme.labelColor) : base;
     final bool hasMarker = marker != null &&
         marker!.displayMode != VarietySparkMarkerDisplayMode.none;
     final double markerInset = hasMarker ? marker!.size / 2 : 0;
@@ -524,8 +527,8 @@ class VarietySparkPainter extends CustomPainter {
           : center.dy + markerInset;
       final double left = (center.dx - painter.width / 2)
           .clamp(_plotLeft, math.max(_plotRight - painter.width, _plotLeft));
-      final double clampedTop = top
-          .clamp(_plotTop, math.max(_plotBottom - painter.height, _plotTop));
+      final double clampedTop =
+          top.clamp(_plotTop, math.max(_plotBottom - painter.height, _plotTop));
       painter.paint(canvas, Offset(left, clampedTop));
     }
   }
@@ -633,7 +636,8 @@ class VarietySparkPainter extends CustomPainter {
       case VarietySparkMarkerShape.circle:
         path.addOval(Rect.fromCircle(center: center, radius: half));
       case VarietySparkMarkerShape.square:
-        path.addRect(Rect.fromCenter(center: center, width: size, height: size));
+        path.addRect(
+            Rect.fromCenter(center: center, width: size, height: size));
       case VarietySparkMarkerShape.diamond:
         path
           ..moveTo(center.dx, center.dy - half)
@@ -657,7 +661,8 @@ class VarietySparkPainter extends CustomPainter {
     return path;
   }
 
-  void _drawLine(Canvas canvas, Offset from, Offset to, Paint paint, List<double> dash) {
+  void _drawLine(
+      Canvas canvas, Offset from, Offset to, Paint paint, List<double> dash) {
     if (dash.isEmpty) {
       canvas.drawLine(from, to, paint);
       return;

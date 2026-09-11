@@ -120,7 +120,8 @@ class HomePage extends StatelessWidget {
       body: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: demos.length,
-        separatorBuilder: (BuildContext context, int index) => const Divider(height: 1),
+        separatorBuilder: (BuildContext context, int index) =>
+            const Divider(height: 1),
         itemBuilder: (BuildContext context, int index) {
           final _Demo demo = demos[index];
           return ListTile(

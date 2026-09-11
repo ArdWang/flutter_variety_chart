@@ -30,7 +30,8 @@ void main() {
       );
 
   group('onCreateRenderer / onRendererCreated', () {
-    testWidgets('painters route per-series to the factory', (WidgetTester tester) async {
+    testWidgets('painters route per-series to the factory',
+        (WidgetTester tester) async {
       int factoryCalls = 0;
       int createdCallbacks = 0;
       VarietyElementRenderer? captured;
@@ -43,7 +44,8 @@ void main() {
               factoryCalls++;
               return VarietyElementRenderer(theme);
             },
-            onRendererCreated: (VarietyElementRenderer renderer, int seriesIndex) {
+            onRendererCreated:
+                (VarietyElementRenderer renderer, int seriesIndex) {
               createdCallbacks++;
               captured = renderer;
             },
@@ -57,7 +59,8 @@ void main() {
       expect(captured, isNotNull);
     });
 
-    testWidgets('multiple series each get their own renderer', (WidgetTester tester) async {
+    testWidgets('multiple series each get their own renderer',
+        (WidgetTester tester) async {
       int factoryCalls = 0;
       await tester.pumpWidget(
         chart(series: <VarietyLineSeries>[
@@ -86,7 +89,8 @@ void main() {
   });
 
   group('onCreateShader', () {
-    testWidgets('a custom shader is consulted during path fill', (WidgetTester tester) async {
+    testWidgets('a custom shader is consulted during path fill',
+        (WidgetTester tester) async {
       int shaderCalls = 0;
       await tester.pumpWidget(
         chart(series: <VarietyLineSeries>[
@@ -112,7 +116,8 @@ void main() {
       expect(shaderCalls, greaterThan(0));
     });
 
-    testWidgets('overriding shader is applied to the line', (WidgetTester tester) async {
+    testWidgets('overriding shader is applied to the line',
+        (WidgetTester tester) async {
       int shaderCalls = 0;
       await tester.pumpWidget(
         chart(series: <VarietyLineSeries>[
@@ -139,7 +144,8 @@ void main() {
   });
 
   group('selectionBehavior', () {
-    testWidgets('a series-specific selectionBehaviour is preferred over the chart-wide one',
+    testWidgets(
+        'a series-specific selectionBehaviour is preferred over the chart-wide one',
         (WidgetTester tester) async {
       int perSeriesApplied = 0;
       await tester.pumpWidget(
@@ -166,7 +172,8 @@ void main() {
       expect(perSeriesApplied, 0);
     });
 
-    testWidgets('chart-wide selectionBehaviour is used when the series has none',
+    testWidgets(
+        'chart-wide selectionBehaviour is used when the series has none',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         chart(

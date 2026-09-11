@@ -25,7 +25,9 @@ void main() {
   group('category axis', () {
     test('collects categories in first-seen order', () {
       final VarietyCartesianGeometry geometry = buildGeometry(
-        series: <VarietySeries>[VarietyColumnSeries(name: 'A', data: monthly())],
+        series: <VarietySeries>[
+          VarietyColumnSeries(name: 'A', data: monthly())
+        ],
       );
       expect(geometry.categories, <String>['Jan', 'Feb', 'Mar', 'Apr']);
       expect(geometry.xAxisType, VarietyAxisType.category);
@@ -33,7 +35,9 @@ void main() {
 
     test('pads the value range to include zero for banded series', () {
       final VarietyCartesianGeometry geometry = buildGeometry(
-        series: <VarietySeries>[VarietyColumnSeries(name: 'A', data: monthly())],
+        series: <VarietySeries>[
+          VarietyColumnSeries(name: 'A', data: monthly())
+        ],
       );
       expect(geometry.yMinimum, lessThanOrEqualTo(0));
       expect(geometry.yMaximum, greaterThanOrEqualTo(55));
@@ -41,25 +45,33 @@ void main() {
 
     test('spaces category slots evenly', () {
       final VarietyCartesianGeometry geometry = buildGeometry(
-        series: <VarietySeries>[VarietyColumnSeries(name: 'A', data: monthly())],
+        series: <VarietySeries>[
+          VarietyColumnSeries(name: 'A', data: monthly())
+        ],
       );
       expect(geometry.slotCenters.length, 4);
       final double firstGap = geometry.slotCenters[1] - geometry.slotCenters[0];
-      final double secondGap = geometry.slotCenters[2] - geometry.slotCenters[1];
+      final double secondGap =
+          geometry.slotCenters[2] - geometry.slotCenters[1];
       expect(firstGap, closeTo(secondGap, 0.001));
     });
 
     test('emits one banded rectangle per point', () {
       final VarietyCartesianGeometry geometry = buildGeometry(
-        series: <VarietySeries>[VarietyColumnSeries(name: 'A', data: monthly())],
+        series: <VarietySeries>[
+          VarietyColumnSeries(name: 'A', data: monthly())
+        ],
       );
       expect(geometry.bandRects.first.length, 4);
-      expect(geometry.bandRects.first.every((Rect? rect) => rect != null), isTrue);
+      expect(
+          geometry.bandRects.first.every((Rect? rect) => rect != null), isTrue);
     });
 
     test('hit tests inside a column rectangle', () {
       final VarietyCartesianGeometry geometry = buildGeometry(
-        series: <VarietySeries>[VarietyColumnSeries(name: 'A', data: monthly())],
+        series: <VarietySeries>[
+          VarietyColumnSeries(name: 'A', data: monthly())
+        ],
       );
       final Rect rect = geometry.bandRects.first.first!;
       final VarietyHitResult? hit = geometry.hitTest(rect.center);
@@ -70,7 +82,9 @@ void main() {
 
     test('collapses geometry at progress zero', () {
       final VarietyCartesianGeometry geometry = buildGeometry(
-        series: <VarietySeries>[VarietyColumnSeries(name: 'A', data: monthly())],
+        series: <VarietySeries>[
+          VarietyColumnSeries(name: 'A', data: monthly())
+        ],
         progress: 0,
       );
       expect(geometry.bandRects.first.first!.height, lessThan(0.01));
@@ -118,7 +132,8 @@ void main() {
             ],
           ),
         ],
-        xAxis: const VarietyAxis(type: VarietyAxisType.numeric, minimum: 0, maximum: 100),
+        xAxis: const VarietyAxis(
+            type: VarietyAxisType.numeric, minimum: 0, maximum: 100),
         visibleXRange: (25, 75),
       );
       expect(geometry.xMinimum, 25);
@@ -138,7 +153,8 @@ void main() {
             ],
           ),
         ],
-        xAxis: const VarietyAxis(type: VarietyAxisType.dateTime, dateFormat: 'dd MMM'),
+        xAxis: const VarietyAxis(
+            type: VarietyAxisType.dateTime, dateFormat: 'dd MMM'),
       );
       expect(geometry.xAxisType, VarietyAxisType.dateTime);
       expect(geometry.dateTimeTicks, isNotEmpty);
@@ -274,7 +290,9 @@ void main() {
       expect(geometry.transposed, isFalse);
     });
 
-    test('puts values on the horizontal axis and categories on the vertical one', () {
+    test(
+        'puts values on the horizontal axis and categories on the vertical one',
+        () {
       final VarietyCartesianGeometry geometry = barGeometry();
       expect(geometry.xAxisType, VarietyAxisType.numeric);
       expect(geometry.yAxisType, VarietyAxisType.category);
@@ -348,7 +366,9 @@ void main() {
 
     test('adds a trendline element when one is requested', () {
       final VarietyCartesianGeometry withoutTrend = buildGeometry(
-        series: <VarietySeries>[VarietyScatterSeries(name: 'A', data: monthly())],
+        series: <VarietySeries>[
+          VarietyScatterSeries(name: 'A', data: monthly())
+        ],
         xAxis: const VarietyAxis(type: VarietyAxisType.numeric),
       );
       final VarietyCartesianGeometry withTrend = buildGeometry(
@@ -361,7 +381,8 @@ void main() {
         ],
         xAxis: const VarietyAxis(type: VarietyAxisType.numeric),
       );
-      expect(withTrend.elements.length, greaterThan(withoutTrend.elements.length));
+      expect(
+          withTrend.elements.length, greaterThan(withoutTrend.elements.length));
     });
   });
 }

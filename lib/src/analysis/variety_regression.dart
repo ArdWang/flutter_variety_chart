@@ -53,52 +53,55 @@ List<double?> varietyMovingAverage(List<double> values, int period) {
 
 double Function(double x)? _fitLinear(List<(double, double)> points) {
   final _LinearFit fit = _leastSquares(
-    points.map(( (double, double) p) => p.$1).toList(growable: false),
-    points.map(( (double, double) p) => p.$2).toList(growable: false),
+    points.map(((double, double) p) => p.$1).toList(growable: false),
+    points.map(((double, double) p) => p.$2).toList(growable: false),
   );
   return (double x) => fit.slope * x + fit.intercept;
 }
 
 double Function(double x)? _fitExponential(List<(double, double)> points) {
-  if (points.any(( (double, double) p) => p.$2 <= 0)) {
+  if (points.any(((double, double) p) => p.$2 <= 0)) {
     return null;
   }
   final _LinearFit fit = _leastSquares(
-    points.map(( (double, double) p) => p.$1).toList(growable: false),
-    points.map(( (double, double) p) => math.log(p.$2)).toList(growable: false),
+    points.map(((double, double) p) => p.$1).toList(growable: false),
+    points.map(((double, double) p) => math.log(p.$2)).toList(growable: false),
   );
   final double a = math.exp(fit.intercept);
   return (double x) => a * math.exp(fit.slope * x);
 }
 
 double Function(double x)? _fitLogarithmic(List<(double, double)> points) {
-  if (points.any(( (double, double) p) => p.$1 <= 0)) {
+  if (points.any(((double, double) p) => p.$1 <= 0)) {
     return null;
   }
   final _LinearFit fit = _leastSquares(
-    points.map(( (double, double) p) => math.log(p.$1)).toList(growable: false),
-    points.map(( (double, double) p) => p.$2).toList(growable: false),
+    points.map(((double, double) p) => math.log(p.$1)).toList(growable: false),
+    points.map(((double, double) p) => p.$2).toList(growable: false),
   );
-  return (double x) => x <= 0 ? double.nan : fit.slope * math.log(x) + fit.intercept;
+  return (double x) =>
+      x <= 0 ? double.nan : fit.slope * math.log(x) + fit.intercept;
 }
 
 double Function(double x)? _fitPower(List<(double, double)> points) {
-  if (points.any(( (double, double) p) => p.$1 <= 0 || p.$2 <= 0)) {
+  if (points.any(((double, double) p) => p.$1 <= 0 || p.$2 <= 0)) {
     return null;
   }
   final _LinearFit fit = _leastSquares(
-    points.map(( (double, double) p) => math.log(p.$1)).toList(growable: false),
-    points.map(( (double, double) p) => math.log(p.$2)).toList(growable: false),
+    points.map(((double, double) p) => math.log(p.$1)).toList(growable: false),
+    points.map(((double, double) p) => math.log(p.$2)).toList(growable: false),
   );
   final double a = math.exp(fit.intercept);
-  return (double x) => x <= 0 ? double.nan : a * math.pow(x, fit.slope).toDouble();
+  return (double x) =>
+      x <= 0 ? double.nan : a * math.pow(x, fit.slope).toDouble();
 }
 
-double Function(double x)? _fitPolynomial(List<(double, double)> points, int order) {
+double Function(double x)? _fitPolynomial(
+    List<(double, double)> points, int order) {
   final int degree = order.clamp(1, 6);
   final int size = degree + 1;
-  final List<List<double>> matrix =
-      List<List<double>>.generate(size, (_) => List<double>.filled(size + 1, 0));
+  final List<List<double>> matrix = List<List<double>>.generate(
+      size, (_) => List<double>.filled(size + 1, 0));
   for (int row = 0; row < size; row++) {
     for (int col = 0; col < size; col++) {
       double sum = 0;
@@ -126,9 +129,10 @@ double Function(double x)? _fitPolynomial(List<(double, double)> points, int ord
   };
 }
 
-double Function(double x)? _movingAverageTrendline(List<(double, double)> points, int period) {
+double Function(double x)? _movingAverageTrendline(
+    List<(double, double)> points, int period) {
   final List<double?> averaged = varietyMovingAverage(
-    points.map(( (double, double) p) => p.$2).toList(growable: false),
+    points.map(((double, double) p) => p.$2).toList(growable: false),
     period,
   );
   return (double x) {

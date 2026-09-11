@@ -51,7 +51,8 @@ class VarietyLegend extends StatelessWidget {
   final double swatchRadius;
 
   /// Builds a custom item for the given series index.
-  final Widget Function(BuildContext context, VarietySeries series, int index)? itemBuilder;
+  final Widget Function(BuildContext context, VarietySeries series, int index)?
+      itemBuilder;
 
   /// Called when a legend item is tapped.
   final void Function(VarietySeries series, int index)? onItemTap;
@@ -154,7 +155,8 @@ class VarietyLegend extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
               settings.title!,
-              style: settings.titleStyle ?? Theme.of(context).textTheme.labelLarge,
+              style:
+                  settings.titleStyle ?? Theme.of(context).textTheme.labelLarge,
             ),
           ),
         content,

@@ -1,9 +1,9 @@
 name: flutter_variety_chart
 description: A pure-Dart, dependency-free chart library for Flutter offering cartesian and circular visualizations such as line, spline, area, column, bar, scatter, pie and doughnut charts.
-version: 0.5.0
-homepage: https://github.com/your-org/flutter_variety_chart
-repository: https://github.com/your-org/flutter_variety_chart
-issue_tracker: https://github.com/your-org/flutter_variety_chart/issues
+version: 0.0.6
+homepage: https://github.com/ArdWang/flutter_variety_chart
+repository: https://github.com/ArdWang/flutter_variety_chart
+issue_tracker: https://github.com/ArdWang/flutter_variety_chart/issues
 
 environment:
   sdk: ">=3.2.0 <4.0.0"

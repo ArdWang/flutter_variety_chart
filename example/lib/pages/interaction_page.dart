@@ -33,7 +33,9 @@ class _InteractionPageState extends State<InteractionPage> {
           'Hover or drag to reveal the tooltip. Tap to reveal the trackball. '
           'Every chart below zooms and pans, including the multi-series ones: '
           'drag to pan, pinch with two fingers to zoom the X and Y axes '
-          'together, scroll to zoom, and double tap to reset.',
+          'together, scroll to zoom, and double tap to reset. The zoom, pan '
+          'and selection card also accepts a long press: drag out a region to '
+          'zoom straight into it.',
       children: <Widget>[
         ChartCard(
           title: 'Tooltip with zoom (two series)',
@@ -46,7 +48,8 @@ class _InteractionPageState extends State<InteractionPage> {
                   : 'Tapped ${hit.series.name} at ${hit.point.label ?? hit.point.x}.';
             }),
             series: <VarietySeries>[
-              VarietyColumnSeries(name: 'Revenue', cornerRadius: 3, data: monthlyRevenue),
+              VarietyColumnSeries(
+                  name: 'Revenue', cornerRadius: 3, data: monthlyRevenue),
               VarietyLineSeries(name: 'Target', data: monthlyTarget),
             ],
           ),
@@ -65,7 +68,8 @@ class _InteractionPageState extends State<InteractionPage> {
               activationMode: VarietyActivationMode.tap,
             ),
             series: <VarietySeries>[
-              VarietyLineSeries(name: 'Revenue', showMarkers: true, data: monthlyRevenue),
+              VarietyLineSeries(
+                  name: 'Revenue', showMarkers: true, data: monthlyRevenue),
               VarietyLineSeries(name: 'Target', data: monthlyTarget),
             ],
           ),
@@ -97,7 +101,8 @@ class _InteractionPageState extends State<InteractionPage> {
             ),
             selectionBehavior: VarietySelectionBehavior(
               selectionType: VarietySelectionType.point,
-              onSelectionChanged: (List<VarietyHitResult> selected) => setState(() {
+              onSelectionChanged: (List<VarietyHitResult> selected) =>
+                  setState(() {
                 _status = selected.isEmpty
                     ? 'Selection cleared.'
                     : 'Selected ${selected.length} point(s).';

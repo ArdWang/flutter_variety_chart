@@ -57,12 +57,21 @@ class AnnotationsPage extends StatelessWidget {
             primaryXAxis: const VarietyAxis(
               type: VarietyAxisType.category,
               plotBands: <VarietyPlotBand>[
-                VarietyPlotBand(start: 1.5, end: 3.5, color: Color(0xFF3F6FE0), opacity: 0.12),
-                VarietyPlotBand(start: 5.5, end: 7.5, color: Color(0xFF8A5CD6), opacity: 0.12),
+                VarietyPlotBand(
+                    start: 1.5,
+                    end: 3.5,
+                    color: Color(0xFF3F6FE0),
+                    opacity: 0.12),
+                VarietyPlotBand(
+                    start: 5.5,
+                    end: 7.5,
+                    color: Color(0xFF8A5CD6),
+                    opacity: 0.12),
               ],
             ),
             series: <VarietySeries>[
-              VarietyColumnSeries(name: 'Revenue', cornerRadius: 3, data: monthlyRevenue),
+              VarietyColumnSeries(
+                  name: 'Revenue', cornerRadius: 3, data: monthlyRevenue),
             ],
           ),
         ),
@@ -76,13 +85,16 @@ class AnnotationsPage extends StatelessWidget {
                 groups: <VarietyLabelGroup>[
                   VarietyLabelGroup(start: 0, end: 2, text: 'H1'),
                   VarietyLabelGroup(start: 3, end: 7, text: 'H2'),
-                  VarietyLabelGroup(start: 0, end: 3, text: 'First half', level: 1),
-                  VarietyLabelGroup(start: 4, end: 7, text: 'Second half', level: 1),
+                  VarietyLabelGroup(
+                      start: 0, end: 3, text: 'First half', level: 1),
+                  VarietyLabelGroup(
+                      start: 4, end: 7, text: 'Second half', level: 1),
                 ],
               ),
             ),
             series: <VarietySeries>[
-              VarietyColumnSeries(name: 'Revenue', cornerRadius: 3, data: monthlyRevenue),
+              VarietyColumnSeries(
+                  name: 'Revenue', cornerRadius: 3, data: monthlyRevenue),
             ],
           ),
         ),

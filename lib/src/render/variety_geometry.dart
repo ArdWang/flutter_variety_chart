@@ -189,7 +189,8 @@ class VarietyCartesianGeometry {
       if (name == null) {
         return 0;
       }
-      final int found = yAxes.indexWhere((VarietyAxis axis) => axis.name == name);
+      final int found =
+          yAxes.indexWhere((VarietyAxis axis) => axis.name == name);
       return found < 0 ? 0 : found;
     });
     axisMinimums = List<double>.filled(yAxes.length, 0);
@@ -199,7 +200,9 @@ class VarietyCartesianGeometry {
 
   /// The index of the secondary axis a series is plotted against.
   int axisIndexOf(int seriesIndex) =>
-      seriesIndex >= 0 && seriesIndex < seriesYAxis.length ? seriesYAxis[seriesIndex] : 0;
+      seriesIndex >= 0 && seriesIndex < seriesYAxis.length
+          ? seriesYAxis[seriesIndex]
+          : 0;
 
   /// The axis object a series is plotted against.
   VarietyAxis axisFor(int seriesIndex) => yAxes[axisIndexOf(seriesIndex)];
@@ -235,7 +238,8 @@ class VarietyCartesianGeometry {
     final double top = _rawPlotRect.top + yAxis.plotOffsetEnd;
     final double bottom = _rawPlotRect.bottom - yAxis.plotOffsetStart;
     final double inset = math.min(xAxis.plotOffset, yAxis.plotOffset);
-    final Rect adjusted = Rect.fromLTRB(left, top + inset, right, bottom - inset);
+    final Rect adjusted =
+        Rect.fromLTRB(left, top + inset, right, bottom - inset);
     if (adjusted.width < 8 || adjusted.height < 8) {
       return _rawPlotRect;
     }
@@ -346,7 +350,8 @@ class VarietyCartesianGeometry {
   bool get _isLogarithmic => yAxisType == VarietyAxisType.logarithmic;
 
   bool get _isDateTimePrimary =>
-      xAxisType == VarietyAxisType.dateTime || xAxisType == VarietyAxisType.dateTimeCategory;
+      xAxisType == VarietyAxisType.dateTime ||
+      xAxisType == VarietyAxisType.dateTimeCategory;
 
   /// The Y pixel of the value `0` on the given axis.
   double baselineYOn(int axisIndex) {
@@ -489,7 +494,8 @@ class VarietyCartesianGeometry {
   VarietyAxis get _categoryAxis => transposed ? yAxis : xAxis;
 
   static bool _shouldTranspose(List<VarietySeries> series) =>
-      series.isNotEmpty && series.every((VarietySeries item) => item is VarietyBarSeries);
+      series.isNotEmpty &&
+      series.every((VarietySeries item) => item is VarietyBarSeries);
 
   List<VarietyChartData> _computeSeriesData(VarietySeries item) {
     List<VarietyChartData> data = item.data;
@@ -526,9 +532,10 @@ class VarietyCartesianGeometry {
     }
 
     copy.sort(
-      (VarietyChartData a, VarietyChartData b) => order == VarietySortingOrder.ascending
-          ? keyOf(a).compareTo(keyOf(b))
-          : keyOf(b).compareTo(keyOf(a)),
+      (VarietyChartData a, VarietyChartData b) =>
+          order == VarietySortingOrder.ascending
+              ? keyOf(a).compareTo(keyOf(b))
+              : keyOf(b).compareTo(keyOf(a)),
     );
     return copy;
   }
@@ -546,7 +553,8 @@ class VarietyCartesianGeometry {
       return data;
     }
     bool isEmptyAt(VarietyChartData point) =>
-        point.isEmpty || (point.y == null && point.close == null && point.high == null);
+        point.isEmpty ||
+        (point.y == null && point.close == null && point.high == null);
     if (!data.any(isEmptyAt)) {
       return data;
     }
@@ -608,7 +616,9 @@ class VarietyCartesianGeometry {
     final double min = samples.reduce(math.min);
     final double max = samples.reduce(math.max);
     if (max - min < 1e-12) {
-      return <VarietyChartData>[VarietyChartData(min, samples.length.toDouble())];
+      return <VarietyChartData>[
+        VarietyChartData(min, samples.length.toDouble())
+      ];
     }
     final double width = (max - min) / bins;
     final List<int> counts = List<int>.filled(bins, 0);
@@ -649,7 +659,8 @@ class VarietyCartesianGeometry {
     }
     if (item.showTotal && item.data.isNotEmpty) {
       result.add(
-        VarietyChartData('Total', running, secondaryY: 0, close: running, label: 'Total'),
+        VarietyChartData('Total', running,
+            secondaryY: 0, close: running, label: 'Total'),
       );
     }
     return result;
@@ -702,7 +713,8 @@ class VarietyCartesianGeometry {
             if (point.x is! DateTime || point.isEmpty) {
               continue;
             }
-            final double ms = (point.x as DateTime).millisecondsSinceEpoch.toDouble();
+            final double ms =
+                (point.x as DateTime).millisecondsSinceEpoch.toDouble();
             min = min == null ? ms : math.min(min, ms);
             max = max == null ? ms : math.max(max, ms);
           }
@@ -771,7 +783,8 @@ class VarietyCartesianGeometry {
       yInterval = 1;
       return;
     }
-    final bool percent = series.any((VarietySeries item) => item.isPercentStacked);
+    final bool percent =
+        series.any((VarietySeries item) => item.isPercentStacked);
     if (percent) {
       yMinimum = yAxis.minimum ?? 0;
       yMaximum = yAxis.maximum ?? 100;
@@ -837,7 +850,8 @@ class VarietyCartesianGeometry {
     }
     if (_isLogarithmic) {
       final double safeLo = lo <= 0 ? 1 : lo;
-      final _LogRange range = _logRange(safeLo, hi > safeLo ? hi : safeLo * 10, logBase);
+      final _LogRange range =
+          _logRange(safeLo, hi > safeLo ? hi : safeLo * 10, logBase);
       yMinimum = yAxis.minimum ?? range.minimum;
       yMaximum = yAxis.maximum ?? range.maximum;
       yInterval = range.interval;
@@ -888,7 +902,8 @@ class VarietyCartesianGeometry {
         hi = lo + 1;
       }
       final _NiceRange nice = _niceRange(lo, hi, axis.desiredIntervals);
-      final (double, double, double) padded = _applyRangePadding(lo, hi, axis, nice);
+      final (double, double, double) padded =
+          _applyRangePadding(lo, hi, axis, nice);
       axisMinimums[axisIndex] = axis.minimum ?? padded.$1;
       axisMaximums[axisIndex] = axis.maximum ?? padded.$2;
       axisIntervals[axisIndex] = axis.interval ?? padded.$3;
@@ -928,7 +943,10 @@ class VarietyCartesianGeometry {
   /// The lowest and highest value a point contributes to the range.
   (double, double) _pointBounds(VarietySeries item, VarietyChartData point) {
     if (item.isRange || item is VarietyCandleSeries) {
-      return (math.min(point.lowValue, point.highValue), math.max(point.lowValue, point.highValue));
+      return (
+        math.min(point.lowValue, point.highValue),
+        math.max(point.lowValue, point.highValue)
+      );
     }
     final double value = point.y ?? 0;
     return (value, value);
@@ -1185,7 +1203,8 @@ class VarietyCartesianGeometry {
       final double to = math.log(hi) / math.log(base);
       final double current = math.log(safe) / math.log(base);
       return _mirrorSecondary(
-        plotRect.bottom - (current - from) / math.max(to - from, 1e-9) * plotRect.height,
+        plotRect.bottom -
+            (current - from) / math.max(to - from, 1e-9) * plotRect.height,
       );
     }
     return _mirrorSecondary(
@@ -1201,7 +1220,8 @@ class VarietyCartesianGeometry {
       final double hi = math.log(yMaximum) / math.log(logBase);
       final double current = math.log(safe) / math.log(logBase);
       return _mirrorSecondary(
-        plotRect.bottom - (current - lo) / math.max(hi - lo, 1e-9) * plotRect.height,
+        plotRect.bottom -
+            (current - lo) / math.max(hi - lo, 1e-9) * plotRect.height,
       );
     }
     return _mirrorSecondary(
@@ -1331,7 +1351,6 @@ class VarietyCartesianGeometry {
     _buildWhiskers(seriesIndex, item, bar);
   }
 
-
   void _buildStepArea(int seriesIndex, VarietyStepAreaSeries item) {
     final List<VarietyChartData> points = resolvedData[seriesIndex];
     final Color color = colorFor(item, seriesIndex, 0);
@@ -1351,7 +1370,8 @@ class VarietyCartesianGeometry {
         Offset(
           x,
           item.isStacked
-              ? animateY(pixelYOn(stepAxis, baseValue(seriesIndex, p)), stepAxis)
+              ? animateY(
+                  pixelYOn(stepAxis, baseValue(seriesIndex, p)), stepAxis)
               : baselineYOn(stepAxis),
         ),
       );
@@ -1375,7 +1395,7 @@ class VarietyCartesianGeometry {
       path.close();
       elements.add(
         VarietyPathElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           path: path,
           fillColor: color,
           fillOpacity: item.fillOpacity,
@@ -1393,7 +1413,8 @@ class VarietyCartesianGeometry {
         continue;
       }
       markers.add(
-        VarietyMarker(Offset(pointPositions[seriesIndex][p].dx, topPixel(seriesIndex, p))),
+        VarietyMarker(Offset(
+            pointPositions[seriesIndex][p].dx, topPixel(seriesIndex, p))),
       );
     }
     if (markers.isEmpty) {
@@ -1401,7 +1422,7 @@ class VarietyCartesianGeometry {
     }
     elements.add(
       VarietyMarkersElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         markers: markers,
         size: item.markerSize,
         shape: VarietyMarkerShape.circle,
@@ -1422,7 +1443,7 @@ class VarietyCartesianGeometry {
       }
       elements.add(
         VarietyPathElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           path: _joinPath(run, VarietyLineStyle.straight),
           strokeColor: color,
           strokeWidth: item.strokeWidth,
@@ -1448,7 +1469,8 @@ class VarietyCartesianGeometry {
     flush();
   }
 
-  void _buildWhiskers(int seriesIndex, VarietySeries owner, VarietyErrorBarSeries bar) {
+  void _buildWhiskers(
+      int seriesIndex, VarietySeries owner, VarietyErrorBarSeries bar) {
     final List<VarietyChartData> points = resolvedData[seriesIndex];
     if (points.isEmpty) {
       return;
@@ -1496,9 +1518,12 @@ class VarietyCartesianGeometry {
       final int axisIndex = axisIndexOf(seriesIndex);
       if (bar.mode == VarietyErrorBarMode.vertical ||
           bar.mode == VarietyErrorBarMode.both) {
-        final double top = animateY(pixelYOn(axisIndex, value + magnitude), axisIndex);
-        final double bottom = animateY(pixelYOn(axisIndex, value - magnitude), axisIndex);
-        stems.add(VarietySegment(Offset(position.dx, top), Offset(position.dx, bottom)));
+        final double top =
+            animateY(pixelYOn(axisIndex, value + magnitude), axisIndex);
+        final double bottom =
+            animateY(pixelYOn(axisIndex, value - magnitude), axisIndex);
+        stems.add(VarietySegment(
+            Offset(position.dx, top), Offset(position.dx, bottom)));
         if (bar.showCap) {
           caps.add(
             VarietySegment(
@@ -1543,11 +1568,13 @@ class VarietyCartesianGeometry {
       return;
     }
     elements.add(
-      VarietySegmentsElement(segments: stems, color: color, width: bar.strokeWidth),
+      VarietySegmentsElement(
+          segments: stems, color: color, width: bar.strokeWidth),
     );
     if (caps.isNotEmpty) {
       elements.add(
-        VarietySegmentsElement(segments: caps, color: color, width: bar.strokeWidth),
+        VarietySegmentsElement(
+            segments: caps, color: color, width: bar.strokeWidth),
       );
     }
   }
@@ -1623,7 +1650,7 @@ class VarietyCartesianGeometry {
       }
       elements.add(
         VarietyRectsElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           rects: <Rect>[box],
           color: item.color?.withValues(alpha: 0.25) ??
               color.withValues(alpha: 0.25),
@@ -1634,10 +1661,12 @@ class VarietyCartesianGeometry {
       );
       elements.add(
         VarietySegmentsElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           segments: <VarietySegment>[
-            VarietySegment(Offset(center, math.min(q1, q3)), Offset(center, highFence)),
-            VarietySegment(Offset(center, math.max(q1, q3)), Offset(center, lowFence)),
+            VarietySegment(
+                Offset(center, math.min(q1, q3)), Offset(center, highFence)),
+            VarietySegment(
+                Offset(center, math.max(q1, q3)), Offset(center, lowFence)),
             VarietySegment(
               Offset(center - band / 4, lowFence),
               Offset(center + band / 4, lowFence),
@@ -1653,7 +1682,7 @@ class VarietyCartesianGeometry {
       );
       elements.add(
         VarietySegmentsElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           segments: <VarietySegment>[
             VarietySegment(
               Offset(box.left, median),
@@ -1667,9 +1696,10 @@ class VarietyCartesianGeometry {
       if (item.showMean) {
         elements.add(
           VarietyMarkersElement(
-          seriesIndex: seriesIndex,
+            seriesIndex: seriesIndex,
             markers: <VarietyMarker>[
-              VarietyMarker(Offset(center, pixelYOn(axisIndexOf(seriesIndex), stats.mean))),
+              VarietyMarker(Offset(
+                  center, pixelYOn(axisIndexOf(seriesIndex), stats.mean))),
             ],
             size: 8,
             shape: VarietyMarkerShape.diamond,
@@ -1682,13 +1712,14 @@ class VarietyCartesianGeometry {
         for (final int index in indexes) {
           inner.add(
             VarietyMarker(
-              Offset(center, pixelYOn(axisIndexOf(seriesIndex), points[index].y ?? 0)),
+              Offset(center,
+                  pixelYOn(axisIndexOf(seriesIndex), points[index].y ?? 0)),
             ),
           );
         }
         elements.add(
           VarietyMarkersElement(
-          seriesIndex: seriesIndex,
+            seriesIndex: seriesIndex,
             markers: inner,
             size: 5,
             shape: VarietyMarkerShape.circle,
@@ -1699,7 +1730,7 @@ class VarietyCartesianGeometry {
       if (item.showOutliers && stats.outliers.isNotEmpty) {
         elements.add(
           VarietyMarkersElement(
-          seriesIndex: seriesIndex,
+            seriesIndex: seriesIndex,
             markers: stats.outliers
                 .map(
                   (double value) => VarietyMarker(
@@ -1713,7 +1744,8 @@ class VarietyCartesianGeometry {
           ),
         );
       }
-      _addDataLabel(item, seriesIndex, indexes.first, Offset(center, math.min(q1, q3)), null);
+      _addDataLabel(item, seriesIndex, indexes.first,
+          Offset(center, math.min(q1, q3)), null);
     });
   }
 
@@ -1740,7 +1772,8 @@ class VarietyCartesianGeometry {
       q1 = values[(n * 0.25).floor().clamp(0, n - 1)];
       q3 = values[(n * 0.75).floor().clamp(0, n - 1)];
     } else {
-      final bool excludeMedian = mode == VarietyBoxPlotMode.exclusive && n.isOdd;
+      final bool excludeMedian =
+          mode == VarietyBoxPlotMode.exclusive && n.isOdd;
       final int lowerEnd = excludeMedian ? n ~/ 2 : (n + 1) ~/ 2;
       final int upperStart = excludeMedian ? n ~/ 2 + 1 : n ~/ 2;
       q1 = medianOf(values.sublist(0, lowerEnd));
@@ -1758,7 +1791,8 @@ class VarietyCartesianGeometry {
     final double min = inside.isEmpty ? values.first : inside.first;
     final double max = inside.isEmpty ? values.last : inside.last;
     final double mean = values.reduce((double a, double b) => a + b) / n;
-    return _BoxStats(min, q1, median, q3, max, lowFence, highFence, outliers, mean);
+    return _BoxStats(
+        min, q1, median, q3, max, lowFence, highFence, outliers, mean);
   }
 
   /// Fits and draws every trendline declared by a series.
@@ -1798,7 +1832,8 @@ class VarietyCartesianGeometry {
       if (fit == null) {
         continue;
       }
-      final double startX = samples.first.$1 - trendline.backwardForecast * step;
+      final double startX =
+          samples.first.$1 - trendline.backwardForecast * step;
       final double endX = samples.last.$1 + trendline.forwardForecast * step;
       final List<Offset> fitted = <Offset>[];
       const int steps = 64;
@@ -1808,14 +1843,17 @@ class VarietyCartesianGeometry {
         if (!y.isFinite) {
           continue;
         }
-        fitted.add(Offset(x, animateY(pixelYOn(axisIndexOf(seriesIndex), y), axisIndexOf(seriesIndex))));
+        fitted.add(Offset(
+            x,
+            animateY(pixelYOn(axisIndexOf(seriesIndex), y),
+                axisIndexOf(seriesIndex))));
       }
       if (fitted.length < 2) {
         continue;
       }
       elements.add(
         VarietyPathElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           path: _joinPath(fitted, VarietyLineStyle.straight),
           strokeColor: trendline.color ?? colorFor(item, seriesIndex, 0),
           strokeWidth: trendline.width,
@@ -1935,10 +1973,13 @@ class VarietyCartesianGeometry {
   /// Resolves the effective colour of a point, honouring overrides and opacity.
   Color colorFor(VarietySeries item, int seriesIndex, int pointIndex) {
     final List<VarietyChartData> points = resolvedData[seriesIndex];
-    final Color base = (pointIndex < points.length ? points[pointIndex].color : null) ??
-        item.color ??
-        varietyDefaultPalette[seriesIndex % varietyDefaultPalette.length];
-    return item.opacity >= 1 ? base : base.withValues(alpha: base.a * item.opacity);
+    final Color base =
+        (pointIndex < points.length ? points[pointIndex].color : null) ??
+            item.color ??
+            varietyDefaultPalette[seriesIndex % varietyDefaultPalette.length];
+    return item.opacity >= 1
+        ? base
+        : base.withValues(alpha: base.a * item.opacity);
   }
 
   double _cornerRadiusOf(VarietySeries item) {
@@ -2000,8 +2041,7 @@ class VarietyCartesianGeometry {
       // In a transposed layout the value runs horizontally and the category
       // index runs vertically, so the two axes swap roles here.
       final Offset position = pointPositions[seriesIndex][p];
-      final double center =
-          (transposed ? position.dy : position.dx) + shift;
+      final double center = (transposed ? position.dy : position.dx) + shift;
       final Color color = colorFor(item, seriesIndex, p);
       final double radius = _cornerRadiusOf(item);
       if (item is VarietyCandleSeries) {
@@ -2058,14 +2098,17 @@ class VarietyCartesianGeometry {
         if (point.label == 'Total') {
           fill = item.totalColor ?? item.color ?? color;
         } else if (delta >= 0) {
-          fill = point.color ?? item.positiveColor ?? item.color ?? const Color(0xFF2FA37A);
+          fill = point.color ??
+              item.positiveColor ??
+              item.color ??
+              const Color(0xFF2FA37A);
         } else {
           fill = point.color ?? item.negativeColor ?? const Color(0xFFE0603F);
         }
       }
       elements.add(
         VarietyRectsElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           rects: <Rect>[normalized],
           color: fill,
           radius: radius,
@@ -2082,17 +2125,18 @@ class VarietyCartesianGeometry {
       _buildNormalCurve(seriesIndex, item);
     }
     if (item is VarietyColumnSeries && item.showTrack) {
-      final Color track =
-          item.trackColor ?? colorFor(item, seriesIndex, 0).withValues(alpha: 0.15);
+      final Color track = item.trackColor ??
+          colorFor(item, seriesIndex, 0).withValues(alpha: 0.15);
       for (final Rect? rect in rects) {
         if (rect == null) {
           continue;
         }
         elements.add(
           VarietyRectsElement(
-          seriesIndex: seriesIndex,
+            seriesIndex: seriesIndex,
             rects: <Rect>[
-              Rect.fromLTRB(rect.left, plotRect.top, rect.right, plotRect.bottom),
+              Rect.fromLTRB(
+                  rect.left, plotRect.top, rect.right, plotRect.bottom),
             ],
             color: track,
           ),
@@ -2101,7 +2145,8 @@ class VarietyCartesianGeometry {
     }
   }
 
-  void _buildWaterfallConnectors(int seriesIndex, VarietyWaterfallSeries item, double width) {
+  void _buildWaterfallConnectors(
+      int seriesIndex, VarietyWaterfallSeries item, double width) {
     final List<VarietyChartData> points = resolvedData[seriesIndex];
     final List<VarietySegment> segments = <VarietySegment>[];
     for (int p = 0; p < points.length - 1; p++) {
@@ -2115,7 +2160,7 @@ class VarietyCartesianGeometry {
     }
     elements.add(
       VarietySegmentsElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         segments: segments,
         color: item.connectorLineColor ?? const Color(0xFF9AA0A6),
         width: item.connectorLineWidth,
@@ -2153,11 +2198,15 @@ class VarietyCartesianGeometry {
     for (int i = 0; i <= steps; i++) {
       final double t = i / steps;
       final double value = mean - 3 * sd + 6 * sd * t;
-      final double density = math.exp(-0.5 * math.pow((value - mean) / sd, 2).toDouble()) /
-          (sd * math.sqrt(2 * math.pi));
+      final double density =
+          math.exp(-0.5 * math.pow((value - mean) / sd, 2).toDouble()) /
+              (sd * math.sqrt(2 * math.pi));
       final double x = pointPositions[seriesIndex].first.dx +
-          (pointPositions[seriesIndex].last.dx - pointPositions[seriesIndex].first.dx) * t;
-      final double y = animateY(pixelY(density * count * _binWidth(seriesIndex)));
+          (pointPositions[seriesIndex].last.dx -
+                  pointPositions[seriesIndex].first.dx) *
+              t;
+      final double y =
+          animateY(pixelY(density * count * _binWidth(seriesIndex)));
       if (i == 0) {
         path.moveTo(x, y);
       } else {
@@ -2166,9 +2215,10 @@ class VarietyCartesianGeometry {
     }
     elements.add(
       VarietyPathElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         path: path,
-        strokeColor: item.normalDistributionColor ?? colorFor(item, seriesIndex, 0),
+        strokeColor:
+            item.normalDistributionColor ?? colorFor(item, seriesIndex, 0),
         strokeWidth: item.normalDistributionWidth,
       ),
     );
@@ -2182,7 +2232,8 @@ class VarietyCartesianGeometry {
     return (points[1].x as num).toDouble() - (points[0].x as num).toDouble();
   }
 
-  void _buildCandle(int seriesIndex, VarietyCandleSeries item, int p, double center, double width) {
+  void _buildCandle(int seriesIndex, VarietyCandleSeries item, int p,
+      double center, double width) {
     final VarietyChartData point = resolvedData[seriesIndex][p];
     final bool rising = point.closeValue >= point.openValue;
     final Color color = point.color ??
@@ -2190,14 +2241,17 @@ class VarietyCartesianGeometry {
             ? (item.bullFillColor ?? const Color(0xFF2FA37A))
             : (item.bearFillColor ?? const Color(0xFFE0603F)));
     final int axisIndex = axisIndexOf(seriesIndex);
-    final double high = animateY(pixelYOn(axisIndex, point.highValue), axisIndex);
+    final double high =
+        animateY(pixelYOn(axisIndex, point.highValue), axisIndex);
     final double low = animateY(pixelYOn(axisIndex, point.lowValue), axisIndex);
-    final double open = animateY(pixelYOn(axisIndex, point.openValue), axisIndex);
-    final double close = animateY(pixelYOn(axisIndex, point.closeValue), axisIndex);
+    final double open =
+        animateY(pixelYOn(axisIndex, point.openValue), axisIndex);
+    final double close =
+        animateY(pixelYOn(axisIndex, point.closeValue), axisIndex);
     if (item.showWicks) {
       elements.add(
         VarietySegmentsElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           segments: <VarietySegment>[
             VarietySegment(Offset(center, high), Offset(center, low)),
           ],
@@ -2215,7 +2269,7 @@ class VarietyCartesianGeometry {
     bandRects[seriesIndex][p] = body;
     elements.add(
       VarietyRectsElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         rects: <Rect>[body],
         color: color,
         border: item.borderColor ?? color,
@@ -2232,7 +2286,8 @@ class VarietyCartesianGeometry {
         continue;
       }
       markers.add(
-        VarietyMarker(pointPositions[seriesIndex][p], color: colorFor(item, seriesIndex, p)),
+        VarietyMarker(pointPositions[seriesIndex][p],
+            color: colorFor(item, seriesIndex, p)),
       );
       _addDataLabel(item, seriesIndex, p, pointPositions[seriesIndex][p], null);
     }
@@ -2241,7 +2296,7 @@ class VarietyCartesianGeometry {
     }
     elements.add(
       VarietyMarkersElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         markers: markers,
         size: _markerSizeOf(item),
         shape: _markerShapeOf(item),
@@ -2273,9 +2328,10 @@ class VarietyCartesianGeometry {
       if (point.isEmpty) {
         continue;
       }
-      final double ratio = maxSize == minSize ? 1 : (point.magnitude - minSize) / span;
-      final double radius =
-          item.minimumRadius + (item.maximumRadius - item.minimumRadius) * ratio;
+      final double ratio =
+          maxSize == minSize ? 1 : (point.magnitude - minSize) / span;
+      final double radius = item.minimumRadius +
+          (item.maximumRadius - item.minimumRadius) * ratio;
       bubbles.add(
         VarietyBubble(
           pointPositions[seriesIndex][p],
@@ -2290,7 +2346,7 @@ class VarietyCartesianGeometry {
     }
     elements.add(
       VarietyBubblesElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         bubbles: bubbles,
         color: colorFor(item, seriesIndex, 0),
         border: item.borderColor,
@@ -2313,12 +2369,16 @@ class VarietyCartesianGeometry {
       }
       final int axisIndex = axisIndexOf(seriesIndex);
       final double x = pointPositions[seriesIndex][p].dx;
-      final double high = animateY(pixelYOn(axisIndex, point.highValue), axisIndex);
-      final double low = animateY(pixelYOn(axisIndex, point.lowValue), axisIndex);
+      final double high =
+          animateY(pixelYOn(axisIndex, point.highValue), axisIndex);
+      final double low =
+          animateY(pixelYOn(axisIndex, point.lowValue), axisIndex);
       stems.add(VarietySegment(Offset(x, high), Offset(x, low)));
       if (item is VarietyHiLoOpenCloseSeries) {
-        final double open = animateY(pixelYOn(axisIndex, point.openValue), axisIndex);
-        final double close = animateY(pixelYOn(axisIndex, point.closeValue), axisIndex);
+        final double open =
+            animateY(pixelYOn(axisIndex, point.openValue), axisIndex);
+        final double close =
+            animateY(pixelYOn(axisIndex, point.closeValue), axisIndex);
         ticks.add(VarietySegment(
           Offset(x - item.tickWidth / 2, open),
           Offset(x + item.tickWidth / 2, open),
@@ -2335,19 +2395,22 @@ class VarietyCartesianGeometry {
     }
     elements.add(
       VarietySegmentsElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         segments: stems,
         color: color,
-        width: item is VarietyHiLoOpenCloseSeries ? item.strokeWidth : (item as VarietyHiLoSeries).strokeWidth,
+        width: item is VarietyHiLoOpenCloseSeries
+            ? item.strokeWidth
+            : (item as VarietyHiLoSeries).strokeWidth,
       ),
     );
     if (ticks.isNotEmpty) {
-      elements.add(VarietySegmentsElement(segments: ticks, color: color, width: 1.6));
+      elements.add(
+          VarietySegmentsElement(segments: ticks, color: color, width: 1.6));
     }
     if (markers.isNotEmpty) {
       elements.add(
         VarietyMarkersElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           markers: markers,
           size: (item as VarietyHiLoSeries).markerSize,
           shape: VarietyMarkerShape.circle,
@@ -2388,8 +2451,10 @@ class VarietyCartesianGeometry {
         continue;
       }
       final double x = pointPositions[seriesIndex][p].dx;
-      final double high = animateY(pixelYOn(axisIndex, points[p].highValue), axisIndex);
-      final double low = animateY(pixelYOn(axisIndex, points[p].lowValue), axisIndex);
+      final double high =
+          animateY(pixelYOn(axisIndex, points[p].highValue), axisIndex);
+      final double low =
+          animateY(pixelYOn(axisIndex, points[p].lowValue), axisIndex);
       upper.add(Offset(x, high));
       lower.add(Offset(x, low));
       _addDataLabel(item, seriesIndex, p, Offset(x, high), null);
@@ -2405,7 +2470,7 @@ class VarietyCartesianGeometry {
     path.close();
     elements.add(
       VarietyPathElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         path: path,
         fillColor: color,
         fillOpacity: fillOpacity,
@@ -2422,7 +2487,7 @@ class VarietyCartesianGeometry {
     }
     elements.add(
       VarietyMarkersElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         markers: markers,
         size: _markerSizeOf(item),
         shape: _markerShapeOf(item),
@@ -2473,7 +2538,7 @@ class VarietyCartesianGeometry {
       path.close();
       elements.add(
         VarietyPathElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           path: path,
           fillColor: color,
           fillOpacity: fillOpacity,
@@ -2500,7 +2565,8 @@ class VarietyCartesianGeometry {
         Offset(
           x,
           item.isStacked
-              ? animateY(pixelYOn(areaAxis, baseValue(seriesIndex, p)), areaAxis)
+              ? animateY(
+                  pixelYOn(areaAxis, baseValue(seriesIndex, p)), areaAxis)
               : baselineYOn(areaAxis),
         ),
       );
@@ -2531,7 +2597,7 @@ class VarietyCartesianGeometry {
     }
     elements.add(
       VarietyMarkersElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         markers: markers,
         size: _markerSizeOf(item),
         shape: _markerShapeOf(item),
@@ -2553,7 +2619,7 @@ class VarietyCartesianGeometry {
       }
       elements.add(
         VarietyPathElement(
-        seriesIndex: seriesIndex,
+          seriesIndex: seriesIndex,
           path: _joinPath(run, item.lineStyle),
           strokeColor: color,
           strokeWidth: item.strokeWidth,
@@ -2569,7 +2635,8 @@ class VarietyCartesianGeometry {
         flush();
         continue;
       }
-      final Offset point = Offset(pointPositions[seriesIndex][p].dx, topPixel(seriesIndex, p));
+      final Offset point =
+          Offset(pointPositions[seriesIndex][p].dx, topPixel(seriesIndex, p));
       run.add(point);
       _addDataLabel(item, seriesIndex, p, point, null);
     }
@@ -2595,7 +2662,7 @@ class VarietyCartesianGeometry {
       if (markers.isNotEmpty) {
         elements.add(
           VarietyMarkersElement(
-          seriesIndex: seriesIndex,
+            seriesIndex: seriesIndex,
             markers: markers,
             size: _markerSizeOf(item),
             shape: _markerShapeOf(item),
@@ -2615,12 +2682,14 @@ class VarietyCartesianGeometry {
     final VarietyChartData point = points[pointIndex];
     final int axisIndex = axisIndexOf(seriesIndex);
     if (item is VarietyLineSeries && item.fillOpacity > 0 && item.isStacked) {
-      return animateY(pixelYOn(axisIndex, topValue(seriesIndex, pointIndex)), axisIndex);
+      return animateY(
+          pixelYOn(axisIndex, topValue(seriesIndex, pointIndex)), axisIndex);
     }
     if (item.isRange || item is VarietyCandleSeries) {
       return animateY(pixelYOn(axisIndex, point.highValue), axisIndex);
     }
-    return animateY(pixelYOn(axisIndex, topValue(seriesIndex, pointIndex)), axisIndex);
+    return animateY(
+        pixelYOn(axisIndex, topValue(seriesIndex, pointIndex)), axisIndex);
   }
 
   Path _joinPath(List<Offset> points, VarietyLineStyle style) {
@@ -2687,7 +2756,7 @@ class VarietyCartesianGeometry {
     }
     elements.add(
       VarietyLabelsElement(
-      seriesIndex: seriesIndex,
+        seriesIndex: seriesIndex,
         labels: <VarietyLabelItem>[
           VarietyLabelItem(
             anchor: anchor,
@@ -2710,7 +2779,8 @@ class VarietyCartesianGeometry {
     if (!_isDateTimePrimary) {
       return;
     }
-    final DateTime start = DateTime.fromMillisecondsSinceEpoch(xMinimum.round());
+    final DateTime start =
+        DateTime.fromMillisecondsSinceEpoch(xMinimum.round());
     final DateTime end = DateTime.fromMillisecondsSinceEpoch(xMaximum.round());
     VarietyDateTimeIntervalType type = xAxis.dateTimeIntervalType;
     if (type == VarietyDateTimeIntervalType.auto) {
@@ -2756,7 +2826,8 @@ class VarietyCartesianGeometry {
       case VarietyDateTimeIntervalType.hours:
         return DateTime(value.year, value.month, value.day, value.hour);
       case VarietyDateTimeIntervalType.minutes:
-        return DateTime(value.year, value.month, value.day, value.hour, value.minute);
+        return DateTime(
+            value.year, value.month, value.day, value.hour, value.minute);
       case VarietyDateTimeIntervalType.seconds:
         return DateTime(
           value.year,
@@ -2773,7 +2844,8 @@ class VarietyCartesianGeometry {
     }
   }
 
-  static DateTime _advance(DateTime value, VarietyDateTimeIntervalType type, int step) {
+  static DateTime _advance(
+      DateTime value, VarietyDateTimeIntervalType type, int step) {
     switch (type) {
       case VarietyDateTimeIntervalType.years:
         return DateTime(value.year + step, value.month, value.day);
@@ -2874,7 +2946,8 @@ class VarietyCartesianGeometry {
     const int guard = 2000;
     double value = axisMinimums[axisIndex];
     int count = 0;
-    while (value <= axisMaximums[axisIndex] + interval * 1e-6 && count < guard) {
+    while (
+        value <= axisMaximums[axisIndex] + interval * 1e-6 && count < guard) {
       ticks.add(value);
       value += interval;
       count++;
@@ -2948,7 +3021,9 @@ class VarietyCartesianGeometry {
     final double hi = math.log(yMaximum) / math.log(logBase);
     const int guard = 200;
     int count = 0;
-    for (double exponent = lo.floorToDouble(); exponent <= hi.ceilToDouble(); exponent++) {
+    for (double exponent = lo.floorToDouble();
+        exponent <= hi.ceilToDouble();
+        exponent++) {
       ticks.add(math.pow(logBase, exponent).toDouble());
       if (++count > guard) {
         break;
@@ -3060,7 +3135,8 @@ class VarietyCartesianGeometry {
           continue;
         }
         for (int p = 0; p < pointPositions[s].length; p++) {
-          final String key = resolvedData[s][p].label ?? _categoryKey(resolvedData[s][p].x);
+          final String key =
+              resolvedData[s][p].label ?? _categoryKey(resolvedData[s][p].x);
           if (categories.indexOf(key) != bestIndex) {
             continue;
           }
@@ -3102,7 +3178,8 @@ class VarietyCartesianGeometry {
           seriesIndex: s,
           point: sourceData[s][bestIndex],
           pointIndex: bestIndex,
-          position: Offset(pointPositions[s][bestIndex].dx, topPixel(s, bestIndex)),
+          position:
+              Offset(pointPositions[s][bestIndex].dx, topPixel(s, bestIndex)),
           band: bandRects[s][bestIndex],
         ),
       );
@@ -3263,11 +3340,11 @@ class VarietyCircularGeometry {
       final double endAngle = _degreesToRadians(_endAngleOf(item));
       final double outer = maxRadius * _radiusFactorOf(item);
       radius = math.max(radius, outer);
-      final double inner = item is VarietyDoughnutSeries
-          ? outer * item.innerRadiusFactor
-          : 0.0;
+      final double inner =
+          item is VarietyDoughnutSeries ? outer * item.innerRadiusFactor : 0.0;
       final double span = endAngle - startAngle;
-      final bool clockwise = _directionOf(item) == VarietySliceDirection.clockwise;
+      final bool clockwise =
+          _directionOf(item) == VarietySliceDirection.clockwise;
       final bool equal = _equalSlicesOf(item);
       final int explodeIndex = _explodeIndexOf(item);
       final double explodeOffset = _explodeOffsetOf(item);
@@ -3285,8 +3362,8 @@ class VarietyCircularGeometry {
         Offset sliceCenter = center;
         if (p == explodeIndex && explodeOffset > 0) {
           final double mid = startAngle + sweep / 2;
-          sliceCenter =
-              center + Offset(math.cos(mid), math.sin(mid)) * explodeOffset * progress;
+          sliceCenter = center +
+              Offset(math.cos(mid), math.sin(mid)) * explodeOffset * progress;
         }
         final Color color = point.color ??
             item.color ??
@@ -3329,12 +3406,14 @@ class VarietyCircularGeometry {
     final double end = _degreesToRadians(item.endAngle);
     for (int p = 0; p < points.length; p++) {
       final VarietyChartData point = points[p];
-      final double outer = maxRadius - ringSpan * p - (ringSpan - thickness) / 2;
+      final double outer =
+          maxRadius - ringSpan * p - (ringSpan - thickness) / 2;
       final double inner = math.max(outer - thickness, 0);
       final double ratio = ((point.y ?? 0) / max).clamp(0.0, 1.0);
       final Color color = point.color ??
           item.color ??
-          varietyDefaultPalette[(seriesIndex + p) % varietyDefaultPalette.length];
+          varietyDefaultPalette[
+              (seriesIndex + p) % varietyDefaultPalette.length];
       rings.add(
         VarietySlice(
           startAngle: start,
@@ -3356,7 +3435,8 @@ class VarietyCircularGeometry {
             sweepAngle: end - start,
             outerRadius: outer,
             innerRadius: inner,
-            color: (item.trackColor ?? color).withValues(alpha: item.trackOpacity),
+            color:
+                (item.trackColor ?? color).withValues(alpha: item.trackOpacity),
             point: point,
             seriesIndex: seriesIndex,
             pointIndex: p,
@@ -3375,9 +3455,12 @@ class VarietyCircularGeometry {
     if (!group) {
       return item.data;
     }
-    final double threshold = item is VarietyPieSeries ? item.groupTo : (item as VarietyDoughnutSeries).groupTo;
-    final String label =
-        item is VarietyPieSeries ? item.groupLabel : (item as VarietyDoughnutSeries).groupLabel;
+    final double threshold = item is VarietyPieSeries
+        ? item.groupTo
+        : (item as VarietyDoughnutSeries).groupTo;
+    final String label = item is VarietyPieSeries
+        ? item.groupLabel
+        : (item as VarietyDoughnutSeries).groupLabel;
     final double total = item.data.fold<double>(
       0,
       (double sum, VarietyChartData point) => sum + math.max(point.y ?? 0, 0),
@@ -3595,7 +3678,8 @@ class VarietyFunnelGeometry {
     }
     final double maxValue = points.fold<double>(
       0,
-      (double best, VarietyChartData point) => math.max(best, math.max(point.y ?? 0, 0)),
+      (double best, VarietyChartData point) =>
+          math.max(best, math.max(point.y ?? 0, 0)),
     );
     if (maxValue <= 0) {
       return;
@@ -3615,13 +3699,15 @@ class VarietyFunnelGeometry {
     final double maxWidth = plotRect.width / 2;
     final List<double> widths = points.map((VarietyChartData point) {
       final double value = math.max(point.y ?? 0, 0);
-      if (isPyramid && series is VarietyPyramidSeries &&
+      if (isPyramid &&
+          series is VarietyPyramidSeries &&
           (series as VarietyPyramidSeries).mode != VarietyPyramidMode.linear) {
         return maxWidth * math.sqrt(value / maxValue);
       }
       return maxWidth * (value / maxValue);
     }).toList(growable: false);
-    final double neck = series is VarietyFunnelSeries && (series as VarietyFunnelSeries).showNeck
+    final double neck = series is VarietyFunnelSeries &&
+            (series as VarietyFunnelSeries).showNeck
         ? widths.last * 0.35
         : 0;
     for (int i = 0; i < points.length; i++) {
@@ -3654,7 +3740,7 @@ class VarietyFunnelGeometry {
         ..close();
       elements.add(
         VarietyPathElement(
-        seriesIndex: 0,
+          seriesIndex: 0,
           path: path,
           fillColor: color,
           strokeColor: series is VarietyFunnelSeries
@@ -3668,8 +3754,8 @@ class VarietyFunnelGeometry {
       if (series.dataLabelSettings.isVisible) {
         elements.add(
           VarietyLabelsElement(
-          seriesIndex: 0,
-          labels: <VarietyLabelItem>[
+            seriesIndex: 0,
+            labels: <VarietyLabelItem>[
               VarietyLabelItem(
                 anchor: segment.center,
                 text: series.dataLabelSettings.builder?.call(points[i]) ??
@@ -3686,7 +3772,8 @@ class VarietyFunnelGeometry {
     }
   }
 
-  double _halfWidthAt(List<double> widths, double neck, int index, {required bool isTop}) {
+  double _halfWidthAt(List<double> widths, double neck, int index,
+      {required bool isTop}) {
     if (isPyramid) {
       final double current = widths[index];
       final double next = index + 1 < widths.length ? widths[index + 1] : 0;

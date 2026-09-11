@@ -54,13 +54,15 @@ class VarietyFunnelChart extends StatefulWidget {
   final TextStyle? legendTextStyle;
 
   /// Builds custom legend items.
-  final Widget Function(BuildContext context, VarietySeries series, int index)? legendBuilder;
+  final Widget Function(BuildContext context, VarietySeries series, int index)?
+      legendBuilder;
 
   /// Whether the tooltip reacts to pointer input.
   final bool enableTooltip;
 
   /// Builds a custom tooltip body.
-  final Widget Function(BuildContext context, VarietyHitResult result)? tooltipBuilder;
+  final Widget Function(BuildContext context, VarietyHitResult result)?
+      tooltipBuilder;
 
   /// How long the entrance animation runs.
   final Duration animationDuration;
@@ -88,7 +90,8 @@ class _VarietyFunnelChartState extends State<VarietyFunnelChart>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: widget.animationDuration);
+    _controller =
+        AnimationController(vsync: this, duration: widget.animationDuration);
     if (widget.enableAnimation) {
       _controller.forward();
     } else {
@@ -120,12 +123,15 @@ class _VarietyFunnelChartState extends State<VarietyFunnelChart>
     final VarietyChartTheme theme = VarietyChartTheme.of(context);
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        final bool bounded = constraints.hasBoundedHeight && constraints.hasBoundedWidth;
+        final bool bounded =
+            constraints.hasBoundedHeight && constraints.hasBoundedWidth;
         final List<Widget> column = <Widget>[];
         if (widget.title != null && widget.title!.isNotEmpty) {
-          column.add(VarietyChartTitle(text: widget.title!, textStyle: widget.titleStyle));
+          column.add(VarietyChartTitle(
+              text: widget.title!, textStyle: widget.titleStyle));
         }
-        final bool wantsLegend = widget.showLegend && widget.series.name != null;
+        final bool wantsLegend =
+            widget.showLegend && widget.series.name != null;
         final Widget? legend = wantsLegend
             ? VarietyLegend(
                 series: <VarietySeries>[widget.series],
@@ -134,18 +140,21 @@ class _VarietyFunnelChartState extends State<VarietyFunnelChart>
                 itemBuilder: widget.legendBuilder,
               )
             : null;
-        if (legend != null && widget.legendPosition == VarietyLegendPosition.top) {
+        if (legend != null &&
+            widget.legendPosition == VarietyLegendPosition.top) {
           column.add(legend);
         }
         column.add(
           Expanded(
             child: AnimatedBuilder(
               animation: _controller,
-              builder: (BuildContext context, Widget? child) => _buildPlot(theme),
+              builder: (BuildContext context, Widget? child) =>
+                  _buildPlot(theme),
             ),
           ),
         );
-        if (legend != null && widget.legendPosition == VarietyLegendPosition.bottom) {
+        if (legend != null &&
+            widget.legendPosition == VarietyLegendPosition.bottom) {
           column.add(legend);
         }
         final Widget body = Column(
@@ -177,12 +186,14 @@ class _VarietyFunnelChartState extends State<VarietyFunnelChart>
           isPyramid: _isPyramid,
         );
         return MouseRegion(
-          onHover: (PointerHoverEvent event) => _update(geometry.hitTest(event.localPosition)),
+          onHover: (PointerHoverEvent event) =>
+              _update(geometry.hitTest(event.localPosition)),
           onExit: (_) => _update(null),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapUp: (TapUpDetails details) {
-              final VarietyHitResult? hit = geometry.hitTest(details.localPosition);
+              final VarietyHitResult? hit =
+                  geometry.hitTest(details.localPosition);
               setState(() => _hit = hit);
               widget.onPointTap?.call(hit);
             },
@@ -194,8 +205,9 @@ class _VarietyFunnelChartState extends State<VarietyFunnelChart>
                     painter: VarietyFunnelPainter(
                       geometry: geometry,
                       theme: theme,
-                      highlights:
-                          _hit == null ? const <VarietyHitResult>[] : <VarietyHitResult>[_hit!],
+                      highlights: _hit == null
+                          ? const <VarietyHitResult>[]
+                          : <VarietyHitResult>[_hit!],
                     ),
                   ),
                 ),

@@ -25,7 +25,8 @@ class VarietyChartTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TextStyle fallback = Theme.of(context).textTheme.titleMedium ?? const TextStyle();
+    final TextStyle fallback =
+        Theme.of(context).textTheme.titleMedium ?? const TextStyle();
     return Padding(
       padding: padding,
       child: SizedBox(

@@ -60,7 +60,8 @@ void main() {
   group('varietyFormatValue', () {
     test('dispatches on the runtime type', () {
       expect(varietyFormatValue(1200), '1.2K');
-      expect(varietyFormatValue(DateTime(2026, 3, 9), datePattern: 'yyyy'), '2026');
+      expect(varietyFormatValue(DateTime(2026, 3, 9), datePattern: 'yyyy'),
+          '2026');
       expect(varietyFormatValue('Jan'), 'Jan');
     });
   });

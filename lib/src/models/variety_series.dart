@@ -1502,7 +1502,6 @@ enum VarietyPyramidMode {
   surface,
 }
 
-
 /// A series that fills the region under a smooth spline.
 ///
 /// It is equivalent to a [VarietyAreaSeries] with

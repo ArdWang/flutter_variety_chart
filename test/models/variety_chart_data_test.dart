@@ -38,13 +38,15 @@ void main() {
     });
 
     test('uses secondaryY as a range bound', () {
-      const VarietyChartData point = VarietyChartData('Jan', 20, secondaryY: 60);
+      const VarietyChartData point =
+          VarietyChartData('Jan', 20, secondaryY: 60);
       expect(point.highValue, 60);
       expect(point.lowValue, 20);
     });
 
     test('copyWith replaces only the supplied fields', () {
-      const VarietyChartData point = VarietyChartData('Jan', 32, label: 'January');
+      const VarietyChartData point =
+          VarietyChartData('Jan', 32, label: 'January');
       final VarietyChartData copy = point.copyWith(y: 40);
       expect(copy.y, 40);
       expect(copy.x, 'Jan');
@@ -62,7 +64,8 @@ void main() {
     });
 
     test('copyWith preserves unspecified fields', () {
-      const VarietyAxis axis = VarietyAxis(title: 'Value', showGridLines: false);
+      const VarietyAxis axis =
+          VarietyAxis(title: 'Value', showGridLines: false);
       final VarietyAxis copy = axis.copyWith(minimum: 5);
       expect(copy.minimum, 5);
       expect(copy.title, 'Value');
@@ -89,24 +92,33 @@ void main() {
     });
 
     test('marks circular and banded series', () {
-      expect(VarietyPieSeries(data: const <VarietyChartData>[]).isCircular, isTrue);
-      expect(VarietyDoughnutSeries(data: const <VarietyChartData>[]).isCircular, isTrue);
-      expect(VarietyRadialBarSeries(data: const <VarietyChartData>[]).isCircular, isTrue);
-      expect(VarietyColumnSeries(data: const <VarietyChartData>[]).isCircular, isFalse);
-      expect(VarietyColumnSeries(data: const <VarietyChartData>[]).isBanded, isTrue);
-      expect(VarietyRangeAreaSeries(data: const <VarietyChartData>[]).isRange, isTrue);
+      expect(VarietyPieSeries(data: const <VarietyChartData>[]).isCircular,
+          isTrue);
+      expect(VarietyDoughnutSeries(data: const <VarietyChartData>[]).isCircular,
+          isTrue);
+      expect(
+          VarietyRadialBarSeries(data: const <VarietyChartData>[]).isCircular,
+          isTrue);
+      expect(VarietyColumnSeries(data: const <VarietyChartData>[]).isCircular,
+          isFalse);
+      expect(VarietyColumnSeries(data: const <VarietyChartData>[]).isBanded,
+          isTrue);
+      expect(VarietyRangeAreaSeries(data: const <VarietyChartData>[]).isRange,
+          isTrue);
     });
   });
 
   group('palette', () {
     test('exposes at least eight distinct colours', () {
       expect(varietyDefaultPalette.length, greaterThanOrEqualTo(8));
-      expect(varietyDefaultPalette.toSet().length, varietyDefaultPalette.length);
+      expect(
+          varietyDefaultPalette.toSet().length, varietyDefaultPalette.length);
     });
   });
 
   group('VarietyChartTheme', () {
-    testWidgets('adapts to the ambient brightness', (WidgetTester tester) async {
+    testWidgets('adapts to the ambient brightness',
+        (WidgetTester tester) async {
       VarietyChartTheme? light;
       VarietyChartTheme? dark;
       await tester.pumpWidget(
@@ -135,7 +147,8 @@ void main() {
           ),
         ),
       );
-      expect(light!.tooltipBackgroundColor, isNot(dark!.tooltipBackgroundColor));
+      expect(
+          light!.tooltipBackgroundColor, isNot(dark!.tooltipBackgroundColor));
       expect(light!.gridLineColor, isNot(dark!.gridLineColor));
     });
   });

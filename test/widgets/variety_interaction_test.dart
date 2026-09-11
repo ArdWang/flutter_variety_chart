@@ -18,8 +18,10 @@ Finder chartCanvas() => find
 
 void main() {
   group('selection', () {
-    testWidgets('a selection controller drives the chart', (WidgetTester tester) async {
-      final VarietySelectionController controller = VarietySelectionController();
+    testWidgets('a selection controller drives the chart',
+        (WidgetTester tester) async {
+      final VarietySelectionController controller =
+          VarietySelectionController();
       addTearDown(controller.dispose);
       await tester.pumpWidget(
         host(
@@ -45,7 +47,8 @@ void main() {
 
     testWidgets('multi selection collects more than one point',
         (WidgetTester tester) async {
-      final VarietySelectionController controller = VarietySelectionController();
+      final VarietySelectionController controller =
+          VarietySelectionController();
       addTearDown(controller.dispose);
       await tester.pumpWidget(
         host(
@@ -132,7 +135,8 @@ void main() {
       expect(find.byType(VarietyTooltipCard), findsNothing);
     });
 
-    testWidgets('onDataLabelRender rewrites a caption', (WidgetTester tester) async {
+    testWidgets('onDataLabelRender rewrites a caption',
+        (WidgetTester tester) async {
       int calls = 0;
       await tester.pumpWidget(
         host(
@@ -145,7 +149,8 @@ void main() {
               VarietyColumnSeries(
                 name: 'A',
                 data: monthly(),
-                dataLabelSettings: const VarietyDataLabelSettings(isVisible: true),
+                dataLabelSettings:
+                    const VarietyDataLabelSettings(isVisible: true),
               ),
             ],
           ),
@@ -174,7 +179,9 @@ void main() {
       // The primary axis labels sit just under the plot area, so probe along
       // that band until one is hit.
       final Rect canvas = tester.getRect(chartCanvas());
-      for (double ratio = 0.1; ratio <= 0.95 && details == null; ratio += 0.05) {
+      for (double ratio = 0.1;
+          ratio <= 0.95 && details == null;
+          ratio += 0.05) {
         await tester.tapAt(
           Offset(
             canvas.left + canvas.width * ratio,
@@ -230,7 +237,8 @@ void main() {
                   VarietyChartData('B', 40, label: 'B'),
                 ],
               ),
-              VarietyErrorBarSeries(name: 'Error', data: monthly(), errorValue: 4),
+              VarietyErrorBarSeries(
+                  name: 'Error', data: monthly(), errorValue: 4),
             ],
           ),
           height: 420,

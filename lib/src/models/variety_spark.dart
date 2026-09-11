@@ -251,7 +251,8 @@ class VarietySparkTrackball {
   final TextStyle? labelStyle;
 
   /// Rewrites the tooltip caption before it is drawn.
-  final String Function(VarietySparkTooltipFormatterDetails details)? tooltipFormatter;
+  final String Function(VarietySparkTooltipFormatterDetails details)?
+      tooltipFormatter;
 
   /// The background colour of the tooltip card.
   final Color? backgroundColor;
@@ -278,7 +279,8 @@ class VarietySparkTrackball {
     List<double>? dashArray,
     VarietySparkActivationMode? activationMode,
     TextStyle? labelStyle,
-    String Function(VarietySparkTooltipFormatterDetails details)? tooltipFormatter,
+    String Function(VarietySparkTooltipFormatterDetails details)?
+        tooltipFormatter,
     Color? backgroundColor,
     bool? shouldAlwaysShow,
     double? hideDelay,

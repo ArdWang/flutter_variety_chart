@@ -84,7 +84,8 @@ class VarietyCircularPainter extends CustomPainter {
     }
     for (final VarietyHitResult hit in highlights) {
       for (final VarietySlice slice in geometry.slices) {
-        if (slice.seriesIndex != hit.seriesIndex || slice.pointIndex != hit.pointIndex) {
+        if (slice.seriesIndex != hit.seriesIndex ||
+            slice.pointIndex != hit.pointIndex) {
           continue;
         }
         final double mid = slice.startAngle + slice.sweepAngle / 2;
@@ -113,8 +114,9 @@ class VarietyCircularPainter extends CustomPainter {
       if (caption.isEmpty) {
         continue;
       }
-      final TextStyle style = (settings.textStyle ?? const TextStyle(fontSize: 11))
-          .copyWith(color: settings.color ?? Colors.white);
+      final TextStyle style =
+          (settings.textStyle ?? const TextStyle(fontSize: 11))
+              .copyWith(color: settings.color ?? Colors.white);
       final TextPainter painter = TextPainter(
         text: TextSpan(text: caption, style: style),
         textDirection: TextDirection.ltr,
@@ -154,7 +156,8 @@ class VarietyCircularPainter extends CustomPainter {
         center.dx + outer * math.cos(start),
         center.dy + outer * math.sin(start),
       )
-      ..arcTo(Rect.fromCircle(center: center, radius: outer), start, sweep, false);
+      ..arcTo(
+          Rect.fromCircle(center: center, radius: outer), start, sweep, false);
     if (inner > 0) {
       path
         ..lineTo(
@@ -183,7 +186,8 @@ class VarietyCircularPainter extends CustomPainter {
     final double inner = slice.innerRadius;
     final double start = slice.startAngle;
     final double sweep = slice.sweepAngle;
-    final double radius = math.min(slice.cornerRadius, (outer - inner).abs() / 2);
+    final double radius =
+        math.min(slice.cornerRadius, (outer - inner).abs() / 2);
     if (radius <= 0.5) {
       return _ringPath(slice);
     }
@@ -194,7 +198,8 @@ class VarietyCircularPainter extends CustomPainter {
         center.dx + insetOuter * math.cos(start),
         center.dy + insetOuter * math.sin(start),
       )
-      ..arcTo(Rect.fromCircle(center: center, radius: outer), start, sweep, false)
+      ..arcTo(
+          Rect.fromCircle(center: center, radius: outer), start, sweep, false)
       ..lineTo(
         center.dx + outer * math.cos(start + sweep),
         center.dy + outer * math.sin(start + sweep),

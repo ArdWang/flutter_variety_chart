@@ -25,7 +25,8 @@ void main() {
 
   group('exponential moving average', () {
     test('seeds from the first full window', () {
-      final List<VarietyChartData> values = exponentialMovingAverage(rising(), 3);
+      final List<VarietyChartData> values =
+          exponentialMovingAverage(rising(), 3);
       expect(values[1].y, isNull);
       expect(values[2].y, closeTo(2, 0.001));
       // A linear ramp makes the EMA lag by a constant, so the last reading
@@ -47,7 +48,8 @@ void main() {
 
     test('triangular average is smoother than the simple one', () {
       final List<VarietyChartData> simple = simpleMovingAverage(rising(), 4);
-      final List<VarietyChartData> triangular = triangularMovingAverage(rising(), 4);
+      final List<VarietyChartData> triangular =
+          triangularMovingAverage(rising(), 4);
       expect(triangular.last.y, isNotNull);
       expect((triangular.last.y! - simple.last.y!).abs(), lessThan(2));
     });
@@ -59,7 +61,8 @@ void main() {
       expect(values.last.y, closeTo(100, 0.001));
     });
 
-    test('relative strength index returns nothing when the window is too long', () {
+    test('relative strength index returns nothing when the window is too long',
+        () {
       expect(relativeStrengthIndex(rising(), 50), isEmpty);
     });
 
@@ -92,7 +95,8 @@ void main() {
 
   group('composite indicators', () {
     test('Bollinger bands bracket the middle band', () {
-      final VarietyBollingerBandsIndicator indicator = VarietyBollingerBandsIndicator(
+      final VarietyBollingerBandsIndicator indicator =
+          VarietyBollingerBandsIndicator(
         source: VarietyLineSeries(data: rising()),
         period: 5,
       );

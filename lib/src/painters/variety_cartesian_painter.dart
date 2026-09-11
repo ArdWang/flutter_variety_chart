@@ -79,11 +79,11 @@ class VarietyCartesianPainter extends CustomPainter {
 
   /// One renderer per series, built from [VarietySeries.onCreateRenderer]
   /// or the default renderer as a fallback.
-  late final Map<int, VarietyElementRenderer> _renderers =
-      _buildRendererMap();
+  late final Map<int, VarietyElementRenderer> _renderers = _buildRendererMap();
 
   Map<int, VarietyElementRenderer> _buildRendererMap() {
-    final Map<int, VarietyElementRenderer> map = <int, VarietyElementRenderer>{};
+    final Map<int, VarietyElementRenderer> map =
+        <int, VarietyElementRenderer>{};
     for (int s = 0; s < geometry.series.length; s++) {
       final VarietySeries series = geometry.series[s];
       final VarietyElementRenderer renderer =
@@ -173,16 +173,20 @@ class VarietyCartesianPainter extends CustomPainter {
         continue;
       }
       final Paint paint = Paint()
-        ..color = (band.color ?? theme.gridLineColor).withValues(alpha: band.opacity);
+        ..color =
+            (band.color ?? theme.gridLineColor).withValues(alpha: band.opacity);
       final double from = band.start.toDouble();
       final double to = band.end.toDouble();
       final num? repeat = band.repeatEvery;
       if (repeat != null && repeat > 0) {
-        for (double value = from; value <= geometry.yMaximum; value += repeat.toDouble()) {
+        for (double value = from;
+            value <= geometry.yMaximum;
+            value += repeat.toDouble()) {
           final double top = geometry.pixelY(value + (to - from));
           final double bottom = geometry.pixelY(value);
           canvas.drawRect(
-            Rect.fromLTRB(geometry.plotRect.left, top, geometry.plotRect.right, bottom),
+            Rect.fromLTRB(
+                geometry.plotRect.left, top, geometry.plotRect.right, bottom),
             paint,
           );
         }
@@ -191,7 +195,8 @@ class VarietyCartesianPainter extends CustomPainter {
       final double top = geometry.pixelY(math.max(from, to));
       final double bottom = geometry.pixelY(math.min(from, to));
       canvas.drawRect(
-        Rect.fromLTRB(geometry.plotRect.left, top, geometry.plotRect.right, bottom),
+        Rect.fromLTRB(
+            geometry.plotRect.left, top, geometry.plotRect.right, bottom),
         paint,
       );
       if (band.label != null) {
@@ -213,7 +218,8 @@ class VarietyCartesianPainter extends CustomPainter {
         continue;
       }
       final Paint paint = Paint()
-        ..color = (band.color ?? theme.gridLineColor).withValues(alpha: band.opacity);
+        ..color =
+            (band.color ?? theme.gridLineColor).withValues(alpha: band.opacity);
       final double left = _bandX(band.start.toDouble());
       final double right = _bandX(band.end.toDouble());
       canvas.drawRect(
@@ -246,7 +252,8 @@ class VarietyCartesianPainter extends CustomPainter {
         ..isAntiAlias = true;
       for (final double tick in geometry.yTicks) {
         final double y = geometry.pixelY(tick);
-        if (y < geometry.plotRect.top - 0.5 || y > geometry.plotRect.bottom + 0.5) {
+        if (y < geometry.plotRect.top - 0.5 ||
+            y > geometry.plotRect.bottom + 0.5) {
           continue;
         }
         _renderer.drawLine(
@@ -330,7 +337,8 @@ class VarietyCartesianPainter extends CustomPainter {
         return geometry.dateTimeTicks
             .map(
               (DateTime tick) => geometry
-                  .toPixel(tick.millisecondsSinceEpoch.toDouble(), geometry.yMinimum)
+                  .toPixel(
+                      tick.millisecondsSinceEpoch.toDouble(), geometry.yMinimum)
                   .dx,
             )
             .toList(growable: false);
@@ -340,7 +348,8 @@ class VarietyCartesianPainter extends CustomPainter {
         final int steps = math.max(geometry.xAxis.desiredIntervals, 1);
         return List<double>.generate(
           steps + 1,
-          (int i) => geometry.toPixel(geometry.xMinimum + span * i / steps, 0).dx,
+          (int i) =>
+              geometry.toPixel(geometry.xMinimum + span * i / steps, 0).dx,
         );
     }
   }
@@ -351,8 +360,9 @@ class VarietyCartesianPainter extends CustomPainter {
 
   void _paintAxisLines(Canvas canvas) {
     if (geometry.yAxis.visible && geometry.yAxis.showAxisLine) {
-      final double x =
-          geometry.yAxis.opposedPosition ? geometry.plotRect.right : geometry.plotRect.left;
+      final double x = geometry.yAxis.opposedPosition
+          ? geometry.plotRect.right
+          : geometry.plotRect.left;
       canvas.drawLine(
         Offset(x, geometry.plotRect.top),
         Offset(x, geometry.plotRect.bottom),
@@ -364,8 +374,9 @@ class VarietyCartesianPainter extends CustomPainter {
       );
     }
     if (geometry.xAxis.visible && geometry.xAxis.showAxisLine) {
-      final double y =
-          geometry.xAxis.opposedPosition ? geometry.plotRect.top : geometry.plotRect.bottom;
+      final double y = geometry.xAxis.opposedPosition
+          ? geometry.plotRect.top
+          : geometry.plotRect.bottom;
       canvas.drawLine(
         Offset(geometry.plotRect.left, y),
         Offset(geometry.plotRect.right, y),
@@ -438,7 +449,8 @@ class VarietyCartesianPainter extends CustomPainter {
       }
       for (final double tick in ticks) {
         final double y = geometry.pixelYOn(i, tick);
-        if (y < geometry.plotRect.top - 0.5 || y > geometry.plotRect.bottom + 0.5) {
+        if (y < geometry.plotRect.top - 0.5 ||
+            y > geometry.plotRect.bottom + 0.5) {
           continue;
         }
         final String caption = geometry.secondaryTickLabelOn(i, tick);
@@ -462,7 +474,10 @@ class VarietyCartesianPainter extends CustomPainter {
       if (title != null && title.isNotEmpty) {
         final TextPainter painter = _renderer.layoutText(
           title,
-          TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: theme.labelColor),
+          TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: theme.labelColor),
         );
         canvas.save();
         canvas.translate(axisX + labelWidth + 24, geometry.plotRect.center.dy);
@@ -470,7 +485,9 @@ class VarietyCartesianPainter extends CustomPainter {
         painter.paint(canvas, Offset(-painter.width / 2, -painter.height / 2));
         canvas.restore();
       }
-      offset += labelWidth + axis.labelOffset + 14 +
+      offset += labelWidth +
+          axis.labelOffset +
+          14 +
           ((title ?? '').isNotEmpty ? 20 : 0);
     }
   }
@@ -479,13 +496,15 @@ class VarietyCartesianPainter extends CustomPainter {
     if (!geometry.yAxis.showLabels || !geometry.yAxis.visible) {
       return;
     }
-    final TextStyle style =
-        geometry.yAxis.labelStyle ?? TextStyle(fontSize: 11, color: theme.labelColor);
+    final TextStyle style = geometry.yAxis.labelStyle ??
+        TextStyle(fontSize: 11, color: theme.labelColor);
     final bool opposed = geometry.yAxis.opposedPosition;
-    final double axisX = opposed ? geometry.plotRect.right : geometry.plotRect.left;
+    final double axisX =
+        opposed ? geometry.plotRect.right : geometry.plotRect.left;
     for (final double tick in geometry.yTicks) {
       final double y = geometry.pixelY(tick);
-      if (y < geometry.plotRect.top - 0.5 || y > geometry.plotRect.bottom + 0.5) {
+      if (y < geometry.plotRect.top - 0.5 ||
+          y > geometry.plotRect.bottom + 0.5) {
         continue;
       }
       final String caption = geometry.secondaryTickLabel(tick);
@@ -501,7 +520,8 @@ class VarietyCartesianPainter extends CustomPainter {
         opposed
             ? Offset(
                 axisX +
-                    (inside ? -geometry.yAxis.labelOffset - painter.width
+                    (inside
+                        ? -geometry.yAxis.labelOffset - painter.width
                         : geometry.yAxis.labelOffset),
                 y - painter.height / 2,
               )
@@ -530,7 +550,8 @@ class VarietyCartesianPainter extends CustomPainter {
     if (title != null && title.isNotEmpty) {
       final TextPainter painter = _renderer.layoutText(
         title,
-        TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: theme.labelColor),
+        TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w600, color: theme.labelColor),
       );
       canvas.save();
       canvas.translate(14, geometry.plotRect.center.dy);
@@ -562,7 +583,8 @@ class VarietyCartesianPainter extends CustomPainter {
             .map(
               (DateTime tick) => _AxisTick(
                 geometry
-                    .toPixel(tick.millisecondsSinceEpoch.toDouble(), geometry.yMinimum)
+                    .toPixel(tick.millisecondsSinceEpoch.toDouble(),
+                        geometry.yMinimum)
                     .dx,
                 geometry.dateTimeTickLabel(tick),
                 tick.millisecondsSinceEpoch.toDouble(),
@@ -628,9 +650,10 @@ class VarietyCartesianPainter extends CustomPainter {
         .toList(growable: false);
 
     final List<bool> visible = List<bool>.filled(ticks.length, true);
-    final bool thinning = axis.labelIntersectAction == VarietyLabelIntersectAction.hide ||
-        axis.labelIntersectAction == VarietyLabelIntersectAction.rotate45 ||
-        axis.labelIntersectAction == VarietyLabelIntersectAction.rotate90;
+    final bool thinning =
+        axis.labelIntersectAction == VarietyLabelIntersectAction.hide ||
+            axis.labelIntersectAction == VarietyLabelIntersectAction.rotate45 ||
+            axis.labelIntersectAction == VarietyLabelIntersectAction.rotate90;
     if (thinning) {
       double lastRight = double.negativeInfinity;
       for (int i = 0; i < ticks.length; i++) {
@@ -671,10 +694,12 @@ class VarietyCartesianPainter extends CustomPainter {
         }
       }
       double rowOffset = 0;
-      if (axis.labelIntersectAction == VarietyLabelIntersectAction.multipleRows) {
+      if (axis.labelIntersectAction ==
+          VarietyLabelIntersectAction.multipleRows) {
         rowOffset = i.isOdd ? painter.height + 2 : 0;
       }
-      final double anchorY = baseY + (inside ? -painter.height - 4 : 0) + rowOffset;
+      final double anchorY =
+          baseY + (inside ? -painter.height - 4 : 0) + rowOffset;
       labelHits?.add(
         VarietyAxisLabelHit(
           rect: Rect.fromCenter(
@@ -700,14 +725,17 @@ class VarietyCartesianPainter extends CustomPainter {
     if (title != null && title.isNotEmpty) {
       final TextPainter painter = _renderer.layoutText(
         title,
-        TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: theme.labelColor),
+        TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w600, color: theme.labelColor),
       );
       painter.paint(
         canvas,
         Offset(
           geometry.plotRect.center.dx - painter.width / 2,
-          baseY + _primaryLabelHeight(style) +
-              (axis.labelIntersectAction == VarietyLabelIntersectAction.multipleRows
+          baseY +
+              _primaryLabelHeight(style) +
+              (axis.labelIntersectAction ==
+                      VarietyLabelIntersectAction.multipleRows
                   ? 20
                   : 0) +
               6,
@@ -716,7 +744,8 @@ class VarietyCartesianPainter extends CustomPainter {
     }
   }
 
-  void _paintWrapped(Canvas canvas, String text, Offset anchor, TextStyle style) {
+  void _paintWrapped(
+      Canvas canvas, String text, Offset anchor, TextStyle style) {
     final List<String> words = text.split(' ');
     final int split = (words.length / 2).ceil();
     final String first = words.take(split).join(' ');
@@ -730,15 +759,19 @@ class VarietyCartesianPainter extends CustomPainter {
 
   void _paintMultiLevelLabels(Canvas canvas) {
     final VarietyMultiLevelLabels? groups = geometry.xAxis.multiLevelLabels;
-    if (groups == null || groups.groups.isEmpty || geometry.slotCenters.isEmpty) {
+    if (groups == null ||
+        groups.groups.isEmpty ||
+        geometry.slotCenters.isEmpty) {
       return;
     }
     final Color borderColor = groups.borderColor ?? theme.axisLineColor;
     final TextStyle style = groups.textStyle ??
-        TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: theme.labelColor);
+        TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600, color: theme.labelColor);
     final double baseY = geometry.plotRect.bottom +
         geometry.xAxis.labelOffset +
-        _primaryLabelHeight(geometry.xAxis.labelStyle ?? const TextStyle(fontSize: 11)) +
+        _primaryLabelHeight(
+            geometry.xAxis.labelStyle ?? const TextStyle(fontSize: 11)) +
         6;
     for (final VarietyLabelGroup group in groups.groups) {
       final double top = baseY + group.level * 22;
@@ -797,7 +830,8 @@ class VarietyCartesianPainter extends CustomPainter {
       final TextPainter painter = _renderer.layoutText(group.text, style);
       painter.paint(
         canvas,
-        Offset(rect.center.dx - painter.width / 2, rect.center.dy - painter.height / 2),
+        Offset(rect.center.dx - painter.width / 2,
+            rect.center.dy - painter.height / 2),
       );
     }
   }
@@ -873,7 +907,8 @@ class VarietyCartesianPainter extends CustomPainter {
               ..strokeWidth = annotation.borderWidth,
             annotation.dashArray,
           );
-          _paintAnnotationText(canvas, annotation, Offset(x + 6, geometry.plotRect.top + 6));
+          _paintAnnotationText(
+              canvas, annotation, Offset(x + 6, geometry.plotRect.top + 6));
         case VarietyShapeType.rectangle:
         case VarietyShapeType.ellipse:
           final Offset anchor = _annotationOffset(annotation);
@@ -883,7 +918,8 @@ class VarietyCartesianPainter extends CustomPainter {
             height: annotation.height <= 0 ? 44 : annotation.height,
           );
           if (annotation.shapeType == VarietyShapeType.rectangle) {
-            final RRect rrect = RRect.fromRectAndRadius(rect, const Radius.circular(6));
+            final RRect rrect =
+                RRect.fromRectAndRadius(rect, const Radius.circular(6));
             canvas.drawRRect(rrect, Paint()..color = fill);
             canvas.drawRRect(
               rrect,
@@ -902,9 +938,11 @@ class VarietyCartesianPainter extends CustomPainter {
                 ..strokeWidth = annotation.borderWidth,
             );
           }
-          _paintAnnotationText(canvas, annotation, rect.topLeft + const Offset(8, 6));
+          _paintAnnotationText(
+              canvas, annotation, rect.topLeft + const Offset(8, 6));
         case VarietyShapeType.text:
-          _paintAnnotationText(canvas, annotation, _annotationOffset(annotation));
+          _paintAnnotationText(
+              canvas, annotation, _annotationOffset(annotation));
         case VarietyShapeType.arrow:
           final Offset anchor = _annotationOffset(annotation);
           final Path arrow = Path()
@@ -923,7 +961,8 @@ class VarietyCartesianPainter extends CustomPainter {
           stream.addListener(
             ImageStreamListener((ImageInfo info, bool synchronous) {
               final Offset anchor = _annotationOffset(annotation);
-              final double width = annotation.width <= 0 ? 48 : annotation.width;
+              final double width =
+                  annotation.width <= 0 ? 48 : annotation.width;
               final double height = annotation.height <= 0
                   ? width * info.image.height / info.image.width
                   : annotation.height;
@@ -956,8 +995,9 @@ class VarietyCartesianPainter extends CustomPainter {
       }
       return geometry.plotRect.left + geometry.slotWidth * (index + 0.5);
     }
-    final double value =
-        x is DateTime ? x.millisecondsSinceEpoch.toDouble() : (x as num).toDouble();
+    final double value = x is DateTime
+        ? x.millisecondsSinceEpoch.toDouble()
+        : (x as num).toDouble();
     return geometry.toPixel(value, geometry.yMinimum).dx;
   }
 
@@ -992,7 +1032,10 @@ class VarietyCartesianPainter extends CustomPainter {
 
   void _paintHighlights(Canvas canvas) {
     final VarietyTrackballBehavior? ball = trackball;
-    if (ball != null && ball.enabled && ball.showLine && trackballSlot != null) {
+    if (ball != null &&
+        ball.enabled &&
+        ball.showLine &&
+        trackballSlot != null) {
       _renderer.drawLine(
         canvas,
         Offset(trackballSlot!, geometry.plotRect.top),
@@ -1037,7 +1080,8 @@ class VarietyCartesianPainter extends CustomPainter {
           hit.series.color ??
           varietyDefaultPalette[hit.seriesIndex % varietyDefaultPalette.length];
       final double size = ball?.markerSize ?? 9;
-      final VarietyMarkerShape shape = ball?.markerShape ?? VarietyMarkerShape.circle;
+      final VarietyMarkerShape shape =
+          ball?.markerShape ?? VarietyMarkerShape.circle;
       final Path path = _renderer.markerPath(shape, hit.position, size);
       canvas.drawPath(path, Paint()..color = theme.markerBorderColor);
       canvas.drawPath(

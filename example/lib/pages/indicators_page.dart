@@ -18,7 +18,8 @@ class IndicatorsPage extends StatelessWidget {
       strokeWidth: 1.6,
       data: dailyPrices
           .map(
-            (VarietyChartData point) => VarietyChartData(point.x, point.closeValue),
+            (VarietyChartData point) =>
+                VarietyChartData(point.x, point.closeValue),
           )
           .toList(growable: false),
     );
@@ -30,8 +31,7 @@ class IndicatorsPage extends StatelessWidget {
 
     return DemoScaffold(
       title: 'Indicators',
-      description:
-          'Indicators are computed from a source series. Single-line '
+      description: 'Indicators are computed from a source series. Single-line '
           'indicators are ordinary series, so they can be dropped straight into '
           'the series list; multi-line indicators expose a build() method.',
       children: <Widget>[
@@ -94,7 +94,8 @@ class IndicatorsPage extends StatelessWidget {
           child: VarietyCartesianChart(
             primaryXAxis: const VarietyAxis(type: VarietyAxisType.numeric),
             series: <VarietySeries>[
-              VarietyMomentumIndicator(name: 'Momentum', period: 3, source: source),
+              VarietyMomentumIndicator(
+                  name: 'Momentum', period: 3, source: source),
               VarietyRocIndicator(name: 'ROC', period: 3, source: source),
               VarietyAtrIndicator(name: 'ATR', period: 3, source: source),
             ],

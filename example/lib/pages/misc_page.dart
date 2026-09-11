@@ -23,7 +23,8 @@ class MiscPage extends StatelessWidget {
           child: VarietyFunnelChart(
             series: VarietyFunnelSeries(
               name: 'Conversion',
-              dataLabelSettings: const VarietyDataLabelSettings(isVisible: true),
+              dataLabelSettings:
+                  const VarietyDataLabelSettings(isVisible: true),
               data: funnelStages,
             ),
           ),
@@ -36,7 +37,8 @@ class MiscPage extends StatelessWidget {
               name: 'Stages',
               gapRatio: 0.08,
               explodeIndexes: const <int>[1],
-              dataLabelSettings: const VarietyDataLabelSettings(isVisible: true),
+              dataLabelSettings:
+                  const VarietyDataLabelSettings(isVisible: true),
               data: funnelStages,
             ),
           ),

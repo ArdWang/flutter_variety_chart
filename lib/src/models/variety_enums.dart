@@ -224,17 +224,28 @@ enum VarietyShapeType {
 }
 
 /// The activation mode understood by the zoom and pan behaviour.
+///
+/// This mirrors the independent flags Syncfusion's `ZoomPanBehavior` exposes
+/// (`enablePinching`, `enablePanning`, `enableMouseWheelZooming`,
+/// `enableDoubleTapZooming`, `enableSelectionZooming`), bundled into the
+/// combinations that are actually useful.
+///
+/// Selection zooming is always driven by a **long press**, exactly as in
+/// Syncfusion ("long-press and drag to select a region"). That is what lets it
+/// run alongside panning, which keeps the plain drag gesture.
 enum VarietyZoomMode {
-  /// Zoom is driven by pinch and mouse wheel gestures only.
+  /// Pinch and mouse wheel zoom, double tap to zoom in or reset, and drag to
+  /// pan while zoomed.
   pinch,
 
-  /// Rectangular rubber-band selection zoom.
+  /// Long-press and drag to rubber-band select a region. A plain drag still
+  /// pans whenever `enablePanning` is set.
   selection,
 
-  /// Both pinch and selection zoom are enabled.
+  /// Everything from [pinch] plus long-press selection zooming.
   both,
 
-  /// Zooming is disabled.
+  /// Zooming is disabled; the chart ignores every zoom and pan gesture.
   none,
 }
 

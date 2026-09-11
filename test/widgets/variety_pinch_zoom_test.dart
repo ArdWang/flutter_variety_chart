@@ -18,8 +18,10 @@ dynamic currentGeometry(WidgetTester tester) =>
 
 /// Performs a two-finger pinch-out at [centre], doubling the finger spread.
 Future<void> pinchOut(WidgetTester tester, Offset centre, double spread) async {
-  final TestGesture a = await tester.startGesture(centre - Offset(spread / 2, 0));
-  final TestGesture b = await tester.startGesture(centre + Offset(spread / 2, 0));
+  final TestGesture a =
+      await tester.startGesture(centre - Offset(spread / 2, 0));
+  final TestGesture b =
+      await tester.startGesture(centre + Offset(spread / 2, 0));
   await tester.pump(const Duration(milliseconds: 50));
   // Slide both fingers together in small alternating steps so the spread
   // never changes by more than the gesture slop: the arena resolves while
@@ -62,8 +64,23 @@ double yValueAt(dynamic geometry, double dy) {
       (dy - plot.top) / plot.height * (geometry.yMaximum - geometry.yMinimum);
 }
 
+/// Long-presses at [centre], drags by [by] and releases.
+Future<void> longPressDrag(
+  WidgetTester tester,
+  Offset centre,
+  Offset by,
+) async {
+  final TestGesture finger = await tester.startGesture(centre);
+  await tester.pump(const Duration(milliseconds: 600));
+  await finger.moveBy(by);
+  await tester.pump();
+  await finger.up();
+  await tester.pumpAndSettle();
+}
+
 Future<void> pumpChart(
   WidgetTester tester, {
+  VarietyZoomMode mode = VarietyZoomMode.pinch,
   VarietyZoomAxisMode axisMode = VarietyZoomAxisMode.xy,
   List<VarietySeries> series = const <VarietySeries>[],
 }) async {
@@ -71,12 +88,13 @@ Future<void> pumpChart(
     host(
       VarietyCartesianChart(
         zoomPanBehavior: VarietyZoomPanBehavior(
-          mode: VarietyZoomMode.pinch,
+          mode: mode,
           axisMode: axisMode,
         ),
         series: series.isEmpty
             ? <VarietySeries>[
-                VarietyLineSeries(name: 'A', showMarkers: true, data: monthly()),
+                VarietyLineSeries(
+                    name: 'A', showMarkers: true, data: monthly()),
               ]
             : series,
       ),
@@ -113,8 +131,10 @@ void main() {
     await pinchOut(tester, tester.getCenter(chartCanvas()), 80);
 
     final dynamic after = currentGeometry(tester);
-    expect(after.xMaximum - after.xMinimum, lessThan(before.xMaximum - before.xMinimum));
-    expect(after.yMaximum - after.yMinimum, moreOrLessEquals(ySpanBefore, epsilon: 0.5));
+    expect(after.xMaximum - after.xMinimum,
+        lessThan(before.xMaximum - before.xMinimum));
+    expect(after.yMaximum - after.yMinimum,
+        moreOrLessEquals(ySpanBefore, epsilon: 0.5));
   });
 
   testWidgets('pinch zooms a chart that mixes column and line series',
@@ -222,5 +242,59 @@ void main() {
     );
     expect(xValueAt(after, local.dx), moreOrLessEquals(xBefore, epsilon: 1e-6));
     expect(yValueAt(after, local.dy), moreOrLessEquals(yBefore, epsilon: 1e-6));
+  });
+
+  testWidgets('a long press drags out a selection zoom in both mode',
+      (WidgetTester tester) async {
+    await pumpChart(tester, mode: VarietyZoomMode.both);
+    final dynamic before = currentGeometry(tester);
+    final double xSpanBefore = before.xMaximum - before.xMinimum;
+    final double ySpanBefore = before.yMaximum - before.yMinimum;
+
+    await longPressDrag(
+      tester,
+      tester.getCenter(chartCanvas()),
+      const Offset(-60, -40),
+    );
+
+    final dynamic after = currentGeometry(tester);
+    expect(after.xMaximum - after.xMinimum, lessThan(xSpanBefore));
+    expect(after.yMaximum - after.yMinimum, lessThan(ySpanBefore));
+  });
+
+  testWidgets('a plain drag still pans in both mode, so the two coexist',
+      (WidgetTester tester) async {
+    await pumpChart(tester, mode: VarietyZoomMode.both);
+    final Offset centre = tester.getCenter(chartCanvas());
+    await pinchOut(tester, centre, 80);
+    await tester.pump(const Duration(milliseconds: 400));
+    final dynamic zoomed = currentGeometry(tester);
+    final double yMinBefore = zoomed.yMinimum;
+
+    // A short drag must pan rather than start a selection rectangle.
+    final TestGesture finger = await tester.startGesture(centre);
+    await tester.pump(const Duration(milliseconds: 40));
+    await finger.moveBy(const Offset(40, 40));
+    await tester.pump();
+    await finger.moveBy(const Offset(0, 40));
+    await tester.pump();
+    await finger.up();
+    await tester.pumpAndSettle();
+
+    final dynamic panned = currentGeometry(tester);
+    expect(panned.yMinimum, greaterThan(yMinBefore));
+  });
+
+  testWidgets('mode none ignores the wheel', (WidgetTester tester) async {
+    await pumpChart(tester, mode: VarietyZoomMode.none);
+    final dynamic before = currentGeometry(tester);
+    final double xSpanBefore = before.xMaximum - before.xMinimum;
+    final double ySpanBefore = before.yMaximum - before.yMinimum;
+
+    await wheel(tester, tester.getCenter(chartCanvas()), -100);
+
+    final dynamic after = currentGeometry(tester);
+    expect(after.xMaximum - after.xMinimum, moreOrLessEquals(xSpanBefore));
+    expect(after.yMaximum - after.yMinimum, moreOrLessEquals(ySpanBefore));
   });
 }

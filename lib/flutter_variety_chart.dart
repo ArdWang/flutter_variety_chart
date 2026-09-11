@@ -48,7 +48,10 @@ export 'src/behaviors/variety_interaction_details.dart';
 
 // Analysis
 export 'src/analysis/variety_regression.dart'
-    show varietyFitTrendline, varietyMovingAverage, varietyMovingAverageTrendline;
+    show
+        varietyFitTrendline,
+        varietyMovingAverage,
+        varietyMovingAverageTrendline;
 
 // Rendering
 export 'src/render/variety_chart_theme.dart';
@@ -68,10 +71,7 @@ export 'src/utils/variety_label_utils.dart';
 // Widgets
 export 'src/painters/variety_cartesian_painter.dart' show VarietyAxisLabelHit;
 export 'src/painters/variety_element_renderer.dart'
-    show
-        VarietyElementRenderer,
-        VarietyRendererFactory,
-        VarietyShaderFactory;
+    show VarietyElementRenderer, VarietyRendererFactory, VarietyShaderFactory;
 export 'src/painters/variety_spark_painter.dart' show VarietySparkPainter;
 export 'src/widgets/variety_cartesian_chart.dart';
 export 'src/widgets/variety_chart_title.dart';

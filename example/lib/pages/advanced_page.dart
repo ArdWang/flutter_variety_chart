@@ -185,11 +185,13 @@ class _AdvancedPageState extends State<AdvancedPage> {
             },
             onLegendTapped: (VarietyLegendTapDetails details) {
               setState(() {
-                _status = '${details.series.name} visible: ${details.isVisible}';
+                _status =
+                    '${details.series.name} visible: ${details.isVisible}';
               });
             },
             series: <VarietySeries>[
-              VarietyColumnSeries(name: 'Revenue', cornerRadius: 3, data: monthlyRevenue),
+              VarietyColumnSeries(
+                  name: 'Revenue', cornerRadius: 3, data: monthlyRevenue),
               VarietyLineSeries(name: 'Target', data: monthlyTarget),
             ],
           ),

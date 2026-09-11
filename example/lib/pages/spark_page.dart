@@ -11,12 +11,34 @@ class SparkPage extends StatelessWidget {
 
   /// A rising series used by the line and area demos.
   static const List<double> rising = <double>[
-    18, 22, 20, 26, 24, 31, 29, 35, 33, 41, 38, 46,
+    18,
+    22,
+    20,
+    26,
+    24,
+    31,
+    29,
+    35,
+    33,
+    41,
+    38,
+    46,
   ];
 
   /// A series with wins, losses and a draw.
   static const List<double> wins = <double>[
-    1, -1, 1, 1, -1, 0, 1, -1, -1, 1, 1, 1,
+    1,
+    -1,
+    1,
+    1,
+    -1,
+    0,
+    1,
+    -1,
+    -1,
+    1,
+    1,
+    1,
   ];
 
   @override
@@ -139,7 +161,8 @@ class SparkPage extends StatelessWidget {
                         child: VarietySparkLineChart(
                           data: List<double>.generate(
                             12,
-                            (int j) => sparklineValues[(i * 3 + j) % sparklineValues.length],
+                            (int j) => sparklineValues[
+                                (i * 3 + j) % sparklineValues.length],
                           ),
                           labelDisplayMode: i == 0
                               ? VarietySparkLabelDisplayMode.last

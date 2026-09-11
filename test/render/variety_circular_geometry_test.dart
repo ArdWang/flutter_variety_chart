@@ -30,7 +30,8 @@ void main() {
         ],
       );
       expect(geometry.slices.length, 2);
-      expect(geometry.slices.first.sweepAngle, closeTo(0.3 * 2 * 3.141592653589793, 0.02));
+      expect(geometry.slices.first.sweepAngle,
+          closeTo(0.3 * 2 * 3.141592653589793, 0.02));
     });
 
     test('collapses the sweep at progress zero', () {
@@ -128,7 +129,8 @@ void main() {
           ),
         ],
       );
-      expect(geometry.slices.single.innerRadius, closeTo(80 * 0.85 * 0.5, 0.001));
+      expect(
+          geometry.slices.single.innerRadius, closeTo(80 * 0.85 * 0.5, 0.001));
     });
 
     test('does not hit test inside the hollow centre', () {
@@ -158,7 +160,8 @@ void main() {
         ],
       );
       expect(geometry.rings.length, 2);
-      expect(geometry.rings.first.outerRadius, greaterThan(geometry.rings.last.outerRadius));
+      expect(geometry.rings.first.outerRadius,
+          greaterThan(geometry.rings.last.outerRadius));
     });
 
     test('emits a track ring when requested', () {
@@ -185,7 +188,8 @@ void main() {
           ),
         ],
       );
-      expect(geometry.rings.single.sweepAngle, closeTo(3.141592653589793, 0.001));
+      expect(
+          geometry.rings.single.sweepAngle, closeTo(3.141592653589793, 0.001));
     });
   });
 }

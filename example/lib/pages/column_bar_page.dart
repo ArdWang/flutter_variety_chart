@@ -44,7 +44,8 @@ class ColumnBarPage extends StatelessWidget {
               VarietyBarSeries(
                 name: 'Bars',
                 cornerRadius: 6,
-                dataLabelSettings: const VarietyDataLabelSettings(isVisible: true),
+                dataLabelSettings:
+                    const VarietyDataLabelSettings(isVisible: true),
                 data: monthlyRevenue,
               ),
             ],

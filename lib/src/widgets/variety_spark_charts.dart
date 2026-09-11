@@ -130,7 +130,8 @@ class _VarietySparkChartState extends State<VarietySparkChart>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: widget.animationDuration);
+    _controller =
+        AnimationController(vsync: this, duration: widget.animationDuration);
     if (widget.enableAnimation) {
       _controller.forward();
     } else {
@@ -249,35 +250,36 @@ class _VarietySparkChartState extends State<VarietySparkChart>
             ? widget.data.reversed.toList(growable: false)
             : widget.data;
         return MouseRegion(
-            onExit: (_) => _release(),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapUp: activation == VarietySparkActivationMode.tap
-                  ? (TapUpDetails details) => _activate(details.localPosition, size)
-                  : null,
-              onTapDown: activation == VarietySparkActivationMode.doubleTap
-                  ? (_) => _cancelHide()
-                  : null,
-              onDoubleTapDown: activation == VarietySparkActivationMode.doubleTap
-                  ? (TapDownDetails details) => _activate(details.localPosition, size)
-                  : null,
-              onLongPressStart: activation == VarietySparkActivationMode.longPress
-                  ? (LongPressStartDetails details) =>
-                      _activate(details.localPosition, size)
-                  : null,
-              onLongPressMoveUpdate:
-                  activation == VarietySparkActivationMode.longPress
-                      ? (LongPressMoveUpdateDetails details) =>
-                          _activate(details.localPosition, size)
-                      : null,
-              onLongPressEnd:
-                  activation == VarietySparkActivationMode.longPress
-                      ? (_) => _release()
-                      : null,
-              child: SizedBox(
-                width: width,
-                height: height,
-                child: AnimatedBuilder(
+          onExit: (_) => _release(),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapUp: activation == VarietySparkActivationMode.tap
+                ? (TapUpDetails details) =>
+                    _activate(details.localPosition, size)
+                : null,
+            onTapDown: activation == VarietySparkActivationMode.doubleTap
+                ? (_) => _cancelHide()
+                : null,
+            onDoubleTapDown: activation == VarietySparkActivationMode.doubleTap
+                ? (TapDownDetails details) =>
+                    _activate(details.localPosition, size)
+                : null,
+            onLongPressStart: activation == VarietySparkActivationMode.longPress
+                ? (LongPressStartDetails details) =>
+                    _activate(details.localPosition, size)
+                : null,
+            onLongPressMoveUpdate:
+                activation == VarietySparkActivationMode.longPress
+                    ? (LongPressMoveUpdateDetails details) =>
+                        _activate(details.localPosition, size)
+                    : null,
+            onLongPressEnd: activation == VarietySparkActivationMode.longPress
+                ? (_) => _release()
+                : null,
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: AnimatedBuilder(
                 animation: _controller,
                 builder: (BuildContext context, Widget? child) => CustomPaint(
                   size: size,
@@ -286,7 +288,8 @@ class _VarietySparkChartState extends State<VarietySparkChart>
                     seriesType: widget.seriesType,
                     theme: theme,
                     progress: widget.enableAnimation ? _controller.value : 1,
-                    color: widget.color ?? Theme.of(context).colorScheme.primary,
+                    color:
+                        widget.color ?? Theme.of(context).colorScheme.primary,
                     strokeWidth: widget.strokeWidth,
                     dashArray: widget.dashArray,
                     borderWidth: widget.borderWidth,
@@ -310,9 +313,9 @@ class _VarietySparkChartState extends State<VarietySparkChart>
                   ),
                 ),
               ),
-              ),
             ),
-          );
+          ),
+        );
       },
     );
   }

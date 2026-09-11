@@ -114,7 +114,8 @@ class LineAreaPage extends StatelessWidget {
                 name: 'Numeric',
                 showMarkers: true,
                 markerShape: VarietyMarkerShape.diamond,
-                dataLabelSettings: const VarietyDataLabelSettings(isVisible: true),
+                dataLabelSettings:
+                    const VarietyDataLabelSettings(isVisible: true),
                 data: scatterSamples,
               ),
             ],

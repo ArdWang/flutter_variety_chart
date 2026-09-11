@@ -26,7 +26,8 @@ VarietySparkPainter painterOf(WidgetTester tester) {
 
 void main() {
   group('widgets', () {
-    testWidgets('renders all four spark chart kinds', (WidgetTester tester) async {
+    testWidgets('renders all four spark chart kinds',
+        (WidgetTester tester) async {
       final List<Widget> charts = <Widget>[
         const VarietySparkLineChart(data: values),
         const VarietySparkAreaChart(data: values),
@@ -40,7 +41,8 @@ void main() {
       }
     });
 
-    testWidgets('handles empty, single and flat data', (WidgetTester tester) async {
+    testWidgets('handles empty, single and flat data',
+        (WidgetTester tester) async {
       for (final List<double> data in <List<double>>[
         <double>[],
         <double>[5],
@@ -52,7 +54,8 @@ void main() {
       }
     });
 
-    testWidgets('renders without animation when disabled', (WidgetTester tester) async {
+    testWidgets('renders without animation when disabled',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         host(const VarietySparkLineChart(data: values, enableAnimation: false)),
       );
@@ -63,7 +66,9 @@ void main() {
     testWidgets('exposes the kind it draws', (WidgetTester tester) async {
       await tester.pumpWidget(host(const VarietySparkBarChart(data: values)));
       expect(
-        tester.widget<VarietySparkBarChart>(find.byType(VarietySparkBarChart)).seriesType,
+        tester
+            .widget<VarietySparkBarChart>(find.byType(VarietySparkBarChart))
+            .seriesType,
         VarietySparkSeriesType.bar,
       );
       expect(painterOf(tester).seriesType, VarietySparkSeriesType.bar);
@@ -94,7 +99,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('accepts line width and a dash pattern', (WidgetTester tester) async {
+    testWidgets('accepts line width and a dash pattern',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         host(
           const VarietySparkLineChart(
@@ -135,7 +141,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('accepts every point colour override', (WidgetTester tester) async {
+    testWidgets('accepts every point colour override',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         host(
           const VarietySparkLineChart(
@@ -155,7 +162,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('accepts a tie colour on a win/loss chart', (WidgetTester tester) async {
+    testWidgets('accepts a tie colour on a win/loss chart',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         host(
           const VarietySparkWinLossChart(
@@ -221,7 +229,8 @@ void main() {
     });
 
     testWidgets('supports every marker shape', (WidgetTester tester) async {
-      for (final VarietySparkMarkerShape shape in VarietySparkMarkerShape.values) {
+      for (final VarietySparkMarkerShape shape
+          in VarietySparkMarkerShape.values) {
         await tester.pumpWidget(
           host(
             VarietySparkLineChart(
@@ -243,7 +252,8 @@ void main() {
   });
 
   group('labels', () {
-    testWidgets('supports every label display mode', (WidgetTester tester) async {
+    testWidgets('supports every label display mode',
+        (WidgetTester tester) async {
       for (final VarietySparkLabelDisplayMode mode
           in VarietySparkLabelDisplayMode.values) {
         await tester.pumpWidget(
@@ -260,7 +270,8 @@ void main() {
       }
     });
 
-    testWidgets('labels every point when asked to', (WidgetTester tester) async {
+    testWidgets('labels every point when asked to',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         host(
           const VarietySparkBarChart(
@@ -270,7 +281,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(painterOf(tester).labelDisplayMode, VarietySparkLabelDisplayMode.all);
+      expect(
+          painterOf(tester).labelDisplayMode, VarietySparkLabelDisplayMode.all);
     });
   });
 
@@ -291,7 +303,8 @@ void main() {
       expect(painterOf(tester).trackballIndex, isNotNull);
     });
 
-    testWidgets('a long press activates the trackball', (WidgetTester tester) async {
+    testWidgets('a long press activates the trackball',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         host(
           const VarietySparkLineChart(
@@ -308,7 +321,8 @@ void main() {
       expect(painterOf(tester).trackballIndex, isNotNull);
     });
 
-    testWidgets('a double tap activates the trackball', (WidgetTester tester) async {
+    testWidgets('a double tap activates the trackball',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         host(
           const VarietySparkLineChart(
@@ -345,7 +359,8 @@ void main() {
       expect(painterOf(tester).trackballIndex, isNull);
     });
 
-    testWidgets('shouldAlwaysShow keeps the trackball', (WidgetTester tester) async {
+    testWidgets('shouldAlwaysShow keeps the trackball',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         host(
           const VarietySparkLineChart(
@@ -427,7 +442,8 @@ void main() {
       expect(painterOf(tester).marker, isNotNull);
     });
 
-    testWidgets('accepts VarietyChartData directly', (WidgetTester tester) async {
+    testWidgets('accepts VarietyChartData directly',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         host(
           const VarietySparkline(
@@ -467,7 +483,8 @@ void main() {
       expect(p.pointFor(values.length - 1).dx, 200);
     });
 
-    test('the highest value is on the top edge and the lowest on the bottom', () {
+    test('the highest value is on the top edge and the lowest on the bottom',
+        () {
       final VarietySparkPainter p = painter()..layoutFor(const Size(200, 60));
       final int high = values.indexOf(values.reduce(math.max));
       final int low = values.indexOf(values.reduce(math.min));
@@ -523,7 +540,8 @@ void main() {
     });
 
     test('a mirrored series is plotted from the right', () {
-      final VarietySparkPainter normal = painter()..layoutFor(const Size(200, 60));
+      final VarietySparkPainter normal = painter()
+        ..layoutFor(const Size(200, 60));
       final VarietySparkPainter mirrored = painter(
         data: values.reversed.toList(growable: false),
       )..layoutFor(const Size(200, 60));

@@ -5,7 +5,8 @@ import 'package:flutter_variety_chart/flutter_variety_chart.dart';
 import '../test_helpers.dart';
 
 void main() {
-  testWidgets('renders one entry per named series', (WidgetTester tester) async {
+  testWidgets('renders one entry per named series',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       host(
         VarietyLegend(
@@ -37,7 +38,8 @@ void main() {
     expect(find.byType(Text), findsOneWidget);
   });
 
-  testWidgets('collapses when nothing can be labelled', (WidgetTester tester) async {
+  testWidgets('collapses when nothing can be labelled',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       host(
         VarietyLegend(
@@ -69,7 +71,8 @@ void main() {
     expect(tapped?.name, 'Alpha');
   });
 
-  testWidgets('uses a vertical layout on the side', (WidgetTester tester) async {
+  testWidgets('uses a vertical layout on the side',
+      (WidgetTester tester) async {
     await tester.pumpWidget(
       host(
         VarietyLegend(
@@ -89,8 +92,9 @@ void main() {
     await tester.pumpWidget(
       host(
         VarietyLegend(
-          itemBuilder: (BuildContext context, VarietySeries series, int index) =>
-              Text('custom-${series.name}'),
+          itemBuilder:
+              (BuildContext context, VarietySeries series, int index) =>
+                  Text('custom-${series.name}'),
           series: <VarietySeries>[
             VarietyLineSeries(name: 'Alpha', data: const <VarietyChartData>[]),
           ],

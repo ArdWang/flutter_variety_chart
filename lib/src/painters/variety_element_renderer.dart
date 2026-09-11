@@ -8,7 +8,6 @@ import '../models/variety_series.dart';
 import '../render/variety_chart_theme.dart';
 import '../render/variety_elements.dart';
 
-
 /// Creates an element renderer for a single series.
 ///
 /// The painter holds one of these per series, so a chart with three
@@ -31,6 +30,7 @@ typedef VarietyShaderFactory = Shader? Function(
   // isFill: true for fill, false for stroke
   bool isFill,
 );
+
 /// Draws [VarietyElement] lists onto a canvas.
 ///
 /// Every chart kind shares this renderer, so a series only has to describe its
@@ -101,14 +101,18 @@ class VarietyElementRenderer {
   /// When [series] is provided the renderer asks it for an
   /// [VarietySeries.onCreateShader]; a non-null shader overrides
   /// [element.fillGradient] / [element.strokeGradient].
-  void drawPath(Canvas canvas, VarietyPathElement element, {VarietySeries? series, Rect? bounds}) {
+  void drawPath(Canvas canvas, VarietyPathElement element,
+      {VarietySeries? series, Rect? bounds}) {
     final Rect resolved = bounds ?? element.path.getBounds();
-    if (element.fillGradient != null || element.fillColor != null ||
-        (series?.onCreateShader != null && series!.onCreateShader!(series, resolved, true) != null)) {
+    if (element.fillGradient != null ||
+        element.fillColor != null ||
+        (series?.onCreateShader != null &&
+            series!.onCreateShader!(series, resolved, true) != null)) {
       final Paint paint = Paint()
         ..style = PaintingStyle.fill
         ..isAntiAlias = element.antiAlias;
-      final Shader? shader = series?.onCreateShader?.call(series, resolved, true);
+      final Shader? shader =
+          series?.onCreateShader?.call(series, resolved, true);
       if (shader != null) {
         paint.shader = shader;
       } else if (element.fillGradient != null) {
@@ -130,7 +134,8 @@ class VarietyElementRenderer {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..isAntiAlias = element.antiAlias;
-    final Shader? shader = series?.onCreateShader?.call(series, resolved, false);
+    final Shader? shader =
+        series?.onCreateShader?.call(series, resolved, false);
     if (shader != null) {
       paint.shader = shader;
     } else if (element.strokeGradient != null) {
@@ -153,7 +158,8 @@ class VarietyElementRenderer {
       if (rect.width <= 0 || rect.height <= 0) {
         continue;
       }
-      final RRect rrect = RRect.fromRectAndRadius(rect, Radius.circular(element.radius));
+      final RRect rrect =
+          RRect.fromRectAndRadius(rect, Radius.circular(element.radius));
       canvas.drawRRect(
         rrect,
         Paint()
@@ -255,7 +261,8 @@ class VarietyElementRenderer {
   void drawLabels(Canvas canvas, VarietyLabelsElement element) {
     for (final VarietyLabelItem item in element.labels) {
       final TextStyle style = (element.style ?? const TextStyle(fontSize: 11))
-          .copyWith(color: item.color ?? element.style?.color ?? theme.labelColor);
+          .copyWith(
+              color: item.color ?? element.style?.color ?? theme.labelColor);
       final TextPainter painter = layoutText(item.text, style);
       painter.paint(canvas, anchorFor(painter, item));
     }
@@ -271,14 +278,16 @@ class VarietyElementRenderer {
           item.anchor.dy - painter.height - item.offset,
         );
       case VarietyLabelPosition.bottom:
-        return Offset(item.anchor.dx - painter.width / 2, item.anchor.dy + item.offset);
+        return Offset(
+            item.anchor.dx - painter.width / 2, item.anchor.dy + item.offset);
       case VarietyLabelPosition.left:
         return Offset(
           item.anchor.dx - painter.width - item.offset,
           item.anchor.dy - painter.height / 2,
         );
       case VarietyLabelPosition.right:
-        return Offset(item.anchor.dx + item.offset, item.anchor.dy - painter.height / 2);
+        return Offset(
+            item.anchor.dx + item.offset, item.anchor.dy - painter.height / 2);
       case VarietyLabelPosition.inside:
       case VarietyLabelPosition.auto:
         return Offset(
@@ -298,7 +307,8 @@ class VarietyElementRenderer {
   }
 
   /// Draws a line, honouring an optional dash pattern.
-  void drawLine(Canvas canvas, Offset from, Offset to, Paint paint, List<double> dash) {
+  void drawLine(
+      Canvas canvas, Offset from, Offset to, Paint paint, List<double> dash) {
     // A line is always a stroked primitive. Callers build paints inline
     // without setting a style; the fill default would silently drop
     // strokeWidth and rasterize the guide (grid, trackball, crosshair)
@@ -347,7 +357,8 @@ class VarietyElementRenderer {
       case VarietyMarkerShape.circle:
         path.addOval(Rect.fromCircle(center: center, radius: half));
       case VarietyMarkerShape.square:
-        path.addRect(Rect.fromCenter(center: center, width: size, height: size));
+        path.addRect(
+            Rect.fromCenter(center: center, width: size, height: size));
       case VarietyMarkerShape.diamond:
         path
           ..moveTo(center.dx, center.dy - half)

@@ -115,12 +115,15 @@ void main() {
     test('ascending sorts by the primary value', () {
       final VarietyCartesianGeometry geometry = build(
         series: <VarietySeries>[
-          VarietyLineSeries(data: shuffled(), sortingOrder: VarietySortingOrder.ascending),
+          VarietyLineSeries(
+              data: shuffled(), sortingOrder: VarietySortingOrder.ascending),
         ],
         xAxis: const VarietyAxis(type: VarietyAxisType.numeric),
       );
       expect(
-        geometry.resolvedData.first.map((VarietyChartData point) => point.x).toList(),
+        geometry.resolvedData.first
+            .map((VarietyChartData point) => point.x)
+            .toList(),
         <int>[1, 2, 3],
       );
     });
@@ -128,7 +131,8 @@ void main() {
     test('descending sorts by the primary value in reverse', () {
       final VarietyCartesianGeometry geometry = build(
         series: <VarietySeries>[
-          VarietyLineSeries(data: shuffled(), sortingOrder: VarietySortingOrder.descending),
+          VarietyLineSeries(
+              data: shuffled(), sortingOrder: VarietySortingOrder.descending),
         ],
         xAxis: const VarietyAxis(type: VarietyAxisType.numeric),
       );
@@ -261,7 +265,8 @@ void main() {
       );
       final Iterable<VarietyPathElement> paths =
           geometry.elements.whereType<VarietyPathElement>();
-      expect(paths.where((VarietyPathElement path) => path.fillColor != null), isNotEmpty);
+      expect(paths.where((VarietyPathElement path) => path.fillColor != null),
+          isNotEmpty);
     });
 
     test('step area fills a staircase', () {
@@ -339,7 +344,8 @@ void main() {
       );
       final VarietyCartesianGeometry inverted = build(
         series: <VarietySeries>[VarietyLineSeries(data: monthly())],
-        yAxis: const VarietyAxis(type: VarietyAxisType.numeric, isInversed: true),
+        yAxis:
+            const VarietyAxis(type: VarietyAxisType.numeric, isInversed: true),
       );
       final double normalTop = normal.pixelY(normal.yMaximum);
       final double invertedTop = inverted.pixelY(inverted.yMaximum);
@@ -358,7 +364,8 @@ void main() {
       final List<double> minor = geometry.yMinorTicks;
       expect(minor, isNotEmpty);
       expect(minor.length, greaterThanOrEqualTo(geometry.yTicks.length - 1));
-      final List<double> merged = <double>[...geometry.yTicks, ...minor]..sort();
+      final List<double> merged = <double>[...geometry.yTicks, ...minor]
+        ..sort();
       for (int i = 1; i < merged.length; i++) {
         expect(merged[i], greaterThan(merged[i - 1]));
       }

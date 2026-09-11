@@ -32,10 +32,10 @@ void main() {
     test('widens towards the widest value', () {
       final VarietyFunnelGeometry geometry =
           build(series: const VarietyFunnelSeries(data: stages));
-      final double first =
-          geometry.segments.first.topRight.dx - geometry.segments.first.topLeft.dx;
-      final double last =
-          geometry.segments.last.bottomRight.dx - geometry.segments.last.bottomLeft.dx;
+      final double first = geometry.segments.first.topRight.dx -
+          geometry.segments.first.topLeft.dx;
+      final double last = geometry.segments.last.bottomRight.dx -
+          geometry.segments.last.bottomLeft.dx;
       expect(first, greaterThan(last));
     });
 
@@ -61,7 +61,8 @@ void main() {
     test('hit tests inside a segment', () {
       final VarietyFunnelGeometry geometry =
           build(series: const VarietyFunnelSeries(data: stages));
-      final VarietyHitResult? hit = geometry.hitTest(geometry.segments[1].center);
+      final VarietyHitResult? hit =
+          geometry.hitTest(geometry.segments[1].center);
       expect(hit, isNotNull);
       expect(hit!.pointIndex, 1);
     });
@@ -79,10 +80,10 @@ void main() {
         series: const VarietyPyramidSeries(data: stages),
         isPyramid: true,
       );
-      final double first =
-          geometry.segments.first.topRight.dx - geometry.segments.first.topLeft.dx;
-      final double last =
-          geometry.segments.last.bottomRight.dx - geometry.segments.last.bottomLeft.dx;
+      final double first = geometry.segments.first.topRight.dx -
+          geometry.segments.first.topLeft.dx;
+      final double last = geometry.segments.last.bottomRight.dx -
+          geometry.segments.last.bottomLeft.dx;
       expect(first, greaterThan(last));
     });
 
@@ -98,10 +99,10 @@ void main() {
         ),
         isPyramid: true,
       );
-      final double linearWidth =
-          linear.segments.last.bottomRight.dx - linear.segments.last.bottomLeft.dx;
-      final double surfaceWidth =
-          surface.segments.last.bottomRight.dx - surface.segments.last.bottomLeft.dx;
+      final double linearWidth = linear.segments.last.bottomRight.dx -
+          linear.segments.last.bottomLeft.dx;
+      final double surfaceWidth = surface.segments.last.bottomRight.dx -
+          surface.segments.last.bottomLeft.dx;
       expect(surfaceWidth, greaterThan(linearWidth));
     });
   });

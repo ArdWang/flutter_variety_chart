@@ -54,13 +54,15 @@ class VarietyCircularChart extends StatefulWidget {
   final TextStyle? legendTextStyle;
 
   /// Builds custom legend items.
-  final Widget Function(BuildContext context, VarietySeries series, int index)? legendBuilder;
+  final Widget Function(BuildContext context, VarietySeries series, int index)?
+      legendBuilder;
 
   /// Whether the tooltip reacts to pointer input.
   final bool enableTooltip;
 
   /// Builds a custom tooltip body.
-  final Widget Function(BuildContext context, VarietyHitResult result)? tooltipBuilder;
+  final Widget Function(BuildContext context, VarietyHitResult result)?
+      tooltipBuilder;
 
   /// How long the entrance animation runs.
   final Duration animationDuration;
@@ -83,13 +85,15 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
   late final AnimationController _controller;
   VarietyHitResult? _hit;
 
-  List<VarietySeries> get _circular =>
-      widget.series.where((VarietySeries item) => item.isCircular).toList(growable: false);
+  List<VarietySeries> get _circular => widget.series
+      .where((VarietySeries item) => item.isCircular)
+      .toList(growable: false);
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: widget.animationDuration);
+    _controller =
+        AnimationController(vsync: this, duration: widget.animationDuration);
     if (widget.enableAnimation && _circular.isNotEmpty) {
       _controller.forward();
     } else {
@@ -127,14 +131,18 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
     final List<VarietySeries> items = _circular;
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        final bool bounded = constraints.hasBoundedHeight && constraints.hasBoundedWidth;
+        final bool bounded =
+            constraints.hasBoundedHeight && constraints.hasBoundedWidth;
         final List<Widget> column = <Widget>[];
         if (widget.title != null && widget.title!.isNotEmpty) {
-          column.add(VarietyChartTitle(text: widget.title!, textStyle: widget.titleStyle));
+          column.add(VarietyChartTitle(
+              text: widget.title!, textStyle: widget.titleStyle));
         }
-        final bool wantsLegend = widget.showLegend && items.any((VarietySeries s) => s.name != null);
-        final bool legendOnSide = widget.legendPosition == VarietyLegendPosition.left ||
-            widget.legendPosition == VarietyLegendPosition.right;
+        final bool wantsLegend =
+            widget.showLegend && items.any((VarietySeries s) => s.name != null);
+        final bool legendOnSide =
+            widget.legendPosition == VarietyLegendPosition.left ||
+                widget.legendPosition == VarietyLegendPosition.right;
         final Widget? legend = wantsLegend
             ? VarietyLegend(
                 series: items,
@@ -143,7 +151,8 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
                 itemBuilder: widget.legendBuilder,
               )
             : null;
-        if (legend != null && widget.legendPosition == VarietyLegendPosition.top) {
+        if (legend != null &&
+            widget.legendPosition == VarietyLegendPosition.top) {
           column.add(legend);
         }
         final Widget plot = AnimatedBuilder(
@@ -156,9 +165,11 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  if (widget.legendPosition == VarietyLegendPosition.left) legend,
+                  if (widget.legendPosition == VarietyLegendPosition.left)
+                    legend,
                   Expanded(child: plot),
-                  if (widget.legendPosition == VarietyLegendPosition.right) legend,
+                  if (widget.legendPosition == VarietyLegendPosition.right)
+                    legend,
                 ],
               ),
             ),
@@ -166,7 +177,8 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
         } else {
           column.add(Expanded(child: plot));
         }
-        if (legend != null && widget.legendPosition == VarietyLegendPosition.bottom) {
+        if (legend != null &&
+            widget.legendPosition == VarietyLegendPosition.bottom) {
           column.add(legend);
         }
         final Widget body = Column(
