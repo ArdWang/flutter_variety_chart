@@ -1,0 +1,7 @@
+include: ../analysis_options.yaml
+
+linter:
+  rules:
+    # Tests build charts inside helper calls, so `const` cannot always be
+    # inferred even though the constructors are constant.
+    prefer_const_constructors: false
