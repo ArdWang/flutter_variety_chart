@@ -1,4 +1,4 @@
-## 0.0.6
+## 0.5.1
 
 ### Gesture zoom and pan aligned with Syncfusion
 
