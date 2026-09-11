@@ -904,12 +904,16 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   /// Clears an active trackball without touching hover state.
   void _clearTrackball() {
     _cancelTrackballTimer();
-    if (_trackballHits.isEmpty && _trackballSlot == null) {
+    if (_trackballHits.isEmpty && _trackballSlot == null && _hit == null) {
       return;
     }
     setState(() {
       _trackballHits = const <VarietyHitResult>[];
       _trackballSlot = null;
+      // Tap activation also seeds [_hit]; leaving it set would downgrade the
+      // card to the plain point tooltip and keep the bubble on screen after
+      // the guide disappeared.
+      _hit = null;
     });
   }
 
