@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -182,6 +184,9 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
   VarietyHitResult? _hit;
   List<VarietyHitResult> _trackballHits = const <VarietyHitResult>[];
+  // Auto-hides the trackball [VarietyTrackballBehavior.hideDelay] after a tap
+  // activation. Restarted on every activation, cancelled on clear/dispose.
+  Timer? _trackballHideTimer;
   double? _trackballSlot;
   List<VarietyHitResult> _selected = const <VarietyHitResult>[];
   final Set<int> _hiddenSeries = <int>{};
@@ -288,6 +293,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   @override
   void dispose() {
     widget.selectionController?.removeListener(_syncSelectionFromController);
+    _trackballHideTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -807,6 +813,12 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     if (ball != null &&
         ball.enabled &&
         ball.activationMode == VarietyActivationMode.tap) {
+      // Taps outside the plot area never activate the trackball; they
+      // dismiss it, matching how blank touches behave in fl_chart.
+      if (!geometry.plotRect.inflate(12).contains(position)) {
+        _clearTrackball();
+        return;
+      }
       _updateTrackball(position, geometry);
       return;
     }
@@ -855,6 +867,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
 
   void _clearPointerState() {
+    _cancelTrackballTimer();
     if (_hit == null && _trackballHits.isEmpty) {
       return;
     }
@@ -867,6 +880,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
 
   void _updateSingleHit(VarietyHitResult? result, {bool hover = false}) {
+    _cancelTrackballTimer();
     final bool changed = _hit != result || _trackballHits.isNotEmpty;
     if (!changed) {
       return;
@@ -881,17 +895,52 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     }
   }
 
+  /// Cancels the pending auto-hide timer, if any.
+  void _cancelTrackballTimer() {
+    _trackballHideTimer?.cancel();
+    _trackballHideTimer = null;
+  }
+
+  /// Clears an active trackball without touching hover state.
+  void _clearTrackball() {
+    _cancelTrackballTimer();
+    if (_trackballHits.isEmpty && _trackballSlot == null) {
+      return;
+    }
+    setState(() {
+      _trackballHits = const <VarietyHitResult>[];
+      _trackballSlot = null;
+    });
+  }
+
+  /// Restarts the auto-hide countdown. Tap activations expire after the
+  /// behaviour's hideDelay unless the trackball should always stay visible.
+  void _scheduleTrackballHide(VarietyTrackballBehavior ball) {
+    _cancelTrackballTimer();
+    if (ball.shouldAlwaysShow) {
+      return;
+    }
+    _trackballHideTimer = Timer(ball.hideDelay, _clearTrackball);
+  }
+
   void _updateTrackball(Offset position, VarietyCartesianGeometry geometry) {
     final List<VarietyHitResult> hits = geometry.hitsAtSlot(position);
     if (hits.isEmpty) {
-      if (_trackballHits.isEmpty) {
+      _clearTrackball();
+      return;
+    }
+    final VarietyTrackballBehavior? ball = widget.trackballBehavior;
+    final bool tapMode =
+        ball != null && ball.activationMode == VarietyActivationMode.tap;
+    if (tapMode) {
+      // fl_chart style activation radius: a tap landing farther than
+      // activationDistance from every point counts as a blank tap and
+      // dismisses the trackball instead of moving it.
+      if ((hits.first.position - position).distance > ball!.activationDistance) {
+        _clearTrackball();
         return;
       }
-      setState(() {
-        _trackballHits = const <VarietyHitResult>[];
-        _trackballSlot = null;
-      });
-      return;
+      _scheduleTrackballHide(ball);
     }
     final double slot = hits.first.position.dx;
     final bool changed = _trackballHits.length != hits.length ||

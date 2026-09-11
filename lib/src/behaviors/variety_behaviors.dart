@@ -83,6 +83,7 @@ class VarietyTrackballBehavior {
     this.showMarkers = true,
     this.markerShape = VarietyMarkerShape.circle,
     this.markerSize = 8,
+    this.activationDistance = 48,
     this.showTooltip = true,
     this.builder,
     this.lineType = VarietyTrackballLineType.vertical,
@@ -119,6 +120,10 @@ class VarietyTrackballBehavior {
 
   /// The diameter of the markers.
   final double markerSize;
+
+  /// How close a tap must land to a point, in logical pixels, before the
+  /// trackball activates. Taps farther away dismiss it instead.
+  final double activationDistance;
 
   /// Whether the shared tooltip card is shown.
   final bool showTooltip;
