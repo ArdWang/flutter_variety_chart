@@ -1,3 +1,27 @@
+## 0.5.2
+
+### Date time axis captions stay unique
+
+A date time axis could print the same caption more than once, which made a
+chart driven by very little data look like it had duplicate points. The
+caption pattern used to be derived from the span alone, so it could be coarser
+than the tick interval: milliseconds across half a minute were all captioned
+`10:28:01`, ten days carved into hours repeated each `dd MMM` twenty-four
+times, and a range crossing midnight repeated `10:00`.
+
+Fixed
+
+* The caption pattern is now resolved against the ticks that were actually
+  generated, walking from the shortest pattern that reads naturally to one
+  that keeps every caption distinct.
+* Two ticks can no longer be captioned the same way, even when the axis pins a
+  `dateFormat` or a `labelFormatter` that cannot tell them apart: the painter
+  keeps the first caption and drops the rest.
+* Automatic intervals are no longer taken at face value. The step is sized so
+  the axis lands near eight ticks, which also stops a ten day range from being
+  carved into two hundred and forty hourly ones. Ranges under two seconds now
+  get millisecond ticks instead of a single label.
+
 ## 0.5.1
 
 ### Gesture zoom and pan aligned with Syncfusion

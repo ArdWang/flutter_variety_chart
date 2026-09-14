@@ -343,6 +343,14 @@ class VarietyCartesianGeometry {
   /// The date time ticks, populated for date time axes.
   final List<DateTime> dateTimeTicks = <DateTime>[];
 
+  /// The pattern used to caption the date time ticks.
+  ///
+  /// Resolved against the ticks that were actually generated, so that no two
+  /// of them can render the same caption. Stays null when the axis supplies
+  /// its own `dateFormat`, when a `labelFormatter` owns the captions, or
+  /// before any ticks exist.
+  String? _dateTimeLabelFormat;
+
   double get _xSpan => math.max(xMaximum - xMinimum, 1e-9);
 
   double get _ySpan => math.max(yMaximum - yMinimum, 1e-9);
@@ -2782,11 +2790,14 @@ class VarietyCartesianGeometry {
     final DateTime start =
         DateTime.fromMillisecondsSinceEpoch(xMinimum.round());
     final DateTime end = DateTime.fromMillisecondsSinceEpoch(xMaximum.round());
+    final Duration span = end.difference(start);
     VarietyDateTimeIntervalType type = xAxis.dateTimeIntervalType;
     if (type == VarietyDateTimeIntervalType.auto) {
-      type = _autoIntervalType(end.difference(start));
+      type = _autoIntervalType(span);
     }
-    final int step = math.max((xAxis.dateTimeInterval ?? 1).round(), 1);
+    final int step = xAxis.dateTimeInterval != null
+        ? math.max(xAxis.dateTimeInterval!.round(), 1)
+        : _autoIntervalStep(span, type);
     DateTime cursor = _floorTo(start, type);
     int guard = 0;
     while (cursor.millisecondsSinceEpoch <= xMaximum && guard < 500) {
@@ -2794,25 +2805,140 @@ class VarietyCartesianGeometry {
       cursor = _advance(cursor, type, step);
       guard++;
     }
+    _resolveDateTimeFormat(type);
   }
 
+  /// How many ticks an automatic date time axis aims for.
+  static const int _targetDateTimeTicks = 8;
+
+  /// Picks the interval unit for a span that did not ask for one.
+  ///
+  /// The unit is the coarsest that still yields a handful of ticks, so a range
+  /// of hours is not carved into seconds and a range of months is not carved
+  /// into days.
   static VarietyDateTimeIntervalType _autoIntervalType(Duration span) {
-    if (span.inDays > 365 * 5) {
+    if (span.inDays >= 365 * 5) {
       return VarietyDateTimeIntervalType.years;
     }
-    if (span.inDays > 180) {
+    if (span.inDays >= 183) {
       return VarietyDateTimeIntervalType.months;
     }
-    if (span.inDays > 10) {
+    if (span.inDays >= 3) {
       return VarietyDateTimeIntervalType.days;
     }
-    if (span.inHours > 6) {
+    if (span.inHours >= 12) {
       return VarietyDateTimeIntervalType.hours;
     }
-    if (span.inMinutes > 5) {
+    if (span.inMinutes >= 20) {
       return VarietyDateTimeIntervalType.minutes;
     }
-    return VarietyDateTimeIntervalType.seconds;
+    if (span.inSeconds >= 2) {
+      return VarietyDateTimeIntervalType.seconds;
+    }
+    return VarietyDateTimeIntervalType.milliseconds;
+  }
+
+  /// The step, counted in [type] units, that keeps the axis near
+  /// [_targetDateTimeTicks] ticks.
+  ///
+  /// The raw step is rounded up to the next round number so ticks land on
+  /// readable values: half a month becomes `1`, and `3.75` days becomes `5`.
+  static int _autoIntervalStep(
+      Duration span, VarietyDateTimeIntervalType type) {
+    final double units;
+    switch (type) {
+      case VarietyDateTimeIntervalType.years:
+        units = span.inDays / 365.25;
+      case VarietyDateTimeIntervalType.months:
+        units = span.inDays / 30.44;
+      case VarietyDateTimeIntervalType.days:
+        units = span.inDays.toDouble();
+      case VarietyDateTimeIntervalType.hours:
+        units = span.inHours.toDouble();
+      case VarietyDateTimeIntervalType.minutes:
+        units = span.inMinutes.toDouble();
+      case VarietyDateTimeIntervalType.seconds:
+        units = span.inSeconds.toDouble();
+      case VarietyDateTimeIntervalType.milliseconds:
+        units = span.inMilliseconds.toDouble();
+      case VarietyDateTimeIntervalType.auto:
+        units = span.inDays.toDouble();
+    }
+    final double raw = units / _targetDateTimeTicks;
+    if (raw <= 1) {
+      return 1;
+    }
+    double magnitude = 1;
+    while (magnitude * 10 <= raw) {
+      magnitude *= 10;
+    }
+    for (final double multiple in const <double>[1, 2, 5, 10]) {
+      if (magnitude * multiple >= raw) {
+        return (magnitude * multiple).round();
+      }
+    }
+    return (magnitude * 10).round();
+  }
+
+  /// Chooses the pattern that captions the generated ticks.
+  ///
+  /// Deriving the pattern from the span alone is not enough: a caller may ask
+  /// for a fine interval over a coarse span (milliseconds across half a
+  /// minute), and a coarse pattern would then print the same caption for
+  /// several ticks in a row. The ladder walks towards more complete patterns
+  /// and stops at the first one that keeps every caption distinct.
+  void _resolveDateTimeFormat(VarietyDateTimeIntervalType type) {
+    if (xAxis.dateFormat != null || dateTimeTicks.isEmpty) {
+      return;
+    }
+    final List<String> ladder = _formatLadder(type);
+    for (final String pattern in ladder) {
+      if (_captionsAreUnique(pattern)) {
+        _dateTimeLabelFormat = pattern;
+        return;
+      }
+    }
+    _dateTimeLabelFormat = ladder.last;
+  }
+
+  bool _captionsAreUnique(String pattern) {
+    final Set<String> seen = <String>{};
+    for (final DateTime tick in dateTimeTicks) {
+      if (!seen.add(varietyFormatDateTime(tick, pattern))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Caption patterns for [type], from the shortest that reads naturally to
+  /// one that always distinguishes neighbouring ticks.
+  static List<String> _formatLadder(VarietyDateTimeIntervalType type) {
+    switch (type) {
+      case VarietyDateTimeIntervalType.years:
+        return const <String>['yyyy'];
+      case VarietyDateTimeIntervalType.months:
+        return const <String>['MMM yyyy'];
+      case VarietyDateTimeIntervalType.days:
+        return const <String>['dd MMM', 'dd MMM yyyy'];
+      case VarietyDateTimeIntervalType.hours:
+      case VarietyDateTimeIntervalType.minutes:
+        return const <String>['HH:mm', 'dd MMM HH:mm', 'dd MMM yyyy HH:mm'];
+      case VarietyDateTimeIntervalType.seconds:
+        return const <String>[
+          'HH:mm:ss',
+          'dd MMM HH:mm:ss',
+          'dd MMM yyyy HH:mm:ss',
+        ];
+      case VarietyDateTimeIntervalType.milliseconds:
+        return const <String>[
+          'HH:mm:ss.SSS',
+          'dd MMM HH:mm:ss.SSS',
+          'dd MMM yyyy HH:mm:ss.SSS',
+        ];
+      case VarietyDateTimeIntervalType.auto:
+        return const <String>['dd MMM', 'dd MMM yyyy'];
+    }
   }
 
   static DateTime _floorTo(DateTime value, VarietyDateTimeIntervalType type) {
@@ -3009,6 +3135,7 @@ class VarietyCartesianGeometry {
       return xAxis.labelFormatter!(tick);
     }
     final String pattern = xAxis.dateFormat ??
+        _dateTimeLabelFormat ??
         varietyAutoDateFormat(
           Duration(milliseconds: (xMaximum - xMinimum).round()),
         );

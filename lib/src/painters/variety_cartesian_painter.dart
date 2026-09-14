@@ -650,6 +650,15 @@ class VarietyCartesianPainter extends CustomPainter {
         .toList(growable: false);
 
     final List<bool> visible = List<bool>.filled(ticks.length, true);
+    // A caption is only ever allowed to appear once. Two ticks can end up with
+    // the same text when the label format is coarser than the tick interval,
+    // and printing it twice tells the reader nothing, so keep the first.
+    final Set<String> captions = <String>{};
+    for (int i = 0; i < ticks.length; i++) {
+      if (!captions.add(ticks[i].text)) {
+        visible[i] = false;
+      }
+    }
     final bool thinning =
         axis.labelIntersectAction == VarietyLabelIntersectAction.hide ||
             axis.labelIntersectAction == VarietyLabelIntersectAction.rotate45 ||
@@ -657,6 +666,9 @@ class VarietyCartesianPainter extends CustomPainter {
     if (thinning) {
       double lastRight = double.negativeInfinity;
       for (int i = 0; i < ticks.length; i++) {
+        if (!visible[i]) {
+          continue;
+        }
         final double left = ticks[i].position - extents[i] / 2;
         if (left < lastRight + 2) {
           visible[i] = false;
