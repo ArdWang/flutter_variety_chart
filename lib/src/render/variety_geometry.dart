@@ -330,6 +330,14 @@ class VarietyCartesianGeometry {
   /// The interval between primary axis ticks on a numeric axis.
   double xInterval = 1;
 
+  /// The value the numeric x tick grid is anchored on.
+  ///
+  /// Ticks sit at `xTickOrigin + k * xInterval`. The origin is the axis minimum
+  /// *before* the zoom window is applied, so the grid keeps the same values
+  /// while the visible window moves. Anchoring on the window instead would slide
+  /// every tick off the data points the moment the user zooms or pans.
+  double xTickOrigin = 0;
+
   /// The base of a logarithmic secondary axis.
   double logBase = 10;
 
@@ -821,6 +829,7 @@ class VarietyCartesianGeometry {
         xMaximum = xAxis.maximum ?? padded.$2;
         xInterval = xAxis.interval ?? padded.$3;
     }
+    xTickOrigin = xMinimum;
     final (double, double)? zoom = visibleXRange;
     if (zoom != null && zoom.$2 > zoom.$1) {
       xMinimum = zoom.$1;
@@ -3098,13 +3107,56 @@ class VarietyCartesianGeometry {
             .toList(growable: false);
       case VarietyAxisType.numeric:
       case VarietyAxisType.logarithmic:
-        final double span = xMaximum - xMinimum;
-        final int steps = math.max(xAxis.desiredIntervals, 1);
-        return List<double>.generate(
-          steps + 1,
-          (int i) => toPixel(xMinimum + span * i / steps, yMinimum).dx,
-        );
+        return xNumericTicks
+            .map((double value) => toPixel(value, yMinimum).dx)
+            .toList(growable: false);
     }
+  }
+
+  /// The primary axis tick values on a numeric axis.
+  ///
+  /// Honours `VarietyAxis.interval` the way [yTicks] honours it on the secondary
+  /// axis: the ticks are laid on a fixed grid, `xTickOrigin + k * interval`, and
+  /// only then clipped to the visible window. Because the grid is anchored on
+  /// the axis origin rather than on the window, zooming and panning leave every
+  /// tick on exactly the same value — which is what keeps a tick on the data
+  /// point it belongs to.
+  ///
+  /// Without an interval the visible span is split into `desiredIntervals` equal
+  /// parts, which is what every numeric axis did before.
+  List<double> get xNumericTicks {
+    final double? interval = xAxis.interval;
+    if (interval != null && interval > 0) {
+      final double span = xMaximum - xMinimum;
+      // Keep the caller's grid exactly, but refine it when the visible window is
+      // narrower than a step and a half: zooming in would otherwise leave the
+      // axis with no ticks at all. Halving the step (or dropping to 1) keeps
+      // every subdivided tick a multiple of the caller's interval, so it lands
+      // on the same values the caller anchored the grid to.
+      double step = interval;
+      while (step > 1 && span / step < 1.5) {
+        step = step % 2 == 0 ? step / 2 : 1;
+      }
+      final List<double> ticks = <double>[];
+      const int guard = 2000;
+      final int first = ((xMinimum - xTickOrigin) / step - 1e-9).ceil();
+      double value = xTickOrigin + first * step;
+      int count = 0;
+      while (value <= xMaximum + step * 1e-6 && count < guard) {
+        ticks.add(value);
+        value += step;
+        count++;
+      }
+      if (ticks.isNotEmpty) {
+        return ticks;
+      }
+    }
+    final double span = xMaximum - xMinimum;
+    final int steps = math.max(xAxis.desiredIntervals, 1);
+    return List<double>.generate(
+      steps + 1,
+      (int i) => xMinimum + span * i / steps,
+    );
   }
 
   /// The tick values of the given secondary axis.

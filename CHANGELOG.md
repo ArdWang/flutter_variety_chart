@@ -20,6 +20,38 @@ Fixed
   `dateFormat` gets the repeated captions they asked for while every point
   still keeps its own slot.
 
+### A numeric x axis honours `interval`, and keeps it through a zoom
+
+`VarietyAxis.interval` was read into the geometry and then never used: a numeric
+x axis split `[minimum, maximum]` into `desiredIntervals` equal parts instead. A
+caller whose x values are whole numbers — a point index, a slot number, anything
+counted — therefore got grid lines and captions *between* its points, and
+rounding a caption to the nearest point only hid part of the mismatch.
+
+Zooming made it worse. A gesture overwrites `xMinimum`/`xMaximum` with the
+visible window (`_resolvePrimaryRange`), and the ticks were then recomputed from
+that window, whose bounds are never whole. Measured on a 1400px plot, every grid
+line sat **22px** away from the point it was meant to mark.
+
+The interval is now honoured the way the secondary axis has always honoured its
+own in `yTicks`.
+
+Fixed
+
+* A numeric x axis lays its ticks on a fixed grid, `xTickOrigin + k * interval`,
+  and clips that grid to the visible window. The origin is the axis minimum
+  *before* the window is applied, so zooming and panning leave every tick on the
+  same value instead of recomputing it from the window.
+* Grid lines, captions and the measured label band all come from that one list
+  (`VarietyCartesianGeometry.xNumericTicks`), so a caption can no longer
+  describe a different value than the line it sits on — or than the band it
+  reserved space for.
+* When the visible window is narrower than a step and a half the whole grid
+  would vanish, so the step subdivides — halving, or dropping to `1` — which
+  keeps every tick a whole multiple of the caller's interval.
+* Without an interval a numeric axis still splits the visible span into
+  `desiredIntervals` equal parts, unchanged.
+
 ## 0.5.3
 
 ### Trackball guide follows the point you tapped

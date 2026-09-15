@@ -674,10 +674,9 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
         );
       }
     } else {
-      final double span = probe.xMaximum - probe.xMinimum;
-      final int steps = math.max(probe.xAxis.desiredIntervals, 1);
-      for (int i = 0; i <= steps; i++) {
-        final double value = probe.xMinimum + span * i / steps;
+      // Measure the captions that will actually be drawn: the tick values come
+      // from the geometry so this agrees with the painted grid lines and labels.
+      for (final double value in probe.xNumericTicks) {
         final String caption = probe.xAxis.labelFormatter?.call(value) ??
             varietyFormatNumber(value);
         bottom =

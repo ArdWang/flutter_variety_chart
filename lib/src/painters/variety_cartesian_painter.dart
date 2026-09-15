@@ -344,13 +344,11 @@ class VarietyCartesianPainter extends CustomPainter {
             .toList(growable: false);
       case VarietyAxisType.numeric:
       case VarietyAxisType.logarithmic:
-        final double span = geometry.xMaximum - geometry.xMinimum;
-        final int steps = math.max(geometry.xAxis.desiredIntervals, 1);
-        return List<double>.generate(
-          steps + 1,
-          (int i) =>
-              geometry.toPixel(geometry.xMinimum + span * i / steps, 0).dx,
-        );
+        // Ticks come from the geometry so the grid lines, the captions and the
+        // zoomed window all agree — see `VarietyCartesianGeometry.xNumericTicks`.
+        return geometry.xNumericTicks
+            .map((double value) => geometry.toPixel(value, 0).dx)
+            .toList(growable: false);
     }
   }
 
@@ -593,19 +591,15 @@ class VarietyCartesianPainter extends CustomPainter {
             .toList(growable: false);
       case VarietyAxisType.numeric:
       case VarietyAxisType.logarithmic:
-        final double span = geometry.xMaximum - geometry.xMinimum;
-        final int steps = math.max(geometry.xAxis.desiredIntervals, 1);
-        return List<_AxisTick>.generate(
-          steps + 1,
-          (int i) {
-            final double value = geometry.xMinimum + span * i / steps;
-            return _AxisTick(
-              geometry.toPixel(value, geometry.yMinimum).dx,
-              geometry.primaryTickLabel(value),
-              value,
-            );
-          },
-        );
+        return geometry.xNumericTicks
+            .map(
+              (double value) => _AxisTick(
+                geometry.toPixel(value, geometry.yMinimum).dx,
+                geometry.primaryTickLabel(value),
+                value,
+              ),
+            )
+            .toList(growable: false);
     }
   }
 
