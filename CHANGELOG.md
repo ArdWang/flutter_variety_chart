@@ -1,24 +1,4 @@
-## 0.5.4
-
-### Category axes no longer fold a day of readings into one slot
-
-A category axis keyed each slot on the *caption* it would print, and a date
-time caption defaults to a date only pattern. Every point of a day therefore
-landed on the same slot: three readings a few seconds apart were drawn on top
-of each other, and the line had nothing to spread across, so the points did
-not line up with the times on the axis.
-
-Fixed
-
-* Categories key on the instant a point carries, not on its caption, which is
-  what upstream's `DateTimeCategoryAxis` does when it keys on
-  `millisecondsSinceEpoch`.
-* Captions are derived separately, and a pattern is chosen fine enough to give
-  every category a caption of its own, so a minute of readings is labelled
-  `11:30:01`, `11:30:11`, `11:30:31` rather than one repeated `15 Sep`.
-* Slots and captions are now kept apart, so a caller who pins a coarse
-  `dateFormat` gets the repeated captions they asked for while every point
-  still keeps its own slot.
+## 0.5.5
 
 ### A numeric x axis honours `interval`, and keeps it through a zoom
 
@@ -51,6 +31,28 @@ Fixed
   keeps every tick a whole multiple of the caller's interval.
 * Without an interval a numeric axis still splits the visible span into
   `desiredIntervals` equal parts, unchanged.
+
+## 0.5.4
+
+### Category axes no longer fold a day of readings into one slot
+
+A category axis keyed each slot on the *caption* it would print, and a date
+time caption defaults to a date only pattern. Every point of a day therefore
+landed on the same slot: three readings a few seconds apart were drawn on top
+of each other, and the line had nothing to spread across, so the points did
+not line up with the times on the axis.
+
+Fixed
+
+* Categories key on the instant a point carries, not on its caption, which is
+  what upstream's `DateTimeCategoryAxis` does when it keys on
+  `millisecondsSinceEpoch`.
+* Captions are derived separately, and a pattern is chosen fine enough to give
+  every category a caption of its own, so a minute of readings is labelled
+  `11:30:01`, `11:30:11`, `11:30:31` rather than one repeated `15 Sep`.
+* Slots and captions are now kept apart, so a caller who pins a coarse
+  `dateFormat` gets the repeated captions they asked for while every point
+  still keeps its own slot.
 
 ## 0.5.3
 
