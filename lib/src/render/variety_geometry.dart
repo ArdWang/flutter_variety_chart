@@ -289,6 +289,14 @@ class VarietyCartesianGeometry {
   /// The raw category values, populated for category axes.
   final List<dynamic> categoryValues = <dynamic>[];
 
+  /// The identity of every category, index aligned with [categories].
+  ///
+  /// Kept apart from the caption because a caption can be shared: a caller's
+  /// `dateFormat` may be coarse enough to print the same text for two
+  /// categories, and looking a point up by its caption would then drop it on
+  /// the wrong slot.
+  final List<String> _categoryKeys = <String>[];
+
   /// The lowest value on the primary axis, in axis units.
   double xMinimum = 0;
 
@@ -462,22 +470,12 @@ class VarietyCartesianGeometry {
         final String key = point.label ?? _categoryKey(point.x);
         if (seen.add(key)) {
           order.add(key);
-        }
-      }
-    }
-    categories.addAll(order);
-    for (int i = 0; i < sourceData.length; i++) {
-      for (final VarietyChartData point in sourceData[i]) {
-        final String key = point.label ?? _categoryKey(point.x);
-        final int index = order.indexOf(key);
-        if (!categoryValues.contains(point.x)) {
           categoryValues.add(point.x);
         }
-        if (index < 0) {
-          continue;
-        }
       }
     }
+    _categoryKeys.addAll(order);
+    categories.addAll(categoryValues.map(_categoryCaption));
     resolvedData = List<List<VarietyChartData>>.generate(
       sourceData.length,
       (int s) => List<VarietyChartData>.generate(
@@ -485,7 +483,7 @@ class VarietyCartesianGeometry {
         (int p) {
           final VarietyChartData point = sourceData[s][p];
           final String key = point.label ?? _categoryKey(point.x);
-          final int index = order.indexOf(key);
+          final int index = _categoryKeys.indexOf(key);
           return VarietyChartData(
             point.y ?? 0,
             index < 0 ? p.toDouble() : index.toDouble(),
@@ -687,18 +685,72 @@ class VarietyCartesianGeometry {
       for (final VarietyChartData point in points) {
         final String key = point.label ?? _categoryKey(point.x);
         if (seen.add(key)) {
-          categories.add(key);
+          _categoryKeys.add(key);
           categoryValues.add(point.x);
         }
       }
     }
+    // Captions are resolved once every value is known, because the pattern has
+    // to be fine enough to tell them all apart.
+    categories.addAll(categoryValues.map(_categoryCaption));
   }
 
+  /// The slot index of [point], or -1 when it carries no category.
+  int categoryIndexOf(VarietyChartData point) =>
+      _categoryKeys.indexOf(point.label ?? _categoryKey(point.x));
+
+  /// The identity of a category.
+  ///
+  /// A date time keys on its instant rather than on its caption: a day of
+  /// readings is one caption but many categories, and keying on the caption
+  /// folded every point of a day onto a single slot. Upstream's
+  /// DateTimeCategoryAxis keys on `millisecondsSinceEpoch` for the same reason.
   String _categoryKey(dynamic x) {
     if (x is DateTime) {
-      return varietyFormatDateTime(x, _categoryAxis.dateFormat ?? 'dd MMM');
+      return varietyFormatDateTime(x, 'yyyy-MM-dd HH:mm:ss.SSS');
     }
     return x?.toString() ?? '';
+  }
+
+  /// The caption the axis prints for a category value.
+  String _categoryCaption(dynamic x) {
+    if (x is DateTime) {
+      return varietyFormatDateTime(
+        x,
+        _categoryAxis.dateFormat ?? _autoCategoryDateFormat(),
+      );
+    }
+    return x?.toString() ?? '';
+  }
+
+  /// A caption pattern fine enough to tell every category apart.
+  ///
+  /// A date only pattern prints the same caption for every point of a day,
+  /// which reads as if they shared a slot. The ladder walks towards finer
+  /// patterns until each category gets a caption of its own.
+  String _autoCategoryDateFormat() {
+    final List<DateTime> times =
+        categoryValues.whereType<DateTime>().toList(growable: false);
+    if (times.isEmpty) {
+      return 'dd MMM';
+    }
+    final List<String> ladder = _formatLadder(
+      _autoIntervalType(times.last.difference(times.first).abs()),
+    );
+    for (final String pattern in ladder) {
+      final Set<String> seen = <String>{};
+      bool unique = true;
+      for (final DateTime time in times) {
+        if (!seen.add(varietyFormatDateTime(time, pattern))) {
+          unique = false;
+          break;
+        }
+      }
+      if (unique) {
+        return pattern;
+      }
+    }
+    return ladder.last;
   }
 
   void _resolveRanges() {
@@ -1159,8 +1211,7 @@ class VarietyCartesianGeometry {
   double pixelXFor(VarietySeries item, int pointIndex, VarietyChartData point) {
     if (xAxisType == VarietyAxisType.category ||
         xAxisType == VarietyAxisType.dateTimeCategory) {
-      final String key = point.label ?? _categoryKey(point.x);
-      final int index = categories.indexOf(key);
+      final int index = categoryIndexOf(point);
       final int resolved = index < 0 ? pointIndex : index;
       return _mirrorPrimary(
         plotRect.left + slotWidth * (resolved - xMinimum + 0.5),
@@ -3321,9 +3372,7 @@ class VarietyCartesianGeometry {
           continue;
         }
         for (int p = 0; p < pointPositions[s].length; p++) {
-          final String key =
-              resolvedData[s][p].label ?? _categoryKey(resolvedData[s][p].x);
-          if (categories.indexOf(key) != bestIndex) {
+          if (categoryIndexOf(resolvedData[s][p]) != bestIndex) {
             continue;
           }
           results.add(
