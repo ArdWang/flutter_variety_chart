@@ -984,12 +984,16 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
 
   void _updateTrackball(Offset position, VarietyCartesianGeometry geometry) {
-    final List<VarietyHitResult> hits = geometry.hitsAtSlot(position);
+    final VarietyTrackballBehavior? ball = widget.trackballBehavior;
+    final List<VarietyHitResult> hits = geometry.hitsAtSlot(
+      position,
+      displayMode:
+          ball?.displayMode ?? VarietyTrackballDisplayMode.groupAllPoints,
+    );
     if (hits.isEmpty) {
       _clearTrackball();
       return;
     }
-    final VarietyTrackballBehavior? ball = widget.trackballBehavior;
     final bool tapMode =
         ball != null && ball.activationMode == VarietyActivationMode.tap;
     if (tapMode) {

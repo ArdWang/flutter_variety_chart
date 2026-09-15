@@ -1,3 +1,25 @@
+## 0.5.3
+
+### Trackball guide follows the point you tapped
+
+The guide used to be anchored on the first series' nearest point, whatever the
+touch was actually near. Series carry their own x values -- time stamped data
+almost always does -- so a tap on a point of the second series could put the
+guide more than a hundred pixels away, and every marker in the shared tooltip
+sat beside it rather than on it.
+
+Fixed
+
+* The guide is anchored on the point closest to the touch across all series,
+  which is what upstream's `leastX` does.
+* `VarietyTrackballBehavior.displayMode` is now honoured. It was declared but
+  never read, so every mode behaved like `groupAllPoints`:
+  * `groupAllPoints` pulls every series onto the guide, so the markers line up
+    with the guide and the tooltip.
+  * `floatAllPoints` leaves each point on its own x.
+  * `nearestPoint` reports the single closest point.
+  * `none` reports nothing.
+
 ## 0.5.2
 
 ### Date time axis captions stay unique

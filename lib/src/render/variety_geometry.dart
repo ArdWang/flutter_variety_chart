@@ -3206,11 +3206,70 @@ class VarietyCartesianGeometry {
     return best;
   }
 
-  /// Returns one hit per series at the slot closest to [position].
+  /// Returns the hits a trackball shows for [position].
   ///
-  /// This is what a trackball uses: a single vertical guide plus one entry for
-  /// every series sharing the same primary-axis index.
-  List<VarietyHitResult> hitsAtSlot(Offset position) {
+  /// Every candidate is the nearest point of its own series, and the guide is
+  /// anchored on whichever of them sits closest to the touch. Series carry
+  /// their own x values, so the first series is not necessarily the one the
+  /// user aimed at; trusting it put the guide off to the side of the touch.
+  ///
+  /// [displayMode] then decides what is reported.
+  /// [VarietyTrackballDisplayMode.groupAllPoints] pulls every candidate onto
+  /// the guide, which is what upstream's trackball does, so the markers line
+  /// up with the guide and with the shared tooltip.
+  List<VarietyHitResult> hitsAtSlot(
+    Offset position, {
+    VarietyTrackballDisplayMode displayMode =
+        VarietyTrackballDisplayMode.groupAllPoints,
+  }) {
+    final List<VarietyHitResult> candidates = _slotCandidates(position);
+    if (candidates.isEmpty || displayMode == VarietyTrackballDisplayMode.none) {
+      return const <VarietyHitResult>[];
+    }
+    int anchor = 0;
+    for (int i = 1; i < candidates.length; i++) {
+      final double distanceToTouch =
+          (_alongPrimary(candidates[i].position) - _alongPrimary(position))
+              .abs();
+      final double anchorToTouch =
+          (_alongPrimary(candidates[anchor].position) - _alongPrimary(position))
+              .abs();
+      if (distanceToTouch < anchorToTouch) {
+        anchor = i;
+      }
+    }
+    final double guide = _alongPrimary(candidates[anchor].position);
+    switch (displayMode) {
+      case VarietyTrackballDisplayMode.nearestPoint:
+        return <VarietyHitResult>[candidates[anchor]];
+      case VarietyTrackballDisplayMode.floatAllPoints:
+        return candidates;
+      case VarietyTrackballDisplayMode.groupAllPoints:
+        return candidates
+            .map(
+              (VarietyHitResult hit) => VarietyHitResult(
+                series: hit.series,
+                seriesIndex: hit.seriesIndex,
+                point: hit.point,
+                pointIndex: hit.pointIndex,
+                position: transposed
+                    ? Offset(hit.position.dx, guide)
+                    : Offset(guide, hit.position.dy),
+                band: hit.band,
+              ),
+            )
+            .toList(growable: false);
+      case VarietyTrackballDisplayMode.none:
+        return const <VarietyHitResult>[];
+    }
+  }
+
+  /// The coordinate a trackball groups on, which flips with the layout.
+  double _alongPrimary(Offset position) =>
+      transposed ? position.dy : position.dx;
+
+  /// The nearest point of every series, each left at its own position.
+  List<VarietyHitResult> _slotCandidates(Offset position) {
     final List<VarietyHitResult> results = <VarietyHitResult>[];
     if (transposed) {
       for (int s = 0; s < series.length; s++) {
