@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import '../behaviors/variety_behaviors.dart';
 import '../models/variety_chart_data.dart';
 import '../models/variety_series.dart';
 import '../render/variety_chart_theme.dart';
@@ -17,6 +18,7 @@ class VarietyTooltipCard extends StatelessWidget {
     required this.theme,
     this.builder,
     this.constraints = const BoxConstraints(maxWidth: 220),
+    this.behavior = const VarietyTooltipBehavior(),
   });
 
   /// The highlighted point.
@@ -31,19 +33,18 @@ class VarietyTooltipCard extends StatelessWidget {
   /// Constraints applied to the card.
   final BoxConstraints constraints;
 
+  /// The styling the chart was configured with.
+  final VarietyTooltipBehavior behavior;
+
   @override
   Widget build(BuildContext context) {
     final Widget body = builder?.call(context, result) ?? _defaultBody(context);
     return ConstrainedBox(
       constraints: constraints,
-      child: Material(
-        color: theme.tooltipBackgroundColor,
-        elevation: 4,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: body,
-        ),
+      child: _TooltipChrome(
+        behavior: behavior,
+        theme: theme,
+        child: body,
       ),
     );
   }
@@ -60,7 +61,7 @@ class VarietyTooltipCard extends StatelessWidget {
         Text(
           result.series.name!,
           style: TextStyle(
-            color: theme.tooltipTextColor,
+            color: _textColor,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -74,7 +75,7 @@ class VarietyTooltipCard extends StatelessWidget {
           child: Text(
             caption,
             style: TextStyle(
-              color: theme.tooltipTextColor.withValues(alpha: 0.75),
+              color: _textColor.withValues(alpha: 0.75),
               fontSize: 11,
             ),
           ),
@@ -89,25 +90,35 @@ class VarietyTooltipCard extends StatelessWidget {
     );
   }
 
+  /// The colour the card's text falls back to.
+  Color get _textColor => behavior.textStyle?.color ?? theme.tooltipTextColor;
+
   Widget _valueRow(BuildContext context, Color color, VarietyChartData point) {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            formatValue(point.y),
-            style: TextStyle(
-              color: theme.tooltipTextColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+          if (behavior.canShowMarker) ...<Widget>[
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            formatValue(
+              point.y,
+              decimalPlaces: behavior.decimalPlaces,
+              template: behavior.format,
+            ),
+            style: behavior.textStyle ??
+                TextStyle(
+                  color: theme.tooltipTextColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ],
       ),
@@ -115,14 +126,75 @@ class VarietyTooltipCard extends StatelessWidget {
   }
 
   /// Formats a tooltip value, dropping the decimals of whole numbers.
-  static String formatValue(double? value) {
+  ///
+  /// [decimalPlaces] rounds the value first, and [template] then wraps the
+  /// result with `{value}` standing in for the number, so `'{value} kg'`
+  /// prints `12 kg`.
+  static String formatValue(
+    double? value, {
+    int? decimalPlaces,
+    String? template,
+  }) {
     if (value == null) {
       return '-';
     }
-    if (value == value.roundToDouble() && value.abs() < 1e15) {
-      return value.toInt().toString();
+    final String text;
+    if (decimalPlaces != null) {
+      text = value.toStringAsFixed(decimalPlaces < 0 ? 0 : decimalPlaces);
+    } else if (value == value.roundToDouble() && value.abs() < 1e15) {
+      text = value.toInt().toString();
+    } else {
+      text = value.toStringAsFixed(2);
     }
-    return value.toStringAsFixed(2);
+    if (template == null || template.isEmpty) {
+      return text;
+    }
+    return template.contains('{value}')
+        ? template.replaceAll('{value}', text)
+        : '$template$text';
+  }
+}
+
+/// The card chrome shared by the single point and trackball tooltips.
+///
+/// Both cards read the same [VarietyTooltipBehavior], so a caller who sets a
+/// fill, a border or an opacity gets it on every tooltip the chart shows.
+class _TooltipChrome extends StatelessWidget {
+  const _TooltipChrome({
+    required this.behavior,
+    required this.theme,
+    required this.child,
+  });
+
+  final VarietyTooltipBehavior behavior;
+  final VarietyChartTheme theme;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color fill = behavior.backgroundColor ?? theme.tooltipBackgroundColor;
+    final double radius = behavior.borderRadius;
+    return Opacity(
+      opacity: behavior.opacity.clamp(0.0, 1.0),
+      child: Material(
+        color: fill,
+        elevation: behavior.elevation,
+        borderRadius: BorderRadius.circular(radius),
+        child: Container(
+          decoration: behavior.borderWidth > 0 && behavior.borderColor != null
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(radius),
+                  border: Border.all(
+                    color: behavior.borderColor!,
+                    width: behavior.borderWidth,
+                  ),
+                )
+              : null,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: child,
+        ),
+      ),
+    );
   }
 }
 
@@ -135,6 +207,7 @@ class VarietyTrackballTooltipCard extends StatelessWidget {
     required this.theme,
     this.builder,
     this.constraints = const BoxConstraints(maxWidth: 240),
+    this.behavior = const VarietyTooltipBehavior(),
   });
 
   /// Every series reading at the active primary-axis slot.
@@ -150,20 +223,19 @@ class VarietyTrackballTooltipCard extends StatelessWidget {
   /// Constraints applied to the card.
   final BoxConstraints constraints;
 
+  /// The styling the chart was configured with.
+  final VarietyTooltipBehavior behavior;
+
   @override
   Widget build(BuildContext context) {
     final Widget body =
         builder?.call(context, results) ?? _defaultBody(context);
     return ConstrainedBox(
       constraints: constraints,
-      child: Material(
-        color: theme.tooltipBackgroundColor,
-        elevation: 4,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: body,
-        ),
+      child: _TooltipChrome(
+        behavior: behavior,
+        theme: theme,
+        child: body,
       ),
     );
   }
@@ -180,7 +252,7 @@ class VarietyTrackballTooltipCard extends StatelessWidget {
             child: Text(
               caption,
               style: TextStyle(
-                color: theme.tooltipTextColor,
+                color: _textColor,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -200,27 +272,35 @@ class VarietyTrackballTooltipCard extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 6),
+              if (behavior.canShowMarker) ...<Widget>[
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration:
+                      BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 6),
+              ],
               Text(
                 result.series.name ?? 'Series ${result.seriesIndex + 1}',
                 style: TextStyle(
-                  color: theme.tooltipTextColor.withValues(alpha: 0.85),
+                  color: _textColor.withValues(alpha: 0.85),
                   fontSize: 11,
                 ),
               ),
               const SizedBox(width: 8),
               Text(
-                VarietyTooltipCard.formatValue(result.point.y),
-                style: TextStyle(
-                  color: theme.tooltipTextColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                VarietyTooltipCard.formatValue(
+                  result.point.y,
+                  decimalPlaces: behavior.decimalPlaces,
+                  template: behavior.format,
                 ),
+                style: behavior.textStyle ??
+                    TextStyle(
+                      color: _textColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
             ],
           ),
@@ -233,6 +313,9 @@ class VarietyTrackballTooltipCard extends StatelessWidget {
       children: rows,
     );
   }
+
+  /// The colour the card's text falls back to.
+  Color get _textColor => behavior.textStyle?.color ?? theme.tooltipTextColor;
 }
 
 /// Pins a tooltip card next to a data point.

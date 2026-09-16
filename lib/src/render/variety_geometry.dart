@@ -990,23 +990,55 @@ class VarietyCartesianGeometry {
     final double span = hi - lo;
     final double fallbackInterval =
         span <= 0 ? 1 : span / math.max(axis.desiredIntervals, 1);
+    // `additional` buys room past the rounded ends so the outermost label has
+    // somewhere to sit; half an interval is the smallest amount that is
+    // visible once the ticks are drawn.
+    final double padding = nice.interval <= 0 ? 0 : nice.interval * 0.5;
+    final double roundedLo = math.min(nice.minimum, lo);
+    final double roundedHi = math.max(nice.maximum, hi);
+    double newLo = lo;
+    double newHi = hi;
+    double interval = fallbackInterval;
     switch (axis.rangePadding) {
       case VarietyRangePadding.none:
-        return (lo, hi, fallbackInterval);
+        break;
       case VarietyRangePadding.extra:
         final double pad = span <= 0 ? 1 : span * 0.05;
-        return (lo - pad, hi + pad, fallbackInterval);
-      case VarietyRangePadding.additional:
-        final double pad = span <= 0 ? 1 : span * 0.02;
-        return (
-          math.min(lo - pad, nice.minimum),
-          math.max(hi + pad, nice.maximum),
-          nice.interval,
-        );
+        newLo = lo - pad;
+        newHi = hi + pad;
+      case VarietyRangePadding.normal:
       case VarietyRangePadding.round:
       case VarietyRangePadding.auto:
-        return (nice.minimum, nice.maximum, nice.interval);
+        newLo = roundedLo;
+        newHi = roundedHi;
+        interval = nice.interval;
+      case VarietyRangePadding.additional:
+        newLo = roundedLo - padding;
+        newHi = roundedHi + padding;
+        interval = nice.interval;
+      case VarietyRangePadding.additionalStart:
+        newLo = roundedLo - padding;
+        newHi = roundedHi;
+        interval = nice.interval;
+      case VarietyRangePadding.additionalEnd:
+        newLo = roundedLo;
+        newHi = roundedHi + padding;
+        interval = nice.interval;
+      case VarietyRangePadding.roundStart:
+        newLo = roundedLo;
+        newHi = hi;
+        interval = nice.interval;
+      case VarietyRangePadding.roundEnd:
+        newLo = lo;
+        newHi = roundedHi;
+        interval = nice.interval;
     }
+    // A style that only pads one end can leave the axis flat when the data
+    // itself is flat, so widen it enough to stay drawable.
+    if (newHi - newLo <= 0) {
+      return (newLo, newLo + (span <= 0 ? 1 : span), fallbackInterval);
+    }
+    return (newLo, newHi, interval);
   }
 
   /// The lowest and highest value a point contributes to the range.
@@ -2812,6 +2844,9 @@ class VarietyCartesianGeometry {
       return;
     }
     final VarietyChartData point = points[pointIndex];
+    if (!settings.showZeroValue && (point.y ?? 0) == 0) {
+      return;
+    }
     String caption =
         settings.builder?.call(point) ?? varietyFormatNumber(point.y ?? 0);
     final String? overridden =
@@ -2831,7 +2866,15 @@ class VarietyCartesianGeometry {
             text: caption,
             position: settings.position,
             offset: settings.labelOffset,
-            color: settings.color,
+            color: settings.useSeriesColor
+                ? colorFor(item, seriesIndex, pointIndex)
+                : settings.color,
+            backgroundColor: settings.backgroundColor,
+            borderColor: settings.borderColor,
+            borderWidth: settings.borderWidth,
+            borderRadius: settings.borderRadius,
+            angle: settings.angle,
+            shift: settings.offset,
           ),
         ],
         style: settings.textStyle,

@@ -30,6 +30,9 @@ enum VarietyRangePadding {
   /// The axis spans exactly the data range.
   none,
 
+  /// The range is extended outwards to the enclosing tick values.
+  normal,
+
   /// The range is extended to round tick values.
   round,
 
@@ -39,8 +42,21 @@ enum VarietyRangePadding {
   /// The padding style is chosen from the axis type.
   auto,
 
-  /// The range is padded so the first and last labels stay inside.
+  /// The range is rounded outwards and then padded so the first and last
+  /// labels stay inside.
   additional,
+
+  /// Like [additional], but only the low end of the axis is padded.
+  additionalStart,
+
+  /// Like [additional], but only the high end of the axis is padded.
+  additionalEnd,
+
+  /// Like [round], but only the low end is rounded outwards.
+  roundStart,
+
+  /// Like [round], but only the high end is rounded outwards.
+  roundEnd,
 }
 
 /// How the first and last tick labels are kept inside the axis.

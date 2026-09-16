@@ -228,6 +228,12 @@ class VarietyLabelItem {
     this.position = VarietyLabelPosition.auto,
     this.offset = 6,
     this.color,
+    this.backgroundColor,
+    this.borderColor,
+    this.borderWidth = 0,
+    this.borderRadius = 4,
+    this.angle = 0,
+    this.shift = Offset.zero,
   });
 
   /// The point the caption is anchored to.
@@ -244,6 +250,24 @@ class VarietyLabelItem {
 
   /// An optional colour override.
   final Color? color;
+
+  /// A card colour painted behind the caption.
+  final Color? backgroundColor;
+
+  /// The colour of the card outline.
+  final Color? borderColor;
+
+  /// The thickness of the card outline. Zero skips the outline.
+  final double borderWidth;
+
+  /// The corner radius of the card.
+  final double borderRadius;
+
+  /// Rotation of the caption about its own centre, in degrees.
+  final double angle;
+
+  /// An extra translation applied once [position] is resolved.
+  final Offset shift;
 }
 
 /// A set of text captions that share one style.

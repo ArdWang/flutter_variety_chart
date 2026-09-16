@@ -63,6 +63,12 @@ class VarietyCartesianPainter extends CustomPainter {
     this.labelHits,
     this.showElements = true,
     this.selected = const <VarietyHitResult>[],
+    this.selection,
+    this.plotAreaBackgroundColor,
+    this.plotAreaBorderColor,
+    this.plotAreaBorderWidth = 0,
+    this.borderColor,
+    this.borderWidth = 0,
   });
 
   /// The pre-computed layout shared with hit testing.
@@ -130,8 +136,26 @@ class VarietyCartesianPainter extends CustomPainter {
   final bool showElements;
 
   /// Selected points supplied by the chart widget; used for highlight rings
-  /// and to dim unselected markers when [unselectedOpacity] < 1.
+  /// and to dim unselected series when the selection behaviour asks for it.
   final List<VarietyHitResult> selected;
+
+  /// The selection styling, when selection is configured.
+  final VarietySelectionBehavior? selection;
+
+  /// A fill painted behind the plot area only.
+  final Color? plotAreaBackgroundColor;
+
+  /// The colour of the box drawn around the plot area.
+  final Color? plotAreaBorderColor;
+
+  /// The thickness of the box drawn around the plot area.
+  final double plotAreaBorderWidth;
+
+  /// The colour of the box drawn around the whole chart.
+  final Color? borderColor;
+
+  /// The thickness of the box drawn around the whole chart.
+  final double borderWidth;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -140,24 +164,55 @@ class VarietyCartesianPainter extends CustomPainter {
         _seriesVisible[s] = geometry.series[s].initialIsVisible;
       }
     }
+    _paintChartFrame(canvas, size);
+    _paintPlotAreaBackground(canvas);
     _paintPlotBands(canvas);
     _paintGrid(canvas);
     if (showElements) {
       canvas.save();
-      canvas.clipRect(geometry.plotRect.inflate(1));
+      final Rect bounds = geometry.plotRect.inflate(1);
+      canvas.clipRect(bounds);
+      // Series holding nothing selected fade back so the selection reads.
+      final VarietySelectionBehavior? sel = selection;
+      final bool dim = sel != null &&
+          sel.enabled &&
+          selected.isNotEmpty &&
+          sel.unselectedOpacity < 1;
+      final Set<int> selectedSeries = <int>{
+        for (final VarietyHitResult hit in selected) hit.seriesIndex,
+      };
+      int? dimmedSeries;
       for (final VarietyElement el in geometry.elements) {
         if (el.seriesIndex != null && _seriesVisible[el.seriesIndex] == false) {
           continue;
         }
         final int key = el.seriesIndex ?? 0;
+        final bool fade = dim &&
+            el.seriesIndex != null &&
+            !selectedSeries.contains(el.seriesIndex);
+        if (fade && dimmedSeries == null) {
+          canvas.saveLayer(
+            bounds,
+            Paint()
+              ..color = Colors.white.withValues(alpha: sel.unselectedOpacity),
+          );
+          dimmedSeries = el.seriesIndex;
+        } else if (!fade && dimmedSeries != null) {
+          canvas.restore();
+          dimmedSeries = null;
+        }
         final VarietyElementRenderer r = _renderers[key] ?? _renderer;
         final VarietySeries? series =
             el.seriesIndex != null ? geometry.series[el.seriesIndex!] : null;
         r.paintWith(canvas, el, series);
       }
+      if (dimmedSeries != null) {
+        canvas.restore();
+      }
       canvas.restore();
     }
     _paintAxisLines(canvas);
+    _paintPlotAreaBorder(canvas);
     _paintAnnotations(canvas);
     _paintHighlights(canvas);
     _paintSelectionRect(canvas);
@@ -242,6 +297,41 @@ class VarietyCartesianPainter extends CustomPainter {
     final double span = math.max(geometry.xMaximum - geometry.xMinimum, 1e-9);
     return geometry.plotRect.left +
         (value - geometry.xMinimum) / span * geometry.plotRect.width;
+  }
+
+  void _paintChartFrame(Canvas canvas, Size size) {
+    final Color? stroke = borderColor;
+    if (borderWidth <= 0 || stroke == null) {
+      return;
+    }
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height).deflate(borderWidth / 2),
+      Paint()
+        ..color = stroke
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = borderWidth,
+    );
+  }
+
+  void _paintPlotAreaBackground(Canvas canvas) {
+    final Color? fill = plotAreaBackgroundColor;
+    if (fill != null) {
+      canvas.drawRect(geometry.plotRect, Paint()..color = fill);
+    }
+  }
+
+  void _paintPlotAreaBorder(Canvas canvas) {
+    final Color? stroke = plotAreaBorderColor;
+    if (plotAreaBorderWidth <= 0 || stroke == null) {
+      return;
+    }
+    canvas.drawRect(
+      geometry.plotRect.deflate(plotAreaBorderWidth / 2),
+      Paint()
+        ..color = stroke
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = plotAreaBorderWidth,
+    );
   }
 
   void _paintGrid(Canvas canvas) {
@@ -1078,31 +1168,49 @@ class VarietyCartesianPainter extends CustomPainter {
       }
     }
     final bool showMarkers = ball == null || ball.showMarkers;
+    final VarietySelectionBehavior? sel = selection;
+    final bool styled = sel != null && sel.enabled && selected.isNotEmpty;
     for (final VarietyHitResult hit in highlights) {
       if (!showMarkers) {
         continue;
       }
-      final Color color = hit.point.color ??
+      Color color = hit.point.color ??
           hit.series.color ??
           varietyDefaultPalette[hit.seriesIndex % varietyDefaultPalette.length];
+      Color border = theme.markerBorderColor;
+      double borderWidth = 2.4;
+      double alpha = 1;
+      if (styled) {
+        if (selected.contains(hit)) {
+          color = sel.selectedColor ?? color;
+          border = sel.selectedBorderColor ?? border;
+          borderWidth = sel.selectedBorderWidth;
+          alpha = sel.selectedOpacity;
+        } else {
+          color = sel.unselectedColor ?? color;
+          border = sel.unselectedBorderColor ?? border;
+          borderWidth = sel.unselectedBorderWidth ?? borderWidth;
+          alpha = sel.unselectedOpacity;
+        }
+      }
       final double size = ball?.markerSize ?? 9;
       final VarietyMarkerShape shape =
           ball?.markerShape ?? VarietyMarkerShape.circle;
       final Path path = _renderer.markerPath(shape, hit.position, size);
-      canvas.drawPath(path, Paint()..color = theme.markerBorderColor);
+      canvas.drawPath(path, Paint()..color = border.withValues(alpha: alpha));
       canvas.drawPath(
         path,
         Paint()
-          ..color = color
+          ..color = color.withValues(alpha: alpha)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
+          ..strokeWidth = borderWidth
           ..isAntiAlias = true,
       );
       if (hit.band != null) {
         canvas.drawRRect(
           RRect.fromRectAndRadius(hit.band!, const Radius.circular(3)),
           Paint()
-            ..color = color.withValues(alpha: 0.16)
+            ..color = color.withValues(alpha: 0.16 * alpha)
             ..style = PaintingStyle.fill,
         );
       }

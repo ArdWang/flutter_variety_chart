@@ -86,6 +86,15 @@ enum VarietyMarkerShape {
 
   /// A multiplication sign.
   cross,
+
+  /// A filled five sided polygon.
+  pentagon,
+
+  /// A vertical stroke through the point, the `|` half of a cross.
+  verticalLine,
+
+  /// A horizontal stroke through the point, the `-` half of a cross.
+  horizontalLine,
 }
 
 /// Determines where data labels are placed with respect to their point.
@@ -155,6 +164,10 @@ enum VarietySelectionType {
 
   /// The whole series is selected.
   series,
+
+  /// Every series' point that shares the tapped slot is selected, which is the
+  /// way to highlight one x position across several series at once.
+  cluster,
 
   /// Selection is disabled.
   none,

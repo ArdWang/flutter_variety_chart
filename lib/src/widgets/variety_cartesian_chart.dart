@@ -50,6 +50,11 @@ class VarietyCartesianChart extends StatefulWidget {
     this.animationDuration = const Duration(milliseconds: 800),
     this.enableAnimation = true,
     this.backgroundColor,
+    this.plotAreaBackgroundColor,
+    this.plotAreaBorderColor,
+    this.plotAreaBorderWidth = 0,
+    this.borderColor,
+    this.borderWidth = 0,
     this.padding = const EdgeInsets.fromLTRB(12, 14, 18, 10),
     this.onPointTap,
     this.onPointHover,
@@ -124,6 +129,22 @@ class VarietyCartesianChart extends StatefulWidget {
 
   /// An optional background colour painted behind the plot area.
   final Color? backgroundColor;
+
+  /// A fill painted behind the plot area only, leaving the axis margins on
+  /// [backgroundColor].
+  final Color? plotAreaBackgroundColor;
+
+  /// The colour of the box drawn around the plot area.
+  final Color? plotAreaBorderColor;
+
+  /// The thickness of the box drawn around the plot area. Zero skips it.
+  final double plotAreaBorderWidth;
+
+  /// The colour of the box drawn around the whole chart.
+  final Color? borderColor;
+
+  /// The thickness of the box drawn around the whole chart. Zero skips it.
+  final double borderWidth;
 
   /// Padding reserved inside the plot area for axis captions.
   final EdgeInsets padding;
@@ -525,6 +546,12 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
             labelHits: _labelHits,
             showElements: _paintsSeries,
             selected: _selected,
+            selection: widget.selectionBehavior,
+            plotAreaBackgroundColor: widget.plotAreaBackgroundColor,
+            plotAreaBorderColor: widget.plotAreaBorderColor,
+            plotAreaBorderWidth: widget.plotAreaBorderWidth,
+            borderColor: widget.borderColor,
+            borderWidth: widget.borderWidth,
           ),
         );
         // Gesture recognisers are only attached when the behaviour that needs them
@@ -819,6 +846,10 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
             ),
           ),
         );
+      } else if (selection.selectionType == VarietySelectionType.cluster) {
+        // Every series' nearest point at the tapped slot, so one x position
+        // can be highlighted across the whole stack.
+        _applySelection(geometry.hitsAtSlot(hit.position));
       } else {
         final bool alreadySelected = _selected.contains(hit);
         if (selection.enableMultiSelection) {
@@ -1461,6 +1492,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
           results: _trackballHits,
           theme: theme,
           builder: ball.builder,
+          behavior: widget.tooltipBehavior,
         ),
       );
     }
@@ -1469,14 +1501,18 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       return const <Widget>[];
     }
     final String header = hit.point.label ?? hit.point.x?.toString() ?? '';
-    final String valueText = VarietyTooltipCard.formatValue(hit.point.y);
+    final VarietyTooltipBehavior tooltip = widget.tooltipBehavior;
+    final String valueText = VarietyTooltipCard.formatValue(
+      hit.point.y,
+      decimalPlaces: tooltip.decimalPlaces,
+      template: tooltip.format,
+    );
     if (widget.onTooltipRender != null &&
         !widget.onTooltipRender!(
           VarietyTooltipDetails(hit: hit, header: header, text: valueText),
         )) {
       return const <Widget>[];
     }
-    final VarietyTooltipBehavior tooltip = widget.tooltipBehavior;
     final VarietyCrosshairBehavior? cross = widget.crosshairBehavior;
     if (cross != null && cross.enabled && cross.showTooltip) {
       return _positionedCard(
@@ -1485,6 +1521,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
           result: hit,
           theme: theme,
           builder: cross.builder,
+          behavior: tooltip,
         ),
       );
     }
@@ -1497,6 +1534,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
         result: hit,
         theme: theme,
         builder: tooltip.builder,
+        behavior: tooltip,
       ),
     );
   }

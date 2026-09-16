@@ -264,7 +264,45 @@ class VarietyElementRenderer {
           .copyWith(
               color: item.color ?? element.style?.color ?? theme.labelColor);
       final TextPainter painter = layoutText(item.text, style);
-      painter.paint(canvas, anchorFor(painter, item));
+      final Offset origin = anchorFor(painter, item) + item.shift;
+      final Rect bounds = origin & painter.size;
+      drawLabelCard(canvas, item, bounds);
+      if (item.angle == 0) {
+        painter.paint(canvas, origin);
+        continue;
+      }
+      final Offset pivot = bounds.center;
+      canvas.save();
+      canvas.translate(pivot.dx, pivot.dy);
+      canvas.rotate(item.angle * math.pi / 180);
+      painter.paint(canvas, Offset(-painter.width / 2, -painter.height / 2));
+      canvas.restore();
+    }
+  }
+
+  /// Draws the optional card behind a caption.
+  void drawLabelCard(Canvas canvas, VarietyLabelItem item, Rect bounds) {
+    if (item.backgroundColor == null && item.borderWidth <= 0) {
+      return;
+    }
+    final RRect card = RRect.fromRectAndRadius(
+      const EdgeInsets.symmetric(horizontal: 4, vertical: 2)
+          .inflateRect(bounds),
+      Radius.circular(item.borderRadius),
+    );
+    final Color? fill = item.backgroundColor;
+    if (fill != null) {
+      canvas.drawRRect(card, Paint()..color = fill);
+    }
+    final Color? stroke = item.borderColor;
+    if (item.borderWidth > 0 && stroke != null) {
+      canvas.drawRRect(
+        card,
+        Paint()
+          ..color = stroke
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = item.borderWidth,
+      );
     }
   }
 
@@ -390,6 +428,28 @@ class VarietyElementRenderer {
           ..lineTo(center.dx + half, center.dy + half)
           ..moveTo(center.dx + half, center.dy - half)
           ..lineTo(center.dx - half, center.dy + half);
+      case VarietyMarkerShape.pentagon:
+        for (int i = 0; i < 5; i++) {
+          final double angle = -math.pi / 2 + i * 2 * math.pi / 5;
+          final Offset corner = Offset(
+            center.dx + half * math.cos(angle),
+            center.dy + half * math.sin(angle),
+          );
+          if (i == 0) {
+            path.moveTo(corner.dx, corner.dy);
+          } else {
+            path.lineTo(corner.dx, corner.dy);
+          }
+        }
+        path.close();
+      case VarietyMarkerShape.verticalLine:
+        path
+          ..moveTo(center.dx, center.dy - half)
+          ..lineTo(center.dx, center.dy + half);
+      case VarietyMarkerShape.horizontalLine:
+        path
+          ..moveTo(center.dx - half, center.dy)
+          ..lineTo(center.dx + half, center.dy);
     }
     return path;
   }

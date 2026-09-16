@@ -16,6 +16,13 @@ class VarietyTooltipBehavior {
     this.borderRadius = 8,
     this.showDuration = Duration.zero,
     this.builder,
+    this.borderColor,
+    this.borderWidth = 0,
+    this.opacity = 1,
+    this.elevation = 4,
+    this.canShowMarker = true,
+    this.decimalPlaces,
+    this.format,
   });
 
   /// Whether the tooltip is shown at all.
@@ -35,6 +42,29 @@ class VarietyTooltipBehavior {
 
   /// Builds a fully custom card body.
   final Widget Function(BuildContext context, VarietyHitResult result)? builder;
+
+  /// The colour of the card outline.
+  final Color? borderColor;
+
+  /// The thickness of the card outline. Zero skips the outline.
+  final double borderWidth;
+
+  /// The opacity of the whole card, between `0` and `1`.
+  final double opacity;
+
+  /// The shadow depth under the card.
+  final double elevation;
+
+  /// Whether the card leads with a dot in the series colour.
+  final bool canShowMarker;
+
+  /// Rounds the value to this many decimals before it is captioned. Null
+  /// leaves the value as it is.
+  final int? decimalPlaces;
+
+  /// Wraps the captioned value. `{value}` is replaced by the formatted
+  /// number, so `'{value} kg'` prints `12 kg`.
+  final String? format;
 }
 
 /// The marker a trackball draws at every highlighted point.
@@ -279,7 +309,13 @@ class VarietySelectionBehavior {
     this.enabled = true,
     this.selectionType = VarietySelectionType.point,
     this.selectedColor,
+    this.selectedBorderColor,
+    this.selectedBorderWidth = 2,
+    this.selectedOpacity = 1,
     this.unselectedOpacity = 0.35,
+    this.unselectedColor,
+    this.unselectedBorderColor,
+    this.unselectedBorderWidth,
     this.onSelectionChanged,
     this.enableMultiSelection = false,
     this.toggleSelection = true,
@@ -288,14 +324,34 @@ class VarietySelectionBehavior {
   /// Whether selection reacts to input.
   final bool enabled;
 
-  /// Whether a single point or a whole series is selected.
+  /// Whether a single point, a whole series, or one slot across every series
+  /// is selected.
   final VarietySelectionType selectionType;
 
   /// The colour applied to the selected point or series.
   final Color? selectedColor;
 
+  /// The outline colour drawn around a selected point.
+  final Color? selectedBorderColor;
+
+  /// The outline thickness drawn around a selected point.
+  final double selectedBorderWidth;
+
+  /// The opacity applied to selected points.
+  final double selectedOpacity;
+
   /// The opacity applied to everything that is not selected.
   final double unselectedOpacity;
+
+  /// The colour applied to everything that is not selected.
+  final Color? unselectedColor;
+
+  /// The outline colour applied to unselected points.
+  final Color? unselectedBorderColor;
+
+  /// The outline thickness applied to unselected points. Null keeps the
+  /// series' own outline.
+  final double? unselectedBorderWidth;
 
   /// Called whenever the selection changes.
   final void Function(List<VarietyHitResult> selected)? onSelectionChanged;

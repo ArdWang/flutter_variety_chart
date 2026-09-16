@@ -18,10 +18,12 @@ No `intl`, no native plugins, no license keys — just Flutter.
 | Circular series | Pie, doughnut, radial bar |
 | Special series | Funnel, pyramid |
 | Spark charts | `VarietySparkLineChart`, `VarietySparkAreaChart`, `VarietySparkBarChart`, `VarietySparkWinLossChart` with markers, data labels, plot bands, point colour overrides, dash patterns and a trackball |
-| Axes | Multiple Y axes; numeric, category, date-time, date-time-category and logarithmic; plot bands, multi-level labels (rectangle / brace / curly bracket), minor ticks and minor grid lines, label intersection handling, range padding, inversion, plot offsets and numeric patterns |
-| Interactions | Tooltip, trackball (vertical / horizontal / both guides, grouped / nearest / float display), crosshair, point/series selection with a `VarietySelectionController`, multi selection, pinch zoom, pan, mouse-wheel zoom, double-tap zoom, rubber-band zoom, axis zoom modes |
+| Axes | Multiple Y axes; numeric, category, date-time, date-time-category and logarithmic; plot bands, multi-level labels (rectangle / brace / curly bracket), minor ticks and minor grid lines, label intersection handling, the full range padding set (`none`, `normal`, `round`, `extra`, `additional`, `additionalStart`, `additionalEnd`, `roundStart`, `roundEnd`, `auto`), inversion, plot offsets and numeric patterns |
+| Interactions | Tooltip with value formatting (`format`, `decimalPlaces`), a configurable card (fill, border, radius, opacity, elevation, marker dot) and a shared/nearest/float trackball (vertical / horizontal / both guides); crosshair; point, series and cluster selection with `VarietySelectionController`, multi selection and full selected / unselected styling (colour, border, opacity); pinch zoom, pan, mouse-wheel zoom, double-tap zoom, rubber-band zoom, axis zoom modes |
+| Data labels | Position, pixel offset, per-series colour, card background, border and corner radius, rotation, and zero suppression |
+| Markers | Nine glyphs (circle, square, diamond, triangle, inverted triangle, plus, cross, pentagon, vertical and horizontal strokes) with size, fill and border |
 | Analysis | Trendlines (linear, exponential, logarithmic, polynomial, power, moving average) and technical indicators (SMA, EMA, WMA, TMA, RSI, ATR, momentum, ROC, Bollinger bands, MACD, stochastic, accumulation / distribution) |
-| Decorations | Text, line, rectangle, ellipse, arrow and image annotations |
+| Decorations | Text, line, rectangle, ellipse, arrow and image annotations; plot area fill and border; chart frame |
 | Callbacks | `onPointTap`, `onPointHover`, `onLegendTapped`, `onTooltipRender`, `onDataLabelRender`, `onAxisLabelTapped`, `onActualRangeChanged`, `onZoomStart`, `onZoomEnd` |
 | Empty points | `gap`, `zero`, `average` and `drop` modes |
 | Theming | Automatic light/dark adaptation from the ambient `ThemeData` |
@@ -44,7 +46,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  flutter_variety_chart: ^0.5.4
+  flutter_variety_chart: ^0.5.6
 ```
 
 Import it:

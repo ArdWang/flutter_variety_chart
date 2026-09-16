@@ -1,3 +1,40 @@
+## 0.5.6
+
+### Rounds out the option surface
+
+A pass over the reference library turned up a set of options that were either
+missing or declared and then never read. Everything here is wired through to
+the renderer and covered by tests.
+
+Added
+
+* `VarietyRangePadding` gains `normal`, `additionalStart`, `additionalEnd`,
+  `roundStart` and `roundEnd`, so an axis can be padded at one end only.
+  `additional` now buys half an interval past the rounded ends, which it needs
+  to be visible at all.
+* `VarietyMarkerShape` gains `pentagon`, `verticalLine` and `horizontalLine`.
+* `VarietySelectionType.cluster` selects one point per series at the tapped
+  slot.
+* `VarietyDataLabelSettings` gains `offset`, `useSeriesColor`,
+  `backgroundColor`, `borderColor`, `borderWidth`, `borderRadius`, `angle` and
+  `showZeroValue`.
+* `VarietyTooltipBehavior` gains `format`, `decimalPlaces`, `canShowMarker`,
+  `borderColor`, `borderWidth`, `opacity` and `elevation`. `format` wraps the
+  value with `{value}`, so `'{value} kg'` prints `12 kg`. Both tooltip cards --
+  the single point one and the shared trackball one -- now read the same
+  behaviour, so a fill, border or opacity applies to every tooltip the chart
+  shows. A `textStyle` colour also drives the card's heading and caption.
+* `VarietyCartesianChart` gains `plotAreaBackgroundColor`,
+  `plotAreaBorderColor`, `plotAreaBorderWidth`, `borderColor` and
+  `borderWidth`.
+
+Fixed
+
+* `VarietySelectionBehavior.selectedColor` and `unselectedOpacity` were
+  declared but never applied, so a selection changed nothing on screen.
+  Selected points now take the configured colour and border, and series that
+  hold nothing selected fade back by `unselectedOpacity`.
+
 ## 0.5.5
 
 ### A numeric x axis honours `interval`, and keeps it through a zoom

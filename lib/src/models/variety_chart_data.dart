@@ -141,6 +141,14 @@ class VarietyDataLabelSettings {
     this.labelOffset = 6,
     this.builder,
     this.showCumulativeTotal = false,
+    this.showZeroValue = true,
+    this.useSeriesColor = false,
+    this.offset = Offset.zero,
+    this.backgroundColor,
+    this.borderColor,
+    this.borderWidth = 0,
+    this.borderRadius = 4,
+    this.angle = 0,
   });
 
   /// Whether labels are painted at all.
@@ -166,4 +174,31 @@ class VarietyDataLabelSettings {
 
   /// When `true` stacked series also show a running total label.
   final bool showCumulativeTotal;
+
+  /// Whether a point whose value is zero still gets a caption. Turning this
+  /// off keeps a chart full of zeroes readable.
+  final bool showZeroValue;
+
+  /// Whether the caption takes its colour from the series it belongs to
+  /// instead of [color].
+  final bool useSeriesColor;
+
+  /// An extra translation applied to the caption after [position] is
+  /// resolved, for nudging a label off a marker or a busy axis.
+  final Offset offset;
+
+  /// A card colour drawn behind the caption.
+  final Color? backgroundColor;
+
+  /// The colour of the card outline.
+  final Color? borderColor;
+
+  /// The thickness of the card outline. Zero skips the outline.
+  final double borderWidth;
+
+  /// The corner radius of the card.
+  final double borderRadius;
+
+  /// Rotation of the caption about its own centre, in degrees.
+  final double angle;
 }
