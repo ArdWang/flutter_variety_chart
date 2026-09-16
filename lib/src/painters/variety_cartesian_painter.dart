@@ -71,6 +71,8 @@ class VarietyCartesianPainter extends CustomPainter {
     this.borderWidth = 0,
     this.selectionRectColor,
     this.selectionRectBorderColor,
+    this.axisTooltip,
+    this.axisLabelHits,
   });
 
   /// The pre-computed layout shared with hit testing.
@@ -166,6 +168,12 @@ class VarietyCartesianPainter extends CustomPainter {
   /// theme.
   final Color? selectionRectBorderColor;
 
+  /// The value boxes pinned to the axes while a guide is up. Null draws none.
+  final VarietyAxisTooltipSettings? axisTooltip;
+
+  /// Collects the axis value boxes that were drawn, for tests and hit testing.
+  final List<VarietyAxisLabelHit>? axisLabelHits;
+
   @override
   void paint(Canvas canvas, Size size) {
     if (_seriesVisible.isEmpty) {
@@ -222,6 +230,7 @@ class VarietyCartesianPainter extends CustomPainter {
     }
     _paintAxisLines(canvas);
     _paintPlotAreaBorder(canvas);
+    _paintAxisTooltips(canvas);
     _paintAnnotations(canvas);
     _paintHighlights(canvas);
     _paintSelectionRect(canvas);
@@ -306,6 +315,83 @@ class VarietyCartesianPainter extends CustomPainter {
     final double span = math.max(geometry.xMaximum - geometry.xMinimum, 1e-9);
     return geometry.plotRect.left +
         (value - geometry.xMinimum) / span * geometry.plotRect.width;
+  }
+
+  void _paintAxisTooltips(Canvas canvas) {
+    final VarietyAxisTooltipSettings? settings = axisTooltip;
+    if (settings == null || !settings.isVisible || highlights.isEmpty) {
+      return;
+    }
+    final VarietyHitResult first = highlights.first;
+    final double columnX = trackballSlot ?? first.position.dx;
+    _paintAxisBox(
+      canvas,
+      settings,
+      geometry.axisXTooltipLabel(first),
+      Offset(columnX, geometry.plotRect.bottom),
+      geometry.xAxis,
+      geometry.numericX(first.point.x, first.pointIndex),
+    );
+    _paintAxisBox(
+      canvas,
+      settings,
+      geometry.axisYTooltipLabel(first),
+      Offset(geometry.plotRect.left, first.position.dy),
+      geometry.yAxis,
+      first.point.y ?? 0,
+    );
+  }
+
+  void _paintAxisBox(
+    Canvas canvas,
+    VarietyAxisTooltipSettings settings,
+    String text,
+    Offset anchor,
+    VarietyAxis axis,
+    double value,
+  ) {
+    if (text.isEmpty) {
+      return;
+    }
+    final TextStyle style = (settings.textStyle ??
+            const TextStyle(fontSize: 11, fontWeight: FontWeight.w500))
+        .copyWith(color: settings.textColor ?? theme.axisTooltipTextColor);
+    final TextPainter painter = _renderer.layoutText(text, style);
+    final Rect box = Rect.fromCenter(
+      center: anchor,
+      width: painter.width + settings.padding.horizontal,
+      height: painter.height + settings.padding.vertical,
+    );
+    final RRect rrect =
+        RRect.fromRectAndRadius(box, Radius.circular(settings.borderRadius));
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = settings.backgroundColor ?? theme.axisTooltipBackgroundColor,
+    );
+    final Color? border = settings.borderColor ?? theme.axisTooltipBorderColor;
+    if (settings.borderWidth > 0 && border != null) {
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..color = border
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = settings.borderWidth,
+      );
+    }
+    painter.paint(
+      canvas,
+      Offset(box.center.dx - painter.width / 2,
+          box.center.dy - painter.height / 2),
+    );
+    axisLabelHits?.add(
+      VarietyAxisLabelHit(
+        rect: box,
+        text: text,
+        value: value,
+        axis: axis,
+      ),
+    );
   }
 
   void _paintChartFrame(Canvas canvas, Size size) {

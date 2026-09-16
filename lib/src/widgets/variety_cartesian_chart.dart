@@ -557,6 +557,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
             selectionRectColor: widget.zoomPanBehavior?.selectionRectColor,
             selectionRectBorderColor:
                 widget.zoomPanBehavior?.selectionRectBorderColor,
+            axisTooltip: _activeAxisTooltip,
           ),
         );
         // Gesture recognisers are only attached when the behaviour that needs them
@@ -610,6 +611,18 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
         );
       },
     );
+  }
+
+  /// The axis value box settings of whichever guide is currently up.
+  VarietyAxisTooltipSettings? get _activeAxisTooltip {
+    if (_trackballHits.isNotEmpty) {
+      return widget.trackballBehavior?.axisTooltip;
+    }
+    final VarietyCrosshairBehavior? cross = widget.crosshairBehavior;
+    if (cross != null && cross.enabled && !cross.showTooltip) {
+      return cross.axisTooltip;
+    }
+    return cross?.axisTooltip;
   }
 
   List<VarietyHitResult> get _activeHighlights {

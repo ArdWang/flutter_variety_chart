@@ -3285,6 +3285,29 @@ class VarietyCartesianGeometry {
     return varietyFormatNumber(value);
   }
 
+  /// The caption an axis value box shows for the primary axis.
+  String axisXTooltipLabel(VarietyHitResult hit) {
+    final dynamic value = hit.point.x;
+    if (value is DateTime) {
+      return xAxisType == VarietyAxisType.dateTime
+          ? dateTimeTickLabel(value)
+          : varietyFormatDateTime(value, xAxis.dateFormat ?? 'dd MMM');
+    }
+    if (value is num) {
+      return primaryTickLabel(value.toDouble());
+    }
+    return hit.point.label ?? value?.toString() ?? '';
+  }
+
+  /// The caption an axis value box shows for the secondary axis.
+  String axisYTooltipLabel(VarietyHitResult hit) {
+    final double? value = hit.point.y;
+    if (value == null) {
+      return '';
+    }
+    return secondaryTickLabelOn(axisIndexOf(hit.seriesIndex), value);
+  }
+
   /// The caption for a date time tick.
   String dateTimeTickLabel(DateTime tick) {
     if (xAxis.labelFormatter != null) {

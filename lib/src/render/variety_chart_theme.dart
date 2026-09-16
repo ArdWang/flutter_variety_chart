@@ -34,6 +34,9 @@ class VarietyChartTheme {
     Color? crosshairLineColor,
     Color? selectionRectColor,
     Color? selectionRectBorderColor,
+    Color? axisTooltipBackgroundColor,
+    Color? axisTooltipTextColor,
+    Color? axisTooltipBorderColor,
     Color? tooltipSeparatorColor,
     List<Color>? palette,
     this.titleTextStyle,
@@ -57,6 +60,9 @@ class VarietyChartTheme {
         _crosshairLineColor = crosshairLineColor,
         _selectionRectColor = selectionRectColor,
         _selectionRectBorderColor = selectionRectBorderColor,
+        _axisTooltipBackgroundColor = axisTooltipBackgroundColor,
+        _axisTooltipTextColor = axisTooltipTextColor,
+        _axisTooltipBorderColor = axisTooltipBorderColor,
         _tooltipSeparatorColor = tooltipSeparatorColor,
         _palette = palette;
 
@@ -115,6 +121,9 @@ class VarietyChartTheme {
   final Color? _crosshairLineColor;
   final Color? _selectionRectColor;
   final Color? _selectionRectBorderColor;
+  final Color? _axisTooltipBackgroundColor;
+  final Color? _axisTooltipTextColor;
+  final Color? _axisTooltipBorderColor;
   final Color? _tooltipSeparatorColor;
   final List<Color>? _palette;
 
@@ -163,6 +172,17 @@ class VarietyChartTheme {
   /// [axisLineColor].
   Color get selectionRectBorderColor =>
       _selectionRectBorderColor ?? axisLineColor;
+
+  /// The fill of the value boxes pinned to the axes while a crosshair or
+  /// trackball is up. Defaults to [tooltipBackgroundColor].
+  Color get axisTooltipBackgroundColor =>
+      _axisTooltipBackgroundColor ?? tooltipBackgroundColor;
+
+  /// The text colour of the axis value boxes. Defaults to [tooltipTextColor].
+  Color get axisTooltipTextColor => _axisTooltipTextColor ?? tooltipTextColor;
+
+  /// The outline of the axis value boxes. Null draws no outline.
+  Color? get axisTooltipBorderColor => _axisTooltipBorderColor;
 
   /// The rule drawn between the header and the rows of a shared tooltip.
   /// Defaults to [tooltipTextColor] at low opacity.
@@ -216,6 +236,9 @@ class VarietyChartTheme {
     Color? crosshairLineColor,
     Color? selectionRectColor,
     Color? selectionRectBorderColor,
+    Color? axisTooltipBackgroundColor,
+    Color? axisTooltipTextColor,
+    Color? axisTooltipBorderColor,
     Color? tooltipSeparatorColor,
     List<Color>? palette,
     TextStyle? titleTextStyle,
@@ -284,6 +307,9 @@ class VarietyChartTheme {
         _crosshairLineColor,
         _selectionRectColor,
         _selectionRectBorderColor,
+        _axisTooltipBackgroundColor,
+        _axisTooltipTextColor,
+        _axisTooltipBorderColor,
         _tooltipSeparatorColor,
         _palette,
         titleTextStyle,

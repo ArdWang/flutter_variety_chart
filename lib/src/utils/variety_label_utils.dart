@@ -261,6 +261,35 @@ String varietyAutoDateFormat(Duration span) {
   return 'HH:mm:ss';
 }
 
+/// Formats a tooltip value, dropping the decimals of whole numbers.
+///
+/// [decimalPlaces] rounds the value first, and [template] then wraps the
+/// result with `{value}` standing in for the number, so `'{value} kg'`
+/// prints `12 kg`. Shared by the tooltip cards and the axis value boxes.
+String varietyFormatTooltipValue(
+  double? value, {
+  int? decimalPlaces,
+  String? template,
+}) {
+  if (value == null) {
+    return '-';
+  }
+  final String text;
+  if (decimalPlaces != null) {
+    text = value.toStringAsFixed(decimalPlaces < 0 ? 0 : decimalPlaces);
+  } else if (value == value.roundToDouble() && value.abs() < 1e15) {
+    text = value.toInt().toString();
+  } else {
+    text = value.toStringAsFixed(2);
+  }
+  if (template == null || template.isEmpty) {
+    return text;
+  }
+  return template.contains('{value}')
+      ? template.replaceAll('{value}', text)
+      : '$template$text';
+}
+
 /// Formats an arbitrary axis value, dispatching on its runtime type.
 String varietyFormatValue(dynamic value, {String? datePattern}) {
   if (value is DateTime) {

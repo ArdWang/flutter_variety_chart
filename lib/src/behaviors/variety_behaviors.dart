@@ -67,6 +67,58 @@ class VarietyTooltipBehavior {
   final String? format;
 }
 
+/// Configures the value box a crosshair or trackball pins to an axis.
+///
+/// While a guide is active the reader has to look down at the axis to learn
+/// which x the guide sits on, and across to it for the y. These boxes carry
+/// that reading next to the axis, the way Syncfusion's axis interactive
+/// tooltip does.
+@immutable
+class VarietyAxisTooltipSettings {
+  /// Creates axis tooltip settings.
+  const VarietyAxisTooltipSettings({
+    this.isVisible = true,
+    this.backgroundColor,
+    this.textColor,
+    this.textStyle,
+    this.borderColor,
+    this.borderWidth = 0,
+    this.borderRadius = 4,
+    this.padding = const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  });
+
+  /// Settings that draw nothing.
+  static const VarietyAxisTooltipSettings hidden =
+      VarietyAxisTooltipSettings(isVisible: false);
+
+  /// Whether the axis boxes are drawn.
+  final bool isVisible;
+
+  /// The fill of the box. Falls back to the theme.
+  final Color? backgroundColor;
+
+  /// The colour of the text inside the box. Falls back to the theme.
+  final Color? textColor;
+
+  /// The full text style of the box.
+  final TextStyle? textStyle;
+
+  /// The outline of the box. Null draws no outline.
+  final Color? borderColor;
+
+  /// The thickness of the outline. Zero skips it.
+  final double borderWidth;
+
+  /// The corner radius of the box.
+  final double borderRadius;
+
+  /// Padding between the text and the edge of the box.
+  ///
+  /// The caption itself comes from the axis, so `labelFormatter`,
+  /// `numberFormat` and `dateFormat` are what shape the text.
+  final EdgeInsets padding;
+}
+
 /// The marker a trackball draws at every highlighted point.
 @immutable
 class VarietyTrackballMarkerSettings {
@@ -122,6 +174,7 @@ class VarietyTrackballBehavior {
     this.markerSettings = const VarietyTrackballMarkerSettings(),
     this.hideDelay = const Duration(seconds: 3),
     this.shouldAlwaysShow = false,
+    this.axisTooltip = const VarietyAxisTooltipSettings(),
   });
 
   /// Whether the trackball reacts to input.
@@ -179,6 +232,9 @@ class VarietyTrackballBehavior {
 
   /// Whether the trackball stays on screen after the first activation.
   final bool shouldAlwaysShow;
+
+  /// The value boxes pinned to the axes while the trackball is up.
+  final VarietyAxisTooltipSettings axisTooltip;
 }
 
 /// Configures the horizontal and vertical crosshair guides.
@@ -196,6 +252,7 @@ class VarietyCrosshairBehavior {
     this.showTooltip = true,
     this.builder,
     this.lineType,
+    this.axisTooltip = const VarietyAxisTooltipSettings(),
   });
 
   /// Whether the crosshair reacts to input.
@@ -224,6 +281,9 @@ class VarietyCrosshairBehavior {
 
   /// Builds a fully custom tooltip body.
   final Widget Function(BuildContext context, VarietyHitResult result)? builder;
+
+  /// The value boxes pinned to the axes while the crosshair is up.
+  final VarietyAxisTooltipSettings axisTooltip;
 
   /// Which guides are drawn. When `null` the two booleans above decide.
   final VarietyTrackballLineType? lineType;

@@ -19,7 +19,8 @@ No `intl`, no native plugins, no license keys — just Flutter.
 | Special series | Funnel, pyramid |
 | Spark charts | `VarietySparkLineChart`, `VarietySparkAreaChart`, `VarietySparkBarChart`, `VarietySparkWinLossChart` with markers, data labels, plot bands, point colour overrides, dash patterns and a trackball |
 | Axes | Multiple Y axes; numeric, category, date-time, date-time-category and logarithmic; plot bands, multi-level labels (rectangle / brace / curly bracket), minor ticks and minor grid lines, label intersection handling, the full range padding set (`none`, `normal`, `round`, `extra`, `additional`, `additionalStart`, `additionalEnd`, `roundStart`, `roundEnd`, `auto`), inversion, plot offsets and numeric patterns |
-| Interactions | Tooltip with value formatting (`format`, `decimalPlaces`), a configurable card (fill, border, radius, opacity, elevation, marker dot) and a shared/nearest/float trackball (vertical / horizontal / both guides); crosshair; point, series and cluster selection with `VarietySelectionController`, multi selection and full selected / unselected styling (colour, border, opacity); pinch zoom, pan, mouse-wheel zoom, double-tap zoom, rubber-band zoom, axis zoom modes |
+| Axis value boxes | While a crosshair or trackball is up, the current x is shown on the x axis and the current y on the y axis, styled through `VarietyAxisTooltipSettings` |
+| Interactions | Tooltip with value formatting (`format`, `decimalPlaces`), a configurable card (fill, border, radius, opacity, elevation, marker dot) and a shared/nearest/float trackball (vertical / horizontal / both guides) with value boxes pinned to the axes; crosshair; point, series and cluster selection with `VarietySelectionController`, multi selection and full selected / unselected styling (colour, border, opacity); pinch zoom, pan, mouse-wheel zoom, double-tap zoom, rubber-band zoom, axis zoom modes |
 | Data labels | Position, pixel offset, per-series colour, card background, border and corner radius, rotation, and zero suppression |
 | Markers | Nine glyphs (circle, square, diamond, triangle, inverted triangle, plus, cross, pentagon, vertical and horizontal strokes) with size, fill and border |
 | Analysis | Trendlines (linear, exponential, logarithmic, polynomial, power, moving average) and technical indicators (SMA, EMA, WMA, TMA, RSI, ATR, momentum, ROC, Bollinger bands, MACD, stochastic, accumulation / distribution) |
@@ -43,6 +44,8 @@ VarietyChartThemeScope(
     plotAreaBorderColor: Colors.black12,
     crosshairLineColor: Colors.deepOrange,
     selectionRectBorderColor: Colors.deepOrange,
+    axisTooltipBackgroundColor: Colors.deepOrange,
+    axisTooltipTextColor: Colors.white,
     legendTextStyle: const TextStyle(fontSize: 12),
     palette: <Color>[Colors.indigo, Colors.teal, Colors.amber],
   ),
@@ -73,7 +76,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  flutter_variety_chart: ^0.5.7
+  flutter_variety_chart: ^0.5.8
 ```
 
 Import it:

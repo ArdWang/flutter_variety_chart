@@ -8,6 +8,7 @@ import '../models/variety_chart_data.dart';
 import '../models/variety_series.dart';
 import '../render/variety_chart_theme.dart';
 import '../render/variety_geometry.dart';
+import '../utils/variety_label_utils.dart';
 
 /// The card shown next to the pointer when a single data point is highlighted.
 class VarietyTooltipCard extends StatelessWidget {
@@ -137,25 +138,12 @@ class VarietyTooltipCard extends StatelessWidget {
     double? value, {
     int? decimalPlaces,
     String? template,
-  }) {
-    if (value == null) {
-      return '-';
-    }
-    final String text;
-    if (decimalPlaces != null) {
-      text = value.toStringAsFixed(decimalPlaces < 0 ? 0 : decimalPlaces);
-    } else if (value == value.roundToDouble() && value.abs() < 1e15) {
-      text = value.toInt().toString();
-    } else {
-      text = value.toStringAsFixed(2);
-    }
-    if (template == null || template.isEmpty) {
-      return text;
-    }
-    return template.contains('{value}')
-        ? template.replaceAll('{value}', text)
-        : '$template$text';
-  }
+  }) =>
+      varietyFormatTooltipValue(
+        value,
+        decimalPlaces: decimalPlaces,
+        template: template,
+      );
 }
 
 /// The card chrome shared by the single point and trackball tooltips.

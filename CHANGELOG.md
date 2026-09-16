@@ -1,3 +1,26 @@
+## 0.5.8
+
+### Value boxes on the axes
+
+While a crosshair or trackball is up the reader has to look down at the axis to
+learn which x the guide sits on, and across to it for the y. The guide carried
+no such reading, so the axis had to be traced by eye.
+
+Added
+
+* `VarietyAxisTooltipSettings`, and an `axisTooltip` field on both
+  `VarietyCrosshairBehavior` and `VarietyTrackballBehavior`. The x box rides on
+  the x axis under the guide, the y box on the y axis level with the point.
+* The caption comes from the axis, so `labelFormatter`, `numberFormat` and
+  `dateFormat` shape the text; the settings cover the fill, text colour,
+  outline, corner radius and padding. `VarietyAxisTooltipSettings.hidden` turns
+  the boxes off.
+* `axisTooltipBackgroundColor`, `axisTooltipTextColor` and
+  `axisTooltipBorderColor` on `VarietyChartTheme`, all falling back to the
+  tooltip colours.
+* `varietyFormatTooltipValue`, the value formatter the tooltip cards used, is
+  now shared rather than private to the card.
+
 ## 0.5.7
 
 ### A chart theme you can actually reach
