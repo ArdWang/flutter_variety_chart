@@ -260,9 +260,12 @@ class VarietyElementRenderer {
   /// Paints a set of captions.
   void drawLabels(Canvas canvas, VarietyLabelsElement element) {
     for (final VarietyLabelItem item in element.labels) {
-      final TextStyle style = (element.style ?? const TextStyle(fontSize: 11))
+      final TextStyle style = (element.style ??
+              theme.dataLabelTextStyle ??
+              const TextStyle(fontSize: 11))
           .copyWith(
-              color: item.color ?? element.style?.color ?? theme.labelColor);
+              color:
+                  item.color ?? element.style?.color ?? theme.dataLabelColor);
       final TextPainter painter = layoutText(item.text, style);
       final Offset origin = anchorFor(painter, item) + item.shift;
       final Rect bounds = origin & painter.size;

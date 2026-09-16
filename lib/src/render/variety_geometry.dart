@@ -169,6 +169,7 @@ class VarietyCartesianGeometry {
     this.visibleYRange,
     this.dataLabelResolver,
     this.secondaryYAxes = const <VarietyAxis>[],
+    this.palette,
   })  : _rawPlotRect = plotRect,
         transposed = _shouldTranspose(series),
         xAxis = _shouldTranspose(series) ? yAxis : xAxis,
@@ -366,6 +367,15 @@ class VarietyCartesianGeometry {
   /// its own `dateFormat`, when a `labelFormatter` owns the captions, or
   /// before any ticks exist.
   String? _dateTimeLabelFormat;
+
+  /// The series colours, cycled by series index. Null uses the built-in
+  /// palette, which is what a chart with no themed palette of its own wants.
+  final List<Color>? palette;
+
+  /// The palette every series colour falls back to.
+  List<Color> get seriesColors => (palette != null && palette!.isNotEmpty)
+      ? palette!
+      : varietyDefaultPalette;
 
   double get _xSpan => math.max(xMaximum - xMinimum, 1e-9);
 
@@ -2076,7 +2086,7 @@ class VarietyCartesianGeometry {
     final Color base =
         (pointIndex < points.length ? points[pointIndex].color : null) ??
             item.color ??
-            varietyDefaultPalette[seriesIndex % varietyDefaultPalette.length];
+            seriesColors[seriesIndex % seriesColors.length];
     return item.opacity >= 1
         ? base
         : base.withValues(alpha: base.a * item.opacity);

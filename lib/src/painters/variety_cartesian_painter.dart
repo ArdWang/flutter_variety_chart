@@ -69,6 +69,8 @@ class VarietyCartesianPainter extends CustomPainter {
     this.plotAreaBorderWidth = 0,
     this.borderColor,
     this.borderWidth = 0,
+    this.selectionRectColor,
+    this.selectionRectBorderColor,
   });
 
   /// The pre-computed layout shared with hit testing.
@@ -156,6 +158,13 @@ class VarietyCartesianPainter extends CustomPainter {
 
   /// The thickness of the box drawn around the whole chart.
   final double borderWidth;
+
+  /// The fill of the rubber-band selection rectangle. Falls back to the theme.
+  final Color? selectionRectColor;
+
+  /// The outline of the rubber-band selection rectangle. Falls back to the
+  /// theme.
+  final Color? selectionRectBorderColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -379,8 +388,8 @@ class VarietyCartesianPainter extends CustomPainter {
     if (minorY != null && minorTicks.isNotEmpty) {
       final Paint paint = Paint()
         ..color = minorY.color ??
-            (geometry.yAxis.gridLineColor ?? theme.gridLineColor)
-                .withValues(alpha: 0.6)
+            geometry.yAxis.gridLineColor?.withValues(alpha: 0.6) ??
+            theme.minorGridLineColor
         ..strokeWidth = minorY.width
         ..isAntiAlias = true;
       for (final double tick in minorTicks) {
@@ -402,8 +411,8 @@ class VarietyCartesianPainter extends CustomPainter {
     if (minorX != null && minorPositions.isNotEmpty) {
       final Paint paint = Paint()
         ..color = minorX.color ??
-            (geometry.xAxis.gridLineColor ?? theme.gridLineColor)
-                .withValues(alpha: 0.6)
+            geometry.xAxis.gridLineColor?.withValues(alpha: 0.6) ??
+            theme.minorGridLineColor
         ..strokeWidth = minorX.width
         ..isAntiAlias = true;
       for (final double x in minorPositions) {
@@ -510,8 +519,9 @@ class VarietyCartesianPainter extends CustomPainter {
       if (!axis.visible) {
         continue;
       }
-      final TextStyle style =
-          axis.labelStyle ?? TextStyle(fontSize: 11, color: theme.labelColor);
+      final TextStyle style = axis.labelStyle ??
+          theme.axisLabelTextStyle ??
+          TextStyle(fontSize: 11, color: theme.labelColor);
       final List<double> ticks = geometry.yTicksOn(i);
       double labelWidth = 0;
       for (final double tick in ticks) {
@@ -638,8 +648,11 @@ class VarietyCartesianPainter extends CustomPainter {
     if (title != null && title.isNotEmpty) {
       final TextPainter painter = _renderer.layoutText(
         title,
-        TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w600, color: theme.labelColor),
+        theme.axisTitleTextStyle ??
+            TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: theme.axisTitleColor),
       );
       canvas.save();
       canvas.translate(14, geometry.plotRect.center.dy);
@@ -707,8 +720,9 @@ class VarietyCartesianPainter extends CustomPainter {
       return;
     }
     final VarietyAxis axis = geometry.xAxis;
-    final TextStyle style =
-        axis.labelStyle ?? TextStyle(fontSize: 11, color: theme.labelColor);
+    final TextStyle style = axis.labelStyle ??
+        theme.axisLabelTextStyle ??
+        TextStyle(fontSize: 11, color: theme.labelColor);
     final List<_AxisTick> ticks = _primaryTicks();
     if (ticks.isEmpty) {
       return;
@@ -821,8 +835,11 @@ class VarietyCartesianPainter extends CustomPainter {
     if (title != null && title.isNotEmpty) {
       final TextPainter painter = _renderer.layoutText(
         title,
-        TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w600, color: theme.labelColor),
+        theme.axisTitleTextStyle ??
+            TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: theme.axisTitleColor),
       );
       painter.paint(
         canvas,
@@ -863,7 +880,9 @@ class VarietyCartesianPainter extends CustomPainter {
     final Color borderColor = groups.borderColor ?? theme.axisLineColor;
     final TextStyle style = groups.textStyle ??
         TextStyle(
-            fontSize: 11, fontWeight: FontWeight.w600, color: theme.labelColor);
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: theme.axisTitleColor);
     final double baseY = geometry.plotRect.bottom +
         geometry.xAxis.labelOffset +
         _primaryLabelHeight(
@@ -1146,7 +1165,7 @@ class VarietyCartesianPainter extends CustomPainter {
     if (cross != null && cross.enabled && highlights.isNotEmpty) {
       final VarietyHitResult first = highlights.first;
       final Paint paint = Paint()
-        ..color = cross.lineColor ?? theme.axisLineColor
+        ..color = cross.lineColor ?? theme.crosshairLineColor
         ..strokeWidth = cross.lineWidth;
       if (cross.showVerticalLine) {
         _renderer.drawLine(
@@ -1225,13 +1244,13 @@ class VarietyCartesianPainter extends CustomPainter {
     canvas.drawRect(
       rect,
       Paint()
-        ..color = const Color(0xFF3F6FE0).withValues(alpha: 0.16)
+        ..color = selectionRectColor ?? theme.selectionRectColor
         ..style = PaintingStyle.fill,
     );
     canvas.drawRect(
       rect,
       Paint()
-        ..color = const Color(0xFF3F6FE0)
+        ..color = selectionRectBorderColor ?? theme.selectionRectBorderColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2,
     );

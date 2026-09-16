@@ -547,11 +547,16 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
             showElements: _paintsSeries,
             selected: _selected,
             selection: widget.selectionBehavior,
-            plotAreaBackgroundColor: widget.plotAreaBackgroundColor,
-            plotAreaBorderColor: widget.plotAreaBorderColor,
+            plotAreaBackgroundColor:
+                widget.plotAreaBackgroundColor ?? theme.plotAreaBackgroundColor,
+            plotAreaBorderColor:
+                widget.plotAreaBorderColor ?? theme.plotAreaBorderColor,
             plotAreaBorderWidth: widget.plotAreaBorderWidth,
             borderColor: widget.borderColor,
             borderWidth: widget.borderWidth,
+            selectionRectColor: widget.zoomPanBehavior?.selectionRectColor,
+            selectionRectBorderColor:
+                widget.zoomPanBehavior?.selectionRectBorderColor,
           ),
         );
         // Gesture recognisers are only attached when the behaviour that needs them
@@ -631,6 +636,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       plotRect: Offset.zero & safe,
       progress: _progress,
       secondaryYAxes: widget.secondaryYAxes,
+      palette: VarietyChartTheme.of(context).palette,
     );
     final EdgeInsets insets = _insetsFor(probe);
     Rect plotRect = Rect.fromLTRB(
@@ -651,6 +657,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       progress: _progress,
       dataLabelResolver: _resolveDataLabel,
       secondaryYAxes: widget.secondaryYAxes,
+      palette: VarietyChartTheme.of(context).palette,
     );
     _baseXMin = base.xMinimum;
     _baseXMax = base.xMaximum;
@@ -668,6 +675,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       visibleYRange: _zoomY,
       dataLabelResolver: _resolveDataLabel,
       secondaryYAxes: widget.secondaryYAxes,
+      palette: VarietyChartTheme.of(context).palette,
     );
     _reportRangeChanges(base, display);
     return (base, display);

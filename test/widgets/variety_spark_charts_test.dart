@@ -552,24 +552,17 @@ void main() {
 }
 
 /// A minimal theme so the painter can be exercised without a widget tree.
-class _StubTheme implements VarietyChartTheme {
-  const _StubTheme();
-
-  @override
-  Color get axisLineColor => const Color(0xFF000000);
-
-  @override
-  Color get gridLineColor => const Color(0x22000000);
-
-  @override
-  Color get labelColor => const Color(0xCC000000);
-
-  @override
-  Color get markerBorderColor => const Color(0xFFFFFFFF);
-
-  @override
-  Color get tooltipBackgroundColor => const Color(0xFF32323A);
-
-  @override
-  Color get tooltipTextColor => const Color(0xFFFFFFFF);
+///
+/// Extends rather than implements the real theme so that adding a field to
+/// [VarietyChartTheme] does not break this stub.
+class _StubTheme extends VarietyChartTheme {
+  const _StubTheme()
+      : super(
+          axisLineColor: const Color(0xFF000000),
+          gridLineColor: const Color(0x22000000),
+          labelColor: const Color(0xCC000000),
+          markerBorderColor: const Color(0xFFFFFFFF),
+          tooltipBackgroundColor: const Color(0xFF32323A),
+          tooltipTextColor: const Color(0xFFFFFFFF),
+        );
 }

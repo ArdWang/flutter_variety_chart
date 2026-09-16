@@ -91,7 +91,10 @@ class VarietyTooltipCard extends StatelessWidget {
   }
 
   /// The colour the card's text falls back to.
-  Color get _textColor => behavior.textStyle?.color ?? theme.tooltipTextColor;
+  Color get _textColor =>
+      behavior.textStyle?.color ??
+      theme.tooltipTextStyle?.color ??
+      theme.tooltipTextColor;
 
   Widget _valueRow(BuildContext context, Color color, VarietyChartData point) {
     return Padding(
@@ -261,6 +264,18 @@ class VarietyTrackballTooltipCard extends StatelessWidget {
         );
       }
     }
+    if (rows.isNotEmpty) {
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: SizedBox(
+            height: 1,
+            width: double.infinity,
+            child: ColoredBox(color: theme.tooltipSeparatorColor),
+          ),
+        ),
+      );
+    }
     for (final VarietyHitResult result in results) {
       final Color color = result.point.color ??
           result.series.color ??
@@ -315,7 +330,10 @@ class VarietyTrackballTooltipCard extends StatelessWidget {
   }
 
   /// The colour the card's text falls back to.
-  Color get _textColor => behavior.textStyle?.color ?? theme.tooltipTextColor;
+  Color get _textColor =>
+      behavior.textStyle?.color ??
+      theme.tooltipTextStyle?.color ??
+      theme.tooltipTextColor;
 }
 
 /// Pins a tooltip card next to a data point.

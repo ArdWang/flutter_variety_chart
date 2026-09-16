@@ -1,3 +1,34 @@
+## 0.5.7
+
+### A chart theme you can actually reach
+
+`VarietyChartTheme` existed but only carried the six colours the painter
+happened to need, and there was no way to hand a chart your own. Everything
+else -- the minor grid, tick marks, axis titles, chart title, legend, plot
+area, crosshair, rubber-band selection, data labels and the series palette --
+was either derived from the ambient `ThemeData` or hardcoded.
+
+Added
+
+* Around twenty more fields on `VarietyChartTheme`, covering grid lines (major
+  and minor), tick marks, axis titles, chart title and its fill, legend text,
+  title and fill, plot area fill and border, data labels, crosshair, the
+  rubber-band selection rectangle, the shared tooltip's separator, and seven
+  text styles.
+* `VarietyChartTheme.copyWith`, so one override never disturbs the rest. Every
+  field left out falls back to the six base colours, which in turn come from
+  the surrounding theme, so nothing needs configuring for a default look.
+* `VarietyChartThemeScope`, which applies a theme to every chart below it.
+  `VarietyChartTheme.of` reads the nearest scope first and derives from the
+  ambient `ThemeData` when there is none.
+* `palette`, which replaces the built-in series colours for the whole chart.
+
+Fixed
+
+* `VarietyZoomPanBehavior.selectionRectColor` and `selectionRectBorderColor`
+  were declared but never read: the rubber-band rectangle was painted with a
+  hardcoded blue. It now honours the behaviour, then the theme.
+
 ## 0.5.6
 
 ### Rounds out the option surface

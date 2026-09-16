@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../render/variety_chart_theme.dart';
+
 /// A caption rendered above a chart.
 class VarietyChartTitle extends StatelessWidget {
   /// Creates a chart title.
@@ -25,9 +27,12 @@ class VarietyChartTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TextStyle fallback =
-        Theme.of(context).textTheme.titleMedium ?? const TextStyle();
-    return Padding(
+    final VarietyChartTheme theme = VarietyChartTheme.of(context);
+    final TextStyle fallback = (theme.titleTextStyle ??
+            Theme.of(context).textTheme.titleMedium ??
+            const TextStyle())
+        .copyWith(color: theme.titleTextColor);
+    final Widget caption = Padding(
       padding: padding,
       child: SizedBox(
         width: double.infinity,
@@ -40,5 +45,10 @@ class VarietyChartTitle extends StatelessWidget {
         ),
       ),
     );
+    final Color? fill = theme.titleBackgroundColor;
+    if (fill == null) {
+      return caption;
+    }
+    return ColoredBox(color: fill, child: caption);
   }
 }

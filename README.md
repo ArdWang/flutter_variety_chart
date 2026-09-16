@@ -26,7 +26,34 @@ No `intl`, no native plugins, no license keys — just Flutter.
 | Decorations | Text, line, rectangle, ellipse, arrow and image annotations; plot area fill and border; chart frame |
 | Callbacks | `onPointTap`, `onPointHover`, `onLegendTapped`, `onTooltipRender`, `onDataLabelRender`, `onAxisLabelTapped`, `onActualRangeChanged`, `onZoomStart`, `onZoomEnd` |
 | Empty points | `gap`, `zero`, `average` and `drop` modes |
-| Theming | Automatic light/dark adaptation from the ambient `ThemeData` |
+| Theming | Automatic light/dark adaptation from the ambient `ThemeData`, plus `VarietyChartTheme` / `VarietyChartThemeScope` to restyle grid lines, minor grid, tick marks, axis titles, tick labels, chart title, legend, tooltip, plot area fill and border, crosshair, rubber-band selection, data labels and the series palette in one place |
+
+### Theming
+
+Every chart derives its colours from the ambient `ThemeData`, so it follows
+light and dark surfaces with no setup. To override anything, build a theme and
+wrap the tree — one object covers every chart below it:
+
+```dart
+VarietyChartThemeScope(
+  data: VarietyChartTheme.of(context).copyWith(
+    gridLineColor: Colors.black12,
+    minorGridLineColor: Colors.black.withValues(alpha: 0.06),
+    plotAreaBackgroundColor: const Color(0xFFFAFAFA),
+    plotAreaBorderColor: Colors.black12,
+    crosshairLineColor: Colors.deepOrange,
+    selectionRectBorderColor: Colors.deepOrange,
+    legendTextStyle: const TextStyle(fontSize: 12),
+    palette: <Color>[Colors.indigo, Colors.teal, Colors.amber],
+  ),
+  child: MyDashboard(),
+)
+```
+
+Every field is optional: anything left out falls back to the six base colours,
+which in turn come from the surrounding theme. `copyWith` covers the whole
+surface, so a single override never disturbs the rest.
+
 
 ### Design notes
 
@@ -46,7 +73,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  flutter_variety_chart: ^0.5.6
+  flutter_variety_chart: ^0.5.7
 ```
 
 Import it:

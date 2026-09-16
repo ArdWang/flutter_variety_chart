@@ -6,6 +6,7 @@ import '../models/variety_enums.dart';
 import '../models/variety_legend_settings.dart';
 import '../models/variety_options.dart';
 import '../models/variety_series.dart';
+import '../render/variety_chart_theme.dart';
 
 /// A legend describing the series shown by a chart.
 class VarietyLegend extends StatelessWidget {
@@ -88,8 +89,11 @@ class VarietyLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TextStyle fallback =
-        Theme.of(context).textTheme.bodySmall ?? const TextStyle(fontSize: 12);
+    final VarietyChartTheme chartTheme = VarietyChartTheme.of(context);
+    final TextStyle fallback = (chartTheme.legendTextStyle ??
+            Theme.of(context).textTheme.bodySmall ??
+            const TextStyle(fontSize: 12))
+        .copyWith(color: chartTheme.legendTextColor);
     final List<Widget> items = <Widget>[];
     for (int i = 0; i < series.length; i++) {
       final VarietySeries item = series[i];
@@ -155,16 +159,22 @@ class VarietyLegend extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
               settings.title!,
-              style:
-                  settings.titleStyle ?? Theme.of(context).textTheme.labelLarge,
+              style: (settings.titleStyle ??
+                          chartTheme.legendTitleTextStyle ??
+                          Theme.of(context).textTheme.labelLarge)
+                      ?.copyWith(color: chartTheme.legendTitleColor) ??
+                  TextStyle(color: chartTheme.legendTitleColor),
             ),
           ),
         content,
       ],
     );
+    final Widget framed =
+        settings.isResponsive ? body : IntrinsicWidth(child: body);
+    final Color? fill = chartTheme.legendBackgroundColor;
     return Padding(
       padding: padding ?? settings.padding,
-      child: settings.isResponsive ? body : IntrinsicWidth(child: body),
+      child: fill == null ? framed : ColoredBox(color: fill, child: framed),
     );
   }
 
