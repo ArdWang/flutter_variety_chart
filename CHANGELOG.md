@@ -1,3 +1,21 @@
+## 0.5.9
+
+### Tooltip styling reaches the circular and funnel charts
+
+`VarietyCircularChart` and `VarietyFunnelChart` only had an `enableTooltip`
+flag and a body builder, so the card they showed was always the default one --
+its fill, border, opacity and marker dot could not be changed at all, and
+neither could the way a value was captioned.
+
+Added
+
+* `tooltipBehavior` on `VarietyCircularChart` and `VarietyFunnelChart`, the
+  same `VarietyTooltipBehavior` the cartesian chart takes. All four chart
+  widgets now style and format their tooltips the same way, and the card is
+  built from one shared chrome.
+* `enableTooltip` remains the on/off switch and is now combined with
+  `VarietyTooltipBehavior.enabled`, so either one hides the card.
+
 ## 0.5.8
 
 ### Value boxes on the axes

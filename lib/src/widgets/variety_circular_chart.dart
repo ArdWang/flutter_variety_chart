@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../behaviors/variety_behaviors.dart';
 import '../models/variety_enums.dart';
 import '../models/variety_series.dart';
 import '../painters/variety_circular_painter.dart';
@@ -29,6 +30,7 @@ class VarietyCircularChart extends StatefulWidget {
     this.legendBuilder,
     this.enableTooltip = true,
     this.tooltipBuilder,
+    this.tooltipBehavior = const VarietyTooltipBehavior(),
     this.animationDuration = const Duration(milliseconds: 800),
     this.enableAnimation = true,
     this.padding = const EdgeInsets.all(20),
@@ -63,6 +65,11 @@ class VarietyCircularChart extends StatefulWidget {
   /// Builds a custom tooltip body.
   final Widget Function(BuildContext context, VarietyHitResult result)?
       tooltipBuilder;
+
+  /// Styling for the tooltip card. [enableTooltip] is the on/off switch;
+  /// this covers the fill, border, opacity, marker dot, value formatting and
+  /// a body builder of its own.
+  final VarietyTooltipBehavior tooltipBehavior;
 
   /// How long the entrance animation runs.
   final Duration animationDuration;
@@ -241,7 +248,10 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
                   ),
                 ),
               ),
-            if (_hit != null && widget.enableTooltip) ..._overlay(theme),
+            if (_hit != null &&
+                widget.enableTooltip &&
+                widget.tooltipBehavior.enabled)
+              ..._overlay(theme),
           ],
         );
       },
@@ -259,6 +269,7 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
               result: hit,
               theme: theme,
               builder: widget.tooltipBuilder,
+              behavior: widget.tooltipBehavior,
               constraints: const BoxConstraints(maxWidth: 200),
             ),
           ),
@@ -272,7 +283,7 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
   }
 
   void _updateHit(VarietyHitResult? result) {
-    if (!widget.enableTooltip) {
+    if (!widget.enableTooltip && widget.tooltipBehavior.enabled) {
       return;
     }
     final bool changed = (_hit == null) != (result == null) ||

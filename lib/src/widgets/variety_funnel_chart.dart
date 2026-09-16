@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../behaviors/variety_behaviors.dart';
 import '../models/variety_enums.dart';
 import '../models/variety_series.dart';
 import '../painters/variety_funnel_painter.dart';
@@ -29,6 +30,7 @@ class VarietyFunnelChart extends StatefulWidget {
     this.legendBuilder,
     this.enableTooltip = true,
     this.tooltipBuilder,
+    this.tooltipBehavior = const VarietyTooltipBehavior(),
     this.animationDuration = const Duration(milliseconds: 800),
     this.enableAnimation = true,
     this.padding = const EdgeInsets.fromLTRB(24, 12, 24, 12),
@@ -63,6 +65,11 @@ class VarietyFunnelChart extends StatefulWidget {
   /// Builds a custom tooltip body.
   final Widget Function(BuildContext context, VarietyHitResult result)?
       tooltipBuilder;
+
+  /// Styling for the tooltip card. [enableTooltip] is the on/off switch;
+  /// this covers the fill, border, opacity, marker dot, value formatting and
+  /// a body builder of its own.
+  final VarietyTooltipBehavior tooltipBehavior;
 
   /// How long the entrance animation runs.
   final Duration animationDuration;
@@ -211,7 +218,9 @@ class _VarietyFunnelChartState extends State<VarietyFunnelChart>
                     ),
                   ),
                 ),
-                if (_hit != null && widget.enableTooltip)
+                if (_hit != null &&
+                    widget.enableTooltip &&
+                    widget.tooltipBehavior.enabled)
                   ..._overlay(theme, _hit!),
               ],
             ),
@@ -231,6 +240,7 @@ class _VarietyFunnelChartState extends State<VarietyFunnelChart>
               result: hit,
               theme: theme,
               builder: widget.tooltipBuilder,
+              behavior: widget.tooltipBehavior,
               constraints: const BoxConstraints(maxWidth: 200),
             ),
           ),
@@ -240,7 +250,7 @@ class _VarietyFunnelChartState extends State<VarietyFunnelChart>
   }
 
   void _update(VarietyHitResult? result) {
-    if (!widget.enableTooltip) {
+    if (!widget.enableTooltip && widget.tooltipBehavior.enabled) {
       return;
     }
     if (_hit == result) {

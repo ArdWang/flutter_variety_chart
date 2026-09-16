@@ -101,4 +101,91 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  /// Taps a point inside the first slice, which starts at -90 degrees.
+  Future<void> tapSlice(WidgetTester tester) async {
+    final Finder canvas = find
+        .descendant(
+          of: find.byType(VarietyCircularChart),
+          matching: find.byType(CustomPaint),
+        )
+        .first;
+    final Rect bounds = tester.getRect(canvas);
+    await tester
+        .tapAt(Offset(bounds.center.dx, bounds.center.dy - bounds.height / 5));
+    await tester.pumpAndSettle();
+  }
+
+  /// The fill the tooltip card was built with.
+  Color? cardFill(WidgetTester tester) {
+    final Material material = tester.widget<Material>(
+      find
+          .descendant(
+            of: find.byType(VarietyTooltipCard),
+            matching: find.byType(Material),
+          )
+          .first,
+    );
+    return material.color;
+  }
+
+  group('tooltip configuration', () {
+    Widget circular({VarietyTooltipBehavior? behavior, bool? enabled}) => host(
+          VarietyCircularChart(
+            enableTooltip: enabled ?? true,
+            tooltipBehavior: behavior ?? const VarietyTooltipBehavior(),
+            series: <VarietySeries>[
+              VarietyPieSeries(name: 'Sessions', data: slices),
+            ],
+          ),
+        );
+
+    testWidgets('the card takes its fill from the behaviour',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        circular(
+          behavior: const VarietyTooltipBehavior(
+            backgroundColor: Color(0xFF123456),
+            elevation: 0,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tapSlice(tester);
+      expect(find.byType(VarietyTooltipCard), findsOneWidget);
+      expect(cardFill(tester), const Color(0xFF123456));
+    });
+
+    testWidgets('the behaviour can switch the card off',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        circular(behavior: const VarietyTooltipBehavior(enabled: false)),
+      );
+      await tester.pumpAndSettle();
+      await tapSlice(tester);
+      expect(find.byType(VarietyTooltipCard), findsNothing);
+    });
+
+    testWidgets('enableTooltip still switches the card off',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(circular(enabled: false));
+      await tester.pumpAndSettle();
+      await tapSlice(tester);
+      expect(find.byType(VarietyTooltipCard), findsNothing);
+    });
+
+    testWidgets('the value is formatted with decimalPlaces',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        circular(
+          behavior: const VarietyTooltipBehavior(decimalPlaces: 2),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tapSlice(tester);
+      // The first slice is 52, which reads as 52.00 once asked for two
+      // decimals.
+      expect(find.text('52.00'), findsOneWidget);
+    });
+  });
 }
