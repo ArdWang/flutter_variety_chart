@@ -394,6 +394,58 @@ class VarietyCartesianPainter extends CustomPainter {
     );
   }
 
+  /// The length, thickness and colour a tick mark should be drawn with.
+  ///
+  /// `majorTickLines` wins over the plain `tickLength` fields, which is the
+  /// same relationship `minorGridLines` and the grid line fields have.
+  (double, double, Color) _tickStyle(VarietyAxis axis) {
+    final VarietyMajorTickLines? lines = axis.majorTickLines;
+    return (
+      lines?.size ?? axis.tickLength,
+      lines?.width ?? 1,
+      lines?.color ?? axis.axisLineColor ?? theme.axisLineColor,
+    );
+  }
+
+  /// Which way a tick points: `1` away from the plot area, `-1` into it.
+  ///
+  /// A tick points out by default, and [VarietyTickPosition.inside] turns it
+  /// round. Callers multiply this by the sign their axis already uses so that
+  /// an opposed axis still behaves.
+  double _tickDirection(VarietyAxis axis) =>
+      axis.tickPosition == VarietyTickPosition.inside ? -1 : 1;
+
+  /// Draws one tick mark anchored at [anchor] on the axis line.
+  ///
+  /// [outward] is the unit direction pointing away from the plot area, so the
+  /// caller says which side the axis sits on and [VarietyTickPosition] decides
+  /// whether the mark is flipped. Ticks are drawn whenever `showTicks` is set,
+  /// independently of `showLabels`: hiding the captions is not meant to take
+  /// the marks with them.
+  void _paintTickMark(
+    Canvas canvas,
+    VarietyAxis axis,
+    Offset anchor,
+    Offset outward,
+  ) {
+    if (!axis.showTicks) {
+      return;
+    }
+    final (double size, double width, Color color) = _tickStyle(axis);
+    if (size <= 0) {
+      return;
+    }
+    canvas.drawLine(
+      anchor,
+      anchor + outward * (size * _tickDirection(axis)),
+      Paint()
+        ..color = color
+        ..strokeWidth = width
+        ..style = PaintingStyle.stroke
+        ..isAntiAlias = true,
+    );
+  }
+
   void _paintChartFrame(Canvas canvas, Size size) {
     final Color? stroke = borderColor;
     if (borderWidth <= 0 || stroke == null) {
@@ -431,9 +483,11 @@ class VarietyCartesianPainter extends CustomPainter {
 
   void _paintGrid(Canvas canvas) {
     if (geometry.yAxis.showGridLines) {
+      final VarietyMajorGridLines? major = geometry.yAxis.majorGridLines;
       final Paint paint = Paint()
-        ..color = geometry.yAxis.gridLineColor ?? theme.gridLineColor
-        ..strokeWidth = geometry.yAxis.gridLineWidth
+        ..color =
+            major?.color ?? geometry.yAxis.gridLineColor ?? theme.gridLineColor
+        ..strokeWidth = major?.width ?? geometry.yAxis.gridLineWidth
         ..isAntiAlias = true;
       for (final double tick in geometry.yTicks) {
         final double y = geometry.pixelY(tick);
@@ -446,14 +500,16 @@ class VarietyCartesianPainter extends CustomPainter {
           Offset(geometry.plotRect.left, y),
           Offset(geometry.plotRect.right, y),
           paint,
-          geometry.yAxis.gridLineDashPattern,
+          major?.dashArray ?? geometry.yAxis.gridLineDashPattern,
         );
       }
     }
     if (geometry.xAxis.showGridLines) {
+      final VarietyMajorGridLines? major = geometry.xAxis.majorGridLines;
       final Paint paint = Paint()
-        ..color = geometry.xAxis.gridLineColor ?? theme.gridLineColor
-        ..strokeWidth = geometry.xAxis.gridLineWidth
+        ..color =
+            major?.color ?? geometry.xAxis.gridLineColor ?? theme.gridLineColor
+        ..strokeWidth = major?.width ?? geometry.xAxis.gridLineWidth
         ..isAntiAlias = true;
       for (final double x in _primaryGridPositions()) {
         _renderer.drawLine(
@@ -461,7 +517,7 @@ class VarietyCartesianPainter extends CustomPainter {
           Offset(x, geometry.plotRect.top),
           Offset(x, geometry.plotRect.bottom),
           paint,
-          geometry.xAxis.gridLineDashPattern,
+          major?.dashArray ?? geometry.xAxis.gridLineDashPattern,
         );
       }
     }
@@ -637,8 +693,13 @@ class VarietyCartesianPainter extends CustomPainter {
             y > geometry.plotRect.bottom + 0.5) {
           continue;
         }
+        // Extra axes sit on the right, so away from the plot area is +x.
+        _paintTickMark(canvas, axis, Offset(axisX, y), const Offset(1, 0));
+        if (!axis.showLabels) {
+          continue;
+        }
         final String caption = geometry.secondaryTickLabelOn(i, tick);
-        if (caption.isEmpty || !axis.showLabels) {
+        if (caption.isEmpty) {
           continue;
         }
         final TextPainter painter = _renderer.layoutText(caption, style);
@@ -646,13 +707,6 @@ class VarietyCartesianPainter extends CustomPainter {
           canvas,
           Offset(axisX + axis.labelOffset, y - painter.height / 2),
         );
-        if (axis.showTicks) {
-          canvas.drawLine(
-            Offset(axisX, y),
-            Offset(axisX + axis.tickLength, y),
-            linePaint,
-          );
-        }
       }
       final String? title = axis.title;
       if (title != null && title.isNotEmpty) {
@@ -677,18 +731,24 @@ class VarietyCartesianPainter extends CustomPainter {
   }
 
   void _paintSecondaryLabels(Canvas canvas) {
-    if (!geometry.yAxis.showLabels || !geometry.yAxis.visible) {
+    final VarietyAxis axis = geometry.yAxis;
+    if (!axis.visible || (!axis.showLabels && !axis.showTicks)) {
       return;
     }
-    final TextStyle style = geometry.yAxis.labelStyle ??
-        TextStyle(fontSize: 11, color: theme.labelColor);
-    final bool opposed = geometry.yAxis.opposedPosition;
+    final TextStyle style =
+        axis.labelStyle ?? TextStyle(fontSize: 11, color: theme.labelColor);
+    final bool opposed = axis.opposedPosition;
     final double axisX =
         opposed ? geometry.plotRect.right : geometry.plotRect.left;
+    final Offset outward = Offset(opposed ? 1 : -1, 0);
     for (final double tick in geometry.yTicks) {
       final double y = geometry.pixelY(tick);
       if (y < geometry.plotRect.top - 0.5 ||
           y > geometry.plotRect.bottom + 0.5) {
+        continue;
+      }
+      _paintTickMark(canvas, axis, Offset(axisX, y), outward);
+      if (!axis.showLabels) {
         continue;
       }
       final String caption = geometry.secondaryTickLabel(tick);
@@ -696,39 +756,25 @@ class VarietyCartesianPainter extends CustomPainter {
         continue;
       }
       final TextPainter painter = _renderer.layoutText(caption, style);
-      final bool inside =
-          geometry.yAxis.labelPlacement == VarietyLabelPlacement.inside;
-      final double sign = opposed ? -1 : 1;
+      final bool inside = axis.labelPlacement == VarietyLabelPlacement.inside;
       painter.paint(
         canvas,
         opposed
             ? Offset(
                 axisX +
                     (inside
-                        ? -geometry.yAxis.labelOffset - painter.width
-                        : geometry.yAxis.labelOffset),
+                        ? -axis.labelOffset - painter.width
+                        : axis.labelOffset),
                 y - painter.height / 2,
               )
             : Offset(
                 axisX +
                     (inside
-                        ? geometry.yAxis.labelOffset
-                        : -geometry.yAxis.labelOffset - painter.width),
+                        ? axis.labelOffset
+                        : -axis.labelOffset - painter.width),
                 y - painter.height / 2,
               ),
       );
-      assert(sign != 0);
-      if (geometry.yAxis.showTicks) {
-        final double sign = opposed ? 1 : -1;
-        canvas.drawLine(
-          Offset(axisX, y),
-          Offset(axisX + sign * geometry.yAxis.tickLength, y),
-          Paint()
-            ..color = geometry.yAxis.axisLineColor ?? theme.axisLineColor
-            ..strokeWidth = 1
-            ..style = PaintingStyle.stroke,
-        );
-      }
     }
     final String? title = geometry.yAxis.title;
     if (title != null && title.isNotEmpty) {
@@ -802,15 +848,30 @@ class VarietyCartesianPainter extends CustomPainter {
   }
 
   void _paintPrimaryLabels(Canvas canvas) {
-    if (!geometry.xAxis.showLabels || !geometry.xAxis.visible) {
+    final VarietyAxis axis = geometry.xAxis;
+    if (!axis.visible || (!axis.showLabels && !axis.showTicks)) {
       return;
     }
-    final VarietyAxis axis = geometry.xAxis;
     final TextStyle style = axis.labelStyle ??
         theme.axisLabelTextStyle ??
         TextStyle(fontSize: 11, color: theme.labelColor);
     final List<_AxisTick> ticks = _primaryTicks();
     if (ticks.isEmpty) {
+      return;
+    }
+    // The marks sit on the axis line itself, which is the plot area edge, and
+    // they are painted before the captions so a thinned or dropped caption
+    // cannot take a mark with it.
+    if (axis.showTicks) {
+      final double axisLineY = axis.opposedPosition
+          ? geometry.plotRect.top
+          : geometry.plotRect.bottom;
+      final Offset outward = Offset(0, axis.opposedPosition ? -1 : 1);
+      for (final _AxisTick tick in ticks) {
+        _paintTickMark(canvas, axis, Offset(tick.position, axisLineY), outward);
+      }
+    }
+    if (!axis.showLabels) {
       return;
     }
     double rotation = axis.labelRotation;
@@ -1231,21 +1292,60 @@ class VarietyCartesianPainter extends CustomPainter {
     painter.paint(canvas, position);
   }
 
+  /// Which legs a guide should draw, as `(vertical, horizontal)`.
+  ///
+  /// [VarietyTrackballLineType] is the single switch both guides read. The two
+  /// booleans are the crosshair's older pair and only decide when no
+  /// `lineType` was given, which is what keeps `showVerticalLine` and
+  /// `showHorizontalLine` working for callers that still set those.
+  (bool, bool) _guideLegs(
+    VarietyTrackballLineType? type,
+    bool vertical,
+    bool horizontal,
+  ) {
+    switch (type) {
+      case VarietyTrackballLineType.vertical:
+        return (true, false);
+      case VarietyTrackballLineType.horizontal:
+        return (false, true);
+      case VarietyTrackballLineType.both:
+        return (true, true);
+      case null:
+        return (vertical, horizontal);
+    }
+  }
+
   void _paintHighlights(Canvas canvas) {
     final VarietyTrackballBehavior? ball = trackball;
     if (ball != null &&
         ball.enabled &&
         ball.showLine &&
-        trackballSlot != null) {
-      _renderer.drawLine(
-        canvas,
-        Offset(trackballSlot!, geometry.plotRect.top),
-        Offset(trackballSlot!, geometry.plotRect.bottom),
-        Paint()
-          ..color = ball.lineColor ?? theme.axisLineColor
-          ..strokeWidth = ball.lineWidth,
-        ball.lineDashPattern,
-      );
+        trackballSlot != null &&
+        highlights.isNotEmpty) {
+      final (bool vertical, bool horizontal) =
+          _guideLegs(ball.lineType, true, false);
+      final Paint paint = Paint()
+        ..color = ball.lineColor ?? theme.axisLineColor
+        ..strokeWidth = ball.lineWidth;
+      if (vertical) {
+        _renderer.drawLine(
+          canvas,
+          Offset(trackballSlot!, geometry.plotRect.top),
+          Offset(trackballSlot!, geometry.plotRect.bottom),
+          paint,
+          ball.lineDashPattern,
+        );
+      }
+      if (horizontal) {
+        final double y = highlights.first.position.dy;
+        _renderer.drawLine(
+          canvas,
+          Offset(geometry.plotRect.left, y),
+          Offset(geometry.plotRect.right, y),
+          paint,
+          ball.lineDashPattern,
+        );
+      }
     }
     final VarietyCrosshairBehavior? cross = crosshair;
     if (cross != null && cross.enabled && highlights.isNotEmpty) {
@@ -1253,7 +1353,12 @@ class VarietyCartesianPainter extends CustomPainter {
       final Paint paint = Paint()
         ..color = cross.lineColor ?? theme.crosshairLineColor
         ..strokeWidth = cross.lineWidth;
-      if (cross.showVerticalLine) {
+      final (bool vertical, bool horizontal) = _guideLegs(
+        cross.lineType,
+        cross.showVerticalLine,
+        cross.showHorizontalLine,
+      );
+      if (vertical) {
         _renderer.drawLine(
           canvas,
           Offset(first.position.dx, geometry.plotRect.top),
@@ -1262,7 +1367,7 @@ class VarietyCartesianPainter extends CustomPainter {
           cross.lineDashPattern,
         );
       }
-      if (cross.showHorizontalLine) {
+      if (horizontal) {
         _renderer.drawLine(
           canvas,
           Offset(geometry.plotRect.left, first.position.dy),

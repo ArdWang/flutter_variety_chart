@@ -1,3 +1,43 @@
+## 0.5.11
+
+### Tick marks were half wired and half missing
+
+Each axis carried `majorTickLines` and `majorGridLines` style objects that
+nothing read, and `tickPosition` that nothing read either. Worse, the marks
+that did get drawn were nested inside the caption loop, so `showLabels: false`
+silently took the tick marks with it, and the x axis never drew marks at all
+however `showTicks` was set.
+
+Fixed
+
+* `majorTickLines` (size, width, colour) and `majorGridLines` (width, colour,
+  dash array) now reach the renderer on both axes. `majorTickLines` wins over
+  the plain `tickLength` / axis colour fields, the same relationship
+  `minorGridLines` already had with the grid fields.
+* `tickPosition` now decides the side a mark is drawn on, on both axes and on
+  extra axes, and `VarietyTickPosition.inside` flips it into the plot area.
+* Tick marks no longer depend on `showLabels`: the two are separate switches,
+  which is what the fields always implied.
+* The x axis draws tick marks, which it never did.
+
+### The guides read their lineType
+
+`VarietyTrackballBehavior.lineType` and `VarietyCrosshairBehavior.lineType`
+were both declared and never read: the trackball always drew a vertical guide
+and the crosshair always fell back to its two booleans. Both now resolve
+through the same switch, and the crosshair's `showVerticalLine` /
+`showHorizontalLine` pair only decides when no `lineType` was given.
+
+### The trackball reads its visibilityMode
+
+`VarietyTrackballBehavior.visibilityMode` was declared and never read. `always`
+keeps the trackball past its hide delay, `hidden` refuses to show it at all and
+`auto` is the behaviour that was already there. `shouldAlwaysShow` is kept as
+the older spelling of `always`.
+
+Covered by test/render/variety_axis_tick_lines_test.dart and
+test/widgets/variety_trackball_visibility_test.dart.
+
 ## 0.5.10
 
 ### `splineType` now picks the interpolation

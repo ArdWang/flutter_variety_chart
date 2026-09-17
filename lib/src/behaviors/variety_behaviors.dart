@@ -222,6 +222,9 @@ class VarietyTrackballBehavior {
   final VarietyTrackballDisplayMode displayMode;
 
   /// When the trackball appears and disappears.
+  ///
+  /// `always` keeps it up until the pointer leaves, `hidden` refuses to show
+  /// it at all, and `auto` lets it expire after [hideDelay].
   final VarietyTrackballVisibilityMode visibilityMode;
 
   /// The styling of the markers drawn at every highlighted point.
@@ -231,6 +234,8 @@ class VarietyTrackballBehavior {
   final Duration hideDelay;
 
   /// Whether the trackball stays on screen after the first activation.
+  ///
+  /// The older spelling of [visibilityMode]'s `always`.
   final bool shouldAlwaysShow;
 
   /// The value boxes pinned to the axes while the trackball is up.

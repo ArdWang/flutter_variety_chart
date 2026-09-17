@@ -1025,10 +1025,11 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
 
   /// Restarts the auto-hide countdown. Tap activations expire after the
-  /// behaviour's hideDelay unless the trackball should always stay visible.
+  /// behaviour's hideDelay unless the trackball is meant to stay put.
   void _scheduleTrackballHide(VarietyTrackballBehavior ball) {
     _cancelTrackballTimer();
-    if (ball.shouldAlwaysShow) {
+    if (ball.shouldAlwaysShow ||
+        ball.visibilityMode == VarietyTrackballVisibilityMode.always) {
       return;
     }
     _trackballHideTimer = Timer(ball.hideDelay, _clearTrackball);
@@ -1036,6 +1037,13 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   void _updateTrackball(Offset position, VarietyCartesianGeometry geometry) {
     final VarietyTrackballBehavior? ball = widget.trackballBehavior;
+    if (ball != null &&
+        ball.visibilityMode == VarietyTrackballVisibilityMode.hidden) {
+      // A hidden trackball still needs the dismissal: the gesture reached an
+      // active behaviour, so whatever was on screen has to go.
+      _clearTrackball();
+      return;
+    }
     final List<VarietyHitResult> hits = geometry.hitsAtSlot(
       position,
       displayMode:

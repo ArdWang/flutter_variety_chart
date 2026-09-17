@@ -18,7 +18,7 @@ No `intl`, no native plugins, no license keys — just Flutter.
 | Circular series | Pie, doughnut, radial bar |
 | Special series | Funnel, pyramid |
 | Spark charts | `VarietySparkLineChart`, `VarietySparkAreaChart`, `VarietySparkBarChart`, `VarietySparkWinLossChart` with markers, data labels, plot bands, point colour overrides, dash patterns and a trackball |
-| Axes | Multiple Y axes; numeric, category, date-time, date-time-category and logarithmic; plot bands, multi-level labels (rectangle / brace / curly bracket), minor ticks and minor grid lines, label intersection handling, the full range padding set (`none`, `normal`, `round`, `extra`, `additional`, `additionalStart`, `additionalEnd`, `roundStart`, `roundEnd`, `auto`), inversion, plot offsets and numeric patterns |
+| Axes | Multiple Y axes; numeric, category, date-time, date-time-category and logarithmic; plot bands, multi-level labels (rectangle / brace / curly bracket), tick marks on both axes (length, thickness, colour, inside or outside), major tick and major grid line style objects, minor ticks and minor grid lines, label intersection handling, the full range padding set (`none`, `normal`, `round`, `extra`, `additional`, `additionalStart`, `additionalEnd`, `roundStart`, `roundEnd`, `auto`), inversion, plot offsets and numeric patterns |
 | Axis value boxes | While a crosshair or trackball is up, the current x is shown on the x axis and the current y on the y axis, styled through `VarietyAxisTooltipSettings` |
 | Interactions | Tooltip with value formatting (the same `VarietyTooltipBehavior` styles the card on the cartesian, circular and funnel charts) (`format`, `decimalPlaces`), a configurable card (fill, border, radius, opacity, elevation, marker dot) and a shared/nearest/float trackball (vertical / horizontal / both guides) with value boxes pinned to the axes; crosshair; point, series and cluster selection with `VarietySelectionController`, multi selection and full selected / unselected styling (colour, border, opacity); pinch zoom, pan, mouse-wheel zoom, double-tap zoom, rubber-band zoom, axis zoom modes |
 | Data labels | Position, pixel offset, per-series colour, card background, border and corner radius, rotation, and zero suppression |
@@ -76,7 +76,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  flutter_variety_chart: ^0.5.10
+  flutter_variety_chart: ^0.5.11
 ```
 
 Import it:
