@@ -677,9 +677,7 @@ class VarietyCartesianPainter extends CustomPainter {
       if (!axis.visible) {
         continue;
       }
-      final TextStyle style = axis.labelStyle ??
-          theme.axisLabelTextStyle ??
-          TextStyle(fontSize: 11, color: theme.labelColor);
+      final TextStyle style = _tickLabelStyle(axis);
       final List<double> ticks = geometry.yTicksOn(i);
       double labelWidth = 0;
       for (final double tick in ticks) {
@@ -751,8 +749,7 @@ class VarietyCartesianPainter extends CustomPainter {
     if (!axis.visible || (!axis.showLabels && !axis.showTicks)) {
       return;
     }
-    final TextStyle style =
-        axis.labelStyle ?? TextStyle(fontSize: 11, color: theme.labelColor);
+    final TextStyle style = _tickLabelStyle(axis);
     final double axisX = _yAxisLineX();
     final bool opposed = _axisLineOnRight(axisX);
     final Offset outward = Offset(opposed ? 1 : -1, 0);
@@ -871,9 +868,7 @@ class VarietyCartesianPainter extends CustomPainter {
     // the captions so a thinned or dropped caption cannot take a mark with it.
     final double axisLineY = _xAxisLineY();
     final bool below = _axisLineBelow(axisLineY);
-    final TextStyle style = axis.labelStyle ??
-        theme.axisLabelTextStyle ??
-        TextStyle(fontSize: 11, color: theme.labelColor);
+    final TextStyle style = _tickLabelStyle(axis);
     // A line through the middle of the plot cannot have its captions below it
     // without printing them over the series, so a crossing puts them on
     // whichever side it is on. Without a crossing the placement is unchanged.
@@ -910,9 +905,7 @@ class VarietyCartesianPainter extends CustomPainter {
     if (!axis.visible || (!axis.showLabels && !axis.showTicks)) {
       return 0;
     }
-    final TextStyle style = axis.labelStyle ??
-        theme.axisLabelTextStyle ??
-        TextStyle(fontSize: 11, color: theme.labelColor);
+    final TextStyle style = _tickLabelStyle(axis);
     final List<_AxisTick> ticks = _ticksOn(axisIndex);
     if (ticks.isEmpty) {
       return 0;
@@ -1057,6 +1050,18 @@ class VarietyCartesianPainter extends CustomPainter {
         color: theme.axisTitleColor,
       );
 
+  /// The style a tick label of [axis] is painted with.
+  ///
+  /// Several places have to agree on this: the caption itself, the room
+  /// reserved for it, and anything stacked underneath it. The widget that sizes
+  /// the plot area asks the same question through the same chain, so growing
+  /// the label text on one side and not the other is a layout bug rather than a
+  /// cosmetic one.
+  TextStyle _tickLabelStyle(VarietyAxis axis) =>
+      axis.labelStyle ??
+      theme.axisLabelTextStyle ??
+      TextStyle(fontSize: 11, color: theme.labelColor);
+
   /// Draws every horizontal axis declared after the primary one.
   ///
   /// Each axis gets a row of its own: the ones that are not opposed stack
@@ -1071,9 +1076,7 @@ class VarietyCartesianPainter extends CustomPainter {
     // is the plot edge unless the x axis line was moved by a crossing. Its title
     // counts too, measured rather than assumed, or a stacked axis would print
     // over it.
-    final TextStyle primaryStyle = geometry.xAxis.labelStyle ??
-        theme.axisLabelTextStyle ??
-        TextStyle(fontSize: 11, color: theme.labelColor);
+    final TextStyle primaryStyle = _tickLabelStyle(geometry.xAxis);
     double primaryBlock = _labelRowHeight(0, primaryStyle) + 8;
     final String? primaryTitle = geometry.xAxis.title;
     if (primaryTitle != null && primaryTitle.isNotEmpty) {
@@ -1093,9 +1096,7 @@ class VarietyCartesianPainter extends CustomPainter {
       if (!axis.visible) {
         continue;
       }
-      final TextStyle style = axis.labelStyle ??
-          theme.axisLabelTextStyle ??
-          TextStyle(fontSize: 11, color: theme.labelColor);
+      final TextStyle style = _tickLabelStyle(axis);
       final double rowHeight = _labelRowHeight(i, style);
       final bool belowPlot = !axis.opposedPosition;
       final double rowTop = belowPlot
@@ -1160,8 +1161,7 @@ class VarietyCartesianPainter extends CustomPainter {
             color: theme.axisTitleColor);
     final double baseY = geometry.plotRect.bottom +
         geometry.xAxis.labelOffset +
-        _primaryLabelHeight(
-            geometry.xAxis.labelStyle ?? const TextStyle(fontSize: 11)) +
+        _primaryLabelHeight(_tickLabelStyle(geometry.xAxis)) +
         6;
     for (final VarietyLabelGroup group in groups.groups) {
       final double top = baseY + group.level * 22;

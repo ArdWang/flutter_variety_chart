@@ -49,7 +49,20 @@ Changed
   window expressed in the primary axis' units means nothing on another scale, so
   a second axis always shows its whole range.
 
-Covered by test/render/variety_multi_x_axis_test.dart, and the example app's
+Fixed
+
+* **`VarietyChartTheme.axisLabelTextStyle` now reaches every tick label it
+  claims to.** The primary captions honoured it, but the secondary value axes,
+  the extra horizontal axes and the room the widget reserves for all of them
+  fell back to a hard-coded 11 px style instead, so a chart that asked for
+  larger labels got them on the primary axis only and clipped them everywhere
+  else. The three places that have to agree — the caption, the space reserved
+  for it and whatever is stacked underneath it — now share one chain
+  (`axis.labelStyle`, then the theme, then the built-in default), and the
+  multi-level labels measure the primary row with it too.
+
+Covered by test/render/variety_multi_x_axis_test.dart and
+test/widgets/variety_axis_label_style_test.dart, and the example app's
 Advanced page grew a two-axis dyno chart.
 
 ## 0.5.13

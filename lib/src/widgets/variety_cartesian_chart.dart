@@ -807,8 +807,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
 
   EdgeInsets _insetsFor(VarietyCartesianGeometry probe) {
-    final TextStyle yStyle = probe.yAxis.labelStyle ??
-        TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface);
+    final TextStyle yStyle = _tickLabelStyle(probe.yAxis);
     double left = 10;
     for (final double tick in probe.yTicks) {
       final String caption = probe.secondaryTickLabel(tick);
@@ -817,7 +816,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     if ((probe.yAxis.title ?? '').isNotEmpty) {
       left += 18;
     }
-    final TextStyle xStyle = probe.xAxis.labelStyle ?? yStyle;
+    final TextStyle xStyle = _tickLabelStyle(probe.xAxis);
     double bottom = 10;
     final double rotation = probe.xAxis.labelRotation * math.pi / 180;
     if (probe.xAxisType == VarietyAxisType.category ||
@@ -900,9 +899,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       if (!axis.visible) {
         continue;
       }
-      final TextStyle style = axis.labelStyle ??
-          TextStyle(
-              fontSize: 11, color: Theme.of(context).colorScheme.onSurface);
+      final TextStyle style = _tickLabelStyle(axis);
       final double rotation = axis.labelRotation * math.pi / 180;
       double height = 0;
       for (final String caption in _xCaptions(probe, i)) {
@@ -920,6 +917,18 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       }
     }
     return (below, above);
+  }
+
+  /// The style an axis tick label is painted in, matching the painter's.
+  ///
+  /// The room reserved here and the text drawn by the painter have to be
+  /// measured with the very same style, so this chain is kept identical to
+  /// `VarietyCartesianPainter._tickLabelStyle`.
+  TextStyle _tickLabelStyle(VarietyAxis axis) {
+    final VarietyChartTheme theme = VarietyChartTheme.of(context);
+    return axis.labelStyle ??
+        theme.axisLabelTextStyle ??
+        TextStyle(fontSize: 11, color: theme.labelColor);
   }
 
   /// The style an axis title is painted in, matching the painter's.
