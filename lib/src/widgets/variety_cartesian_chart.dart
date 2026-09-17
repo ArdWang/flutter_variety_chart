@@ -35,6 +35,7 @@ class VarietyCartesianChart extends StatefulWidget {
     this.primaryXAxis = const VarietyAxis(type: VarietyAxisType.category),
     this.primaryYAxis = const VarietyAxis(type: VarietyAxisType.numeric),
     this.secondaryYAxes = const <VarietyAxis>[],
+    this.secondaryXAxes = const <VarietyAxis>[],
     this.title,
     this.titleStyle,
     this.showLegend = true,
@@ -83,6 +84,20 @@ class VarietyCartesianChart extends StatefulWidget {
   /// Give an axis a [VarietyAxis.name] and point a series at it through
   /// `yAxisName` to plot that series against its own scale.
   final List<VarietyAxis> secondaryYAxes;
+
+  /// Additional horizontal axes rendered below the plot area.
+  ///
+  /// Give an axis a [VarietyAxis.name] and point a series at it through
+  /// `xAxisName` to plot that series against its own horizontal scale. Each
+  /// extra axis resolves its own range from its own series, prints its own
+  /// ticks in its own row, and gives its columns their own slot width, so two
+  /// series measured in different units can share one plot area without one of
+  /// them being squeezed into the other's scale.
+  ///
+  /// Grid lines and plot bands stay with [primaryXAxis], and so does the zoom
+  /// window: pinching zooms the primary axis only, because a window expressed
+  /// in its units is meaningless on another scale.
+  final List<VarietyAxis> secondaryXAxes;
 
   /// An optional caption rendered above the chart.
   final String? title;
@@ -666,6 +681,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       plotRect: Offset.zero & safe,
       progress: _progress,
       secondaryYAxes: widget.secondaryYAxes,
+      secondaryXAxes: widget.secondaryXAxes,
       palette: VarietyChartTheme.of(context).palette,
     );
     final EdgeInsets insets = _insetsFor(probe);
@@ -687,6 +703,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       progress: _progress,
       dataLabelResolver: _resolveDataLabel,
       secondaryYAxes: widget.secondaryYAxes,
+      secondaryXAxes: widget.secondaryXAxes,
       palette: VarietyChartTheme.of(context).palette,
     );
     _baseXMin = base.xMinimum;
@@ -709,6 +726,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       visibleYRange: _zoomY,
       dataLabelResolver: _resolveDataLabel,
       secondaryYAxes: widget.secondaryYAxes,
+      secondaryXAxes: widget.secondaryXAxes,
       palette: VarietyChartTheme.of(context).palette,
     );
     _reportRangeChanges(base, display);
@@ -783,6 +801,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       visibleXRange: window,
       dataLabelResolver: _resolveDataLabel,
       secondaryYAxes: widget.secondaryYAxes,
+      secondaryXAxes: widget.secondaryXAxes,
       palette: VarietyChartTheme.of(context).palette,
     );
   }
@@ -835,12 +854,83 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       }
       bottom += levels * 22 + 4;
     }
+    final (double extraBelow, double extraAbove) = _extraXAxisInset(probe);
     return EdgeInsets.fromLTRB(
       left + widget.padding.left,
-      widget.padding.top,
+      widget.padding.top + extraAbove,
       widget.padding.right + _secondaryAxisInset(probe),
-      bottom + widget.padding.bottom,
+      bottom + extraBelow + widget.padding.bottom,
     );
+  }
+
+  /// The caption texts a horizontal axis prints, in tick order.
+  Iterable<String> _xCaptions(VarietyCartesianGeometry probe, int axisIndex) {
+    final VarietyAxis axis = probe.xAxes[axisIndex];
+    switch (probe.axisXTypes[axisIndex]) {
+      case VarietyAxisType.category:
+      case VarietyAxisType.dateTimeCategory:
+        return probe.axisCategories[axisIndex];
+      case VarietyAxisType.dateTime:
+        return probe.axisDateTimeTicks[axisIndex].map(
+          (DateTime tick) => probe.dateTimeTickLabelOn(axisIndex, tick),
+        );
+      case VarietyAxisType.numeric:
+      case VarietyAxisType.logarithmic:
+        return probe.xNumericTicksOn(axisIndex).map(
+              (double value) =>
+                  axis.labelFormatter?.call(value) ??
+                  varietyFormatNumber(value),
+            );
+    }
+  }
+
+  /// The vertical room the extra horizontal axes need, below and above.
+  ///
+  /// Mirrors how the painter stacks them: one caption row per axis, plus a row
+  /// for the title when the axis has one. An opposed axis prints above the plot
+  /// area instead, so its row is measured against the top inset.
+  (double, double) _extraXAxisInset(VarietyCartesianGeometry probe) {
+    if (probe.xAxes.length < 2) {
+      return (0, 0);
+    }
+    double below = 0;
+    double above = 0;
+    for (int i = 1; i < probe.xAxes.length; i++) {
+      final VarietyAxis axis = probe.xAxes[i];
+      if (!axis.visible) {
+        continue;
+      }
+      final TextStyle style = axis.labelStyle ??
+          TextStyle(
+              fontSize: 11, color: Theme.of(context).colorScheme.onSurface);
+      final double rotation = axis.labelRotation * math.pi / 180;
+      double height = 0;
+      for (final String caption in _xCaptions(probe, i)) {
+        height = math.max(height, _rotatedHeight(caption, style, rotation));
+      }
+      double row = math.max(height, _textSize('0', style).height) + 8;
+      final String? title = axis.title;
+      if (title != null && title.isNotEmpty) {
+        row += 6 + _textSize(title, _xAxisTitleStyle()).height;
+      }
+      if (axis.opposedPosition) {
+        above += row;
+      } else {
+        below += row;
+      }
+    }
+    return (below, above);
+  }
+
+  /// The style an axis title is painted in, matching the painter's.
+  TextStyle _xAxisTitleStyle() {
+    final VarietyChartTheme theme = VarietyChartTheme.of(context);
+    return theme.axisTitleTextStyle ??
+        TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: theme.axisTitleColor,
+        );
   }
 
   /// The horizontal room the secondary axes need on the right.

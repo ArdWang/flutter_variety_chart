@@ -610,29 +610,7 @@ class VarietyCartesianPainter extends CustomPainter {
     }
   }
 
-  List<double> _primaryGridPositions() {
-    switch (geometry.xAxisType) {
-      case VarietyAxisType.category:
-      case VarietyAxisType.dateTimeCategory:
-        return geometry.slotCenters;
-      case VarietyAxisType.dateTime:
-        return geometry.dateTimeTicks
-            .map(
-              (DateTime tick) => geometry
-                  .toPixel(
-                      tick.millisecondsSinceEpoch.toDouble(), geometry.yMinimum)
-                  .dx,
-            )
-            .toList(growable: false);
-      case VarietyAxisType.numeric:
-      case VarietyAxisType.logarithmic:
-        // Ticks come from the geometry so the grid lines, the captions and the
-        // zoomed window all agree — see `VarietyCartesianGeometry.xNumericTicks`.
-        return geometry.xNumericTicks
-            .map((double value) => geometry.toPixel(value, 0).dx)
-            .toList(growable: false);
-    }
-  }
+  List<double> _primaryGridPositions() => geometry.xTickPositionsOn(0);
 
   // ---------------------------------------------------------------------------
   // Axes
@@ -679,6 +657,7 @@ class VarietyCartesianPainter extends CustomPainter {
     }
     _paintSecondaryLabels(canvas);
     _paintExtraAxes(canvas);
+    _paintExtraXAxes(canvas);
     _paintPrimaryLabels(canvas);
     _paintMultiLevelLabels(canvas);
   }
@@ -830,43 +809,45 @@ class VarietyCartesianPainter extends CustomPainter {
     }
   }
 
-  List<_AxisTick> _primaryTicks() {
-    switch (geometry.xAxisType) {
+  /// The ticks horizontal axis [axisIndex] prints, with their captions.
+  List<_AxisTick> _ticksOn(int axisIndex) {
+    switch (geometry.axisXTypes[axisIndex]) {
       case VarietyAxisType.category:
       case VarietyAxisType.dateTimeCategory:
+        final List<String> captions = geometry.axisCategories[axisIndex];
+        final List<double> centers = geometry.axisSlotCenters[axisIndex];
         final List<_AxisTick> ticks = <_AxisTick>[];
-        for (int i = 0;
-            i < geometry.categories.length && i < geometry.slotCenters.length;
-            i++) {
-          final double center = geometry.slotCenters[i];
+        for (int i = 0; i < captions.length && i < centers.length; i++) {
+          final double center = centers[i];
           // Zooming shifts categories outside the plot area; skip those.
           if (center < geometry.plotRect.left - 1 ||
               center > geometry.plotRect.right + 1) {
             continue;
           }
-          ticks.add(_AxisTick(center, geometry.categories[i], i.toDouble()));
+          ticks.add(_AxisTick(center, captions[i], i.toDouble()));
         }
         return ticks;
       case VarietyAxisType.dateTime:
-        return geometry.dateTimeTicks
+        return geometry.axisDateTimeTicks[axisIndex]
             .map(
               (DateTime tick) => _AxisTick(
-                geometry
-                    .toPixel(tick.millisecondsSinceEpoch.toDouble(),
-                        geometry.yMinimum)
-                    .dx,
-                geometry.dateTimeTickLabel(tick),
+                geometry.pixelXOn(
+                  axisIndex,
+                  tick.millisecondsSinceEpoch.toDouble(),
+                ),
+                geometry.dateTimeTickLabelOn(axisIndex, tick),
                 tick.millisecondsSinceEpoch.toDouble(),
               ),
             )
             .toList(growable: false);
       case VarietyAxisType.numeric:
       case VarietyAxisType.logarithmic:
-        return geometry.xNumericTicks
+        return geometry
+            .xNumericTicksOn(axisIndex)
             .map(
               (double value) => _AxisTick(
-                geometry.toPixel(value, geometry.yMinimum).dx,
-                geometry.primaryTickLabel(value),
+                geometry.pixelXOn(axisIndex, value),
+                geometry.xTickLabelOn(axisIndex, value),
                 value,
               ),
             )
@@ -885,29 +866,65 @@ class VarietyCartesianPainter extends CustomPainter {
 
   void _paintPrimaryLabels(Canvas canvas) {
     final VarietyAxis axis = geometry.xAxis;
-    if (!axis.visible || (!axis.showLabels && !axis.showTicks)) {
-      return;
-    }
-    final TextStyle style = axis.labelStyle ??
-        theme.axisLabelTextStyle ??
-        TextStyle(fontSize: 11, color: theme.labelColor);
-    final List<_AxisTick> ticks = _primaryTicks();
-    if (ticks.isEmpty) {
-      return;
-    }
     // The marks sit on the axis line itself, which is the plot area edge
     // unless the y axis crosses it somewhere else, and they are painted before
     // the captions so a thinned or dropped caption cannot take a mark with it.
     final double axisLineY = _xAxisLineY();
     final bool below = _axisLineBelow(axisLineY);
+    final TextStyle style = axis.labelStyle ??
+        theme.axisLabelTextStyle ??
+        TextStyle(fontSize: 11, color: theme.labelColor);
+    // A line through the middle of the plot cannot have its captions below it
+    // without printing them over the series, so a crossing puts them on
+    // whichever side it is on. Without a crossing the placement is unchanged.
+    final double baseY;
+    if (geometry.yAxis.crossesAt != null) {
+      baseY = below
+          ? axisLineY + axis.labelOffset
+          : axisLineY - axis.labelOffset - _labelRowHeight(0, style);
+    } else {
+      baseY = axis.opposedPosition
+          ? geometry.plotRect.top - axis.labelOffset
+          : geometry.plotRect.bottom + axis.labelOffset;
+    }
+    _paintXAxisLabels(canvas, 0, rowTop: baseY, below: below, lineY: axisLineY);
+  }
+
+  /// Draws the tick marks, captions and title of horizontal axis [axisIndex].
+  ///
+  /// [rowTop] is the y the captions start at, [below] says which way the marks
+  /// and any following rows grow, and [lineY] is the y the marks sit on. Each
+  /// axis draws its own row so that a second horizontal axis can be read
+  /// against its own scale rather than the primary one's.
+  ///
+  /// Returns the height the row took, so a caller stacking rows can start the
+  /// next one clear of it.
+  double _paintXAxisLabels(
+    Canvas canvas,
+    int axisIndex, {
+    required double rowTop,
+    required bool below,
+    required double lineY,
+  }) {
+    final VarietyAxis axis = geometry.xAxes[axisIndex];
+    if (!axis.visible || (!axis.showLabels && !axis.showTicks)) {
+      return 0;
+    }
+    final TextStyle style = axis.labelStyle ??
+        theme.axisLabelTextStyle ??
+        TextStyle(fontSize: 11, color: theme.labelColor);
+    final List<_AxisTick> ticks = _ticksOn(axisIndex);
+    if (ticks.isEmpty) {
+      return 0;
+    }
     if (axis.showTicks) {
       final Offset outward = Offset(0, below ? 1 : -1);
       for (final _AxisTick tick in ticks) {
-        _paintTickMark(canvas, axis, Offset(tick.position, axisLineY), outward);
+        _paintTickMark(canvas, axis, Offset(tick.position, lineY), outward);
       }
     }
     if (!axis.showLabels) {
-      return;
+      return 0;
     }
     double rotation = axis.labelRotation;
     switch (axis.labelIntersectAction) {
@@ -959,19 +976,7 @@ class VarietyCartesianPainter extends CustomPainter {
     }
 
     final bool inside = axis.labelPlacement == VarietyLabelPlacement.inside;
-    // A line through the middle of the plot cannot have its captions below it
-    // without printing them over the series, so a crossing puts them on
-    // whichever side it is on. Without a crossing the placement is unchanged.
-    final double baseY;
-    if (geometry.yAxis.crossesAt != null) {
-      baseY = below
-          ? axisLineY + axis.labelOffset
-          : axisLineY - axis.labelOffset - _primaryLabelHeight(style);
-    } else {
-      baseY = axis.opposedPosition
-          ? geometry.plotRect.top - axis.labelOffset
-          : geometry.plotRect.bottom + axis.labelOffset;
-    }
+    final double baseY = rowTop;
     for (int i = 0; i < ticks.length; i++) {
       if (!visible[i]) {
         continue;
@@ -1015,7 +1020,7 @@ class VarietyCartesianPainter extends CustomPainter {
         ),
       );
       if (axis.labelIntersectAction == VarietyLabelIntersectAction.wrap &&
-          extents[i] > geometry.slotWidth * 0.95 &&
+          extents[i] > geometry.axisSlotWidths[axisIndex] * 0.95 &&
           ticks[i].text.contains(' ')) {
         _paintWrapped(canvas, ticks[i].text, Offset(x, anchorY), style);
         continue;
@@ -1023,30 +1028,108 @@ class VarietyCartesianPainter extends CustomPainter {
       _paintRotated(canvas, ticks[i].text, Offset(x, anchorY), style, rotation);
     }
 
+    double consumed = _labelRowHeight(axisIndex, style) +
+        (axis.labelIntersectAction == VarietyLabelIntersectAction.multipleRows
+            ? 20
+            : 0);
     final String? title = axis.title;
     if (title != null && title.isNotEmpty) {
-      final TextPainter painter = _renderer.layoutText(
-        title,
-        theme.axisTitleTextStyle ??
-            TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: theme.axisTitleColor),
-      );
+      final TextPainter painter =
+          _renderer.layoutText(title, _axisTitleStyle());
       painter.paint(
         canvas,
         Offset(
           geometry.plotRect.center.dx - painter.width / 2,
-          baseY +
-              _primaryLabelHeight(style) +
-              (axis.labelIntersectAction ==
-                      VarietyLabelIntersectAction.multipleRows
-                  ? 20
-                  : 0) +
-              6,
+          baseY + consumed + 6,
         ),
       );
+      consumed += 6 + painter.height;
     }
+    return consumed;
+  }
+
+  /// The style an axis title is painted in.
+  TextStyle _axisTitleStyle() =>
+      theme.axisTitleTextStyle ??
+      TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: theme.axisTitleColor,
+      );
+
+  /// Draws every horizontal axis declared after the primary one.
+  ///
+  /// Each axis gets a row of its own: the ones that are not opposed stack
+  /// downward under the primary captions, and the opposed ones stack upward
+  /// above the plot area. Grid lines and plot bands stay with the primary axis,
+  /// exactly as they do for a secondary value axis.
+  void _paintExtraXAxes(Canvas canvas) {
+    if (geometry.xAxes.length < 2) {
+      return;
+    }
+    // The first row starts clear of everything the primary axis printed, which
+    // is the plot edge unless the x axis line was moved by a crossing. Its title
+    // counts too, measured rather than assumed, or a stacked axis would print
+    // over it.
+    final TextStyle primaryStyle = geometry.xAxis.labelStyle ??
+        theme.axisLabelTextStyle ??
+        TextStyle(fontSize: 11, color: theme.labelColor);
+    double primaryBlock = _labelRowHeight(0, primaryStyle) + 8;
+    final String? primaryTitle = geometry.xAxis.title;
+    if (primaryTitle != null && primaryTitle.isNotEmpty) {
+      primaryBlock +=
+          6 + _renderer.layoutText(primaryTitle, _axisTitleStyle()).height;
+    }
+    final double firstRow = math.max(
+          geometry.plotRect.bottom,
+          _xAxisLineY(),
+        ) +
+        geometry.xAxis.labelOffset +
+        primaryBlock;
+    double belowOffset = 0;
+    double aboveOffset = 0;
+    for (int i = 1; i < geometry.xAxes.length; i++) {
+      final VarietyAxis axis = geometry.xAxes[i];
+      if (!axis.visible) {
+        continue;
+      }
+      final TextStyle style = axis.labelStyle ??
+          theme.axisLabelTextStyle ??
+          TextStyle(fontSize: 11, color: theme.labelColor);
+      final double rowHeight = _labelRowHeight(i, style);
+      final bool belowPlot = !axis.opposedPosition;
+      final double rowTop = belowPlot
+          ? firstRow + belowOffset
+          : geometry.plotRect.top - axis.labelOffset - rowHeight - aboveOffset;
+      final double consumed = _paintXAxisLabels(
+        canvas,
+        i,
+        rowTop: rowTop,
+        below: belowPlot,
+        lineY: belowPlot ? geometry.plotRect.bottom : geometry.plotRect.top,
+      );
+      if (belowPlot) {
+        belowOffset += math.max(consumed, rowHeight) + 8;
+      } else {
+        aboveOffset += math.max(consumed, rowHeight) + 8;
+      }
+    }
+  }
+
+  /// The height one caption row of horizontal axis [axisIndex] needs.
+  ///
+  /// Mirrors [_primaryLabelHeight], but reads the rotation off the axis in
+  /// question, so a rotated second axis still reserves a row deep enough for
+  /// its captions.
+  double _labelRowHeight(int axisIndex, TextStyle style) {
+    final double rotation =
+        geometry.xAxes[axisIndex].labelRotation * math.pi / 180;
+    if (rotation == 0) {
+      return _renderer.layoutText('0', style).height;
+    }
+    final Size sample = _renderer.layoutText('00 MMM', style).size;
+    return sample.height * math.cos(rotation).abs() +
+        sample.width * math.sin(rotation).abs();
   }
 
   void _paintWrapped(

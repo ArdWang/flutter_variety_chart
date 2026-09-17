@@ -167,6 +167,50 @@ class _AdvancedPageState extends State<AdvancedPage> {
           ),
         ),
         ChartCard(
+          title: 'Two horizontal axes, one plot area',
+          height: 340,
+          child: VarietyCartesianChart(
+            // A dyno plot: the same two curves read against engine speed and
+            // against road speed. Each axis resolves its own range from the
+            // series pointed at it, so neither curve is squeezed into the
+            // other's scale.
+            primaryXAxis: VarietyAxis(
+              type: VarietyAxisType.numeric,
+              name: 'rpm',
+              title: 'Engine speed (rpm)',
+              minimum: 0,
+              maximum: 7000,
+              labelFormatter: (dynamic value) =>
+                  '${((value as num) / 1000).round()}k',
+            ),
+            secondaryXAxes: <VarietyAxis>[
+              VarietyAxis(
+                type: VarietyAxisType.numeric,
+                name: 'road',
+                title: 'Road speed (km/h)',
+                minimum: 0,
+                maximum: 220,
+              ),
+            ],
+            primaryYAxis: const VarietyAxis(
+              type: VarietyAxisType.numeric,
+              title: 'Output',
+            ),
+            legendSettings: const VarietyLegendSettings(title: 'Measured'),
+            series: <VarietySeries>[
+              VarietyLineSeries(
+                name: 'Torque vs rpm',
+                data: _dynoTorque(),
+              ),
+              VarietyLineSeries(
+                name: 'Power vs road speed',
+                xAxisName: 'road',
+                data: _dynoPower(),
+              ),
+            ],
+          ),
+        ),
+        ChartCard(
           title: 'Selection controller and tooltip callback',
           height: 320,
           child: VarietyCartesianChart(
@@ -236,4 +280,26 @@ class _AdvancedPageState extends State<AdvancedPage> {
       return VarietyChartData(start.add(Duration(days: i)), value);
     });
   }
+
+  /// Torque against engine speed, on the primary horizontal axis.
+  List<VarietyChartData> _dynoTorque() => const <VarietyChartData>[
+        VarietyChartData(1000, 160),
+        VarietyChartData(2000, 250),
+        VarietyChartData(3000, 310),
+        VarietyChartData(4000, 320),
+        VarietyChartData(5000, 300),
+        VarietyChartData(6000, 250),
+        VarietyChartData(7000, 180),
+      ];
+
+  /// The same engine read against road speed, on the second horizontal axis.
+  List<VarietyChartData> _dynoPower() => const <VarietyChartData>[
+        VarietyChartData(20, 60),
+        VarietyChartData(55, 130),
+        VarietyChartData(90, 195),
+        VarietyChartData(125, 240),
+        VarietyChartData(160, 265),
+        VarietyChartData(195, 235),
+        VarietyChartData(220, 180),
+      ];
 }

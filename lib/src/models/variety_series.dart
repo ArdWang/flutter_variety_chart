@@ -169,14 +169,19 @@ abstract class VarietySeries {
   /// An optional error bar drawn alongside this series.
   final VarietyErrorBarSeries? errorBar;
 
-  /// The name of the primary axis this series is plotted against.
+  /// The name of the horizontal axis this series is plotted against.
   ///
-  /// When `null` the series uses the chart's primary axis.
+  /// When `null` the series uses the chart's primary horizontal axis. Name one
+  /// of the chart's `secondaryXAxes` to plot this series against its own
+  /// horizontal scale: the axis resolves its range from the series pointed at
+  /// it, prints its own ticks in its own row, and hands its columns their own
+  /// slot width. A name that matches no axis falls back to the primary one.
   final String? xAxisName;
 
   /// The name of the secondary axis this series is plotted against.
   ///
-  /// When `null` the series uses the chart's primary secondary axis.
+  /// When `null` the series uses the chart's primary secondary axis. A name
+  /// that matches no axis falls back to the primary one.
   final String? yAxisName;
 
   /// A grouped marker configuration.

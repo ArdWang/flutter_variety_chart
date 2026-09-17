@@ -1,3 +1,57 @@
+## 0.5.14
+
+### Multiple horizontal axes
+
+`VarietySeries.xAxisName` was declared, mirrored in every series constructor and
+read by nothing. The vertical family already had its counterpart working
+(`secondaryYAxes` + `yAxisName`); the horizontal family never went plural. It
+does now.
+
+Added
+
+* `VarietyCartesianChart.secondaryXAxes`, bound from a series through
+  `VarietySeries.xAxisName` exactly as secondary Y axes are bound through
+  `yAxisName`. Every extra axis resolves its own range, its own ticks and its own
+  captions, prints them in a row of its own under the plot area, and gives the
+  columns on it a slot width of their own. A name that matches no axis falls back
+  to the primary one.
+* `VarietyCartesianGeometry` gained the per-axis horizontal state its vertical
+  counterpart already had: `xAxes`, `seriesXAxis`, `xAxisIndexOf`, `xAxisFor`,
+  `axisXTypes`, `axisXMinimums` / `axisXMaximums` / `axisXIntervals` /
+  `axisXTickOrigins`, `axisCategories`, `axisCategoryValues`, `axisSlotCenters`,
+  `axisSlotWidths`, `axisDateTimeTicks`, `pixelXOn`, `xTickPositionsOn`,
+  `xNumericTicksOn`, `xMinorTickPositionsOn`, `xTickLabelOn` and
+  `dateTimeTickLabelOn`. The old singular members (`categories`, `slotCenters`,
+  `slotWidth`, `xMinimum`, `xMaximum`, `xInterval`, `xTickOrigin`,
+  `dateTimeTicks`, `xNumericTicks`, `xAxisType`, `pixelXFor`, `categoryIndexOf`)
+  still read and behave exactly as before, now as views onto axis 0, except
+  that `pixelXFor` takes a series index instead of a series and
+  `categoryIndexOf` takes an optional axis index.
+
+Changed
+
+* **Two horizontal axes can now share one plot area, so a series can leave the
+  primary axis' scale.** That is the point of the feature, but it means a series
+  that names a second horizontal axis no longer widens the primary axis' range,
+  and its points are drawn against the other axis' pixels. Charts that name no
+  axis are unaffected down to the pixel.
+* Column grouping now looks only at the series standing on the same slot axis.
+  Previously the group width was divided by every column-like series on the
+  chart and the offset was taken from the series' position in the whole list, so
+  a column chart with a line series interleaved between two column series gave
+  the later column the wrong offset and a width divided by the wrong count.
+* The trackball snaps each series on its own horizontal axis: a category axis to
+  the nearest slot, a value axis to the nearest point by pixel. On a single-axis
+  chart this is the old behaviour; on a multi-axis chart it is what keeps a
+  series on a second axis reachable.
+* Grid lines and plot bands stay with the primary horizontal axis, and so does
+  the zoom window, matching how secondary Y axes have always been treated. A
+  window expressed in the primary axis' units means nothing on another scale, so
+  a second axis always shows its whole range.
+
+Covered by test/render/variety_multi_x_axis_test.dart, and the example app's
+Advanced page grew a two-axis dyno chart.
+
 ## 0.5.13
 
 ### Auto scrolling and the anchored value range

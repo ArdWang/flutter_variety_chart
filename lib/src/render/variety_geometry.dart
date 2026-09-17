@@ -169,12 +169,18 @@ class VarietyCartesianGeometry {
     this.visibleYRange,
     this.dataLabelResolver,
     this.secondaryYAxes = const <VarietyAxis>[],
+    this.secondaryXAxes = const <VarietyAxis>[],
     this.palette,
   })  : _rawPlotRect = plotRect,
         transposed = _shouldTranspose(series),
         xAxis = _shouldTranspose(series) ? yAxis : xAxis,
         yAxis = _shouldTranspose(series) ? xAxis : yAxis {
-    yAxes = <VarietyAxis>[yAxis, ...secondaryYAxes];
+    // Note `this.`: a constructor parameter of the same name is in scope here,
+    // and the parameter still holds the caller's axes while the fields hold the
+    // transposed ones. The horizontal family has to be built from the fields,
+    // or a bar chart would stack its extra axes in the wrong direction.
+    xAxes = <VarietyAxis>[this.xAxis, ...secondaryXAxes];
+    yAxes = <VarietyAxis>[this.yAxis, ...secondaryYAxes];
     _resolveSeriesAxes();
     _resolveAxisTypes();
     _resolveData();
@@ -185,6 +191,15 @@ class VarietyCartesianGeometry {
   }
 
   void _resolveSeriesAxes() {
+    seriesXAxis = List<int>.generate(series.length, (int index) {
+      final String? name = series[index].xAxisName;
+      if (name == null) {
+        return 0;
+      }
+      final int found =
+          xAxes.indexWhere((VarietyAxis axis) => axis.name == name);
+      return found < 0 ? 0 : found;
+    });
     seriesYAxis = List<int>.generate(series.length, (int index) {
       final String? name = series[index].yAxisName;
       if (name == null) {
@@ -197,6 +212,10 @@ class VarietyCartesianGeometry {
     axisMinimums = List<double>.filled(yAxes.length, 0);
     axisMaximums = List<double>.filled(yAxes.length, 1);
     axisIntervals = List<double>.filled(yAxes.length, 1);
+    axisXMinimums = List<double>.filled(xAxes.length, 0);
+    axisXMaximums = List<double>.filled(xAxes.length, 1);
+    axisXIntervals = List<double>.filled(xAxes.length, 1);
+    axisXTickOrigins = List<double>.filled(xAxes.length, 0);
   }
 
   /// The index of the secondary axis a series is plotted against.
@@ -207,6 +226,27 @@ class VarietyCartesianGeometry {
 
   /// The axis object a series is plotted against.
   VarietyAxis axisFor(int seriesIndex) => yAxes[axisIndexOf(seriesIndex)];
+
+  /// The index of the horizontal axis a series is plotted against.
+  int xAxisIndexOf(int seriesIndex) =>
+      seriesIndex >= 0 && seriesIndex < seriesXAxis.length
+          ? seriesXAxis[seriesIndex]
+          : 0;
+
+  /// The horizontal axis object a series is plotted against.
+  VarietyAxis xAxisFor(int seriesIndex) => xAxes[xAxisIndexOf(seriesIndex)];
+
+  /// Which of the two axis families owns the slot (category) dimension.
+  ///
+  /// Categories always run along the horizontal edge of a normal chart, and
+  /// along the vertical edge of a transposed one, so a bar chart's slots are
+  /// carved out of the vertical family instead.
+  bool get _slotsOnX => !transposed;
+
+  /// The index, in whichever family owns the slots, of the axis a series sits
+  /// against.
+  int _slotAxisIndexOf(int seriesIndex) =>
+      _slotsOnX ? xAxisIndexOf(seriesIndex) : axisIndexOf(seriesIndex);
 
   final Rect _rawPlotRect;
 
@@ -262,6 +302,20 @@ class VarietyCartesianGeometry {
   /// matching `VarietyAxis.name`.
   final List<VarietyAxis> secondaryYAxes;
 
+  /// Additional horizontal axes, drawn below the plot area.
+  ///
+  /// A series opts into one of these axes by setting its `xAxisName` to the
+  /// matching `VarietyAxis.name`. Each extra axis resolves its own range, its
+  /// own ticks and its own slot width, so two series measured on different
+  /// horizontal scales can share one plot area.
+  ///
+  /// Two things stay a primary-axis affair, matching how [secondaryYAxes] are
+  /// treated: grid lines and plot bands. Only [xAxis] draws them. The zoom
+  /// window in [visibleXRange] likewise addresses [xAxis] alone — the other
+  /// axes always show their whole range, because a window expressed in the
+  /// primary axis' units means nothing on a different scale.
+  final List<VarietyAxis> secondaryXAxes;
+
   /// An optional hook that rewrites, or suppresses, a data label caption.
   ///
   /// Returning `null` keeps the default caption and returning an empty string
@@ -274,8 +328,11 @@ class VarietyCartesianGeometry {
     String caption,
   )? dataLabelResolver;
 
-  /// The resolved type of the primary axis.
-  late final VarietyAxisType xAxisType;
+  /// The resolved type of the horizontal axis family, primary first.
+  late final List<VarietyAxisType> axisXTypes = <VarietyAxisType>[];
+
+  /// The resolved type of the primary horizontal axis.
+  VarietyAxisType get xAxisType => axisXTypes[0];
 
   /// The resolved type of the secondary axis.
   late final VarietyAxisType yAxisType;
@@ -284,28 +341,44 @@ class VarietyCartesianGeometry {
   /// grouping have been applied.
   late final List<List<VarietyChartData>> resolvedData;
 
-  /// The ordered category captions, populated for category axes.
-  final List<String> categories = <String>[];
+  /// The ordered category captions of each horizontal axis.
+  ///
+  /// Index 0 is the primary axis. In a transposed layout the slots belong to
+  /// the vertical family, so index 0 double serves as storage for the one
+  /// shared slot axis a bar chart has.
+  final List<List<String>> axisCategories = <List<String>>[];
 
-  /// The raw category values, populated for category axes.
-  final List<dynamic> categoryValues = <dynamic>[];
+  /// The raw category values of each horizontal axis.
+  final List<List<dynamic>> axisCategoryValues = <List<dynamic>>[];
 
-  /// The identity of every category, index aligned with [categories].
+  /// The identity of every category, index aligned with [axisCategories].
   ///
   /// Kept apart from the caption because a caption can be shared: a caller's
   /// `dateFormat` may be coarse enough to print the same text for two
   /// categories, and looking a point up by its caption would then drop it on
   /// the wrong slot.
-  final List<String> _categoryKeys = <String>[];
+  final List<List<String>> _axisCategoryKeys = <List<String>>[];
 
-  /// The lowest value on the primary axis, in axis units.
-  double xMinimum = 0;
+  /// The ordered category captions of the primary horizontal axis.
+  List<String> get categories => axisCategories[0];
 
-  /// The highest value on the primary axis, in axis units.
-  double xMaximum = 1;
+  /// The raw category values of the primary horizontal axis.
+  List<dynamic> get categoryValues => axisCategoryValues[0];
+
+  /// The lowest value on the primary horizontal axis, in axis units.
+  double get xMinimum => axisXMinimums[0];
+
+  /// The highest value on the primary horizontal axis, in axis units.
+  double get xMaximum => axisXMaximums[0];
+
+  /// Every horizontal axis in play, the primary one first.
+  late final List<VarietyAxis> xAxes;
 
   /// Every secondary axis in play, the primary one first.
   late final List<VarietyAxis> yAxes;
+
+  /// The index of the horizontal axis each series is plotted against.
+  late final List<int> seriesXAxis;
 
   /// The index of the secondary axis each series is plotted against.
   late final List<int> seriesYAxis;
@@ -319,6 +392,23 @@ class VarietyCartesianGeometry {
   /// The tick interval of each secondary axis.
   late final List<double> axisIntervals;
 
+  /// The lowest value of each horizontal axis.
+  late final List<double> axisXMinimums;
+
+  /// The highest value of each horizontal axis.
+  late final List<double> axisXMaximums;
+
+  /// The spacing between ticks on each horizontal axis.
+  late final List<double> axisXIntervals;
+
+  /// The value each horizontal axis anchors its numeric tick grid on.
+  ///
+  /// Ticks sit at `origin + k * interval`. The origin is the axis minimum
+  /// *before* the zoom window is applied, so the grid keeps the same values
+  /// while the visible window moves. Anchoring on the window instead would slide
+  /// every tick off the data points the moment the user zooms or pans.
+  late final List<double> axisXTickOrigins;
+
   /// The lowest value on the primary secondary axis.
   double yMinimum = 0;
 
@@ -328,16 +418,11 @@ class VarietyCartesianGeometry {
   /// The spacing between secondary axis ticks.
   double yInterval = 1;
 
-  /// The interval between primary axis ticks on a numeric axis.
-  double xInterval = 1;
+  /// The interval between ticks on the primary horizontal axis.
+  double get xInterval => axisXIntervals[0];
 
-  /// The value the numeric x tick grid is anchored on.
-  ///
-  /// Ticks sit at `xTickOrigin + k * xInterval`. The origin is the axis minimum
-  /// *before* the zoom window is applied, so the grid keeps the same values
-  /// while the visible window moves. Anchoring on the window instead would slide
-  /// every tick off the data points the moment the user zooms or pans.
-  double xTickOrigin = 0;
+  /// The value the primary horizontal axis anchors its numeric tick grid on.
+  double get xTickOrigin => axisXTickOrigins[0];
 
   /// The base of a logarithmic secondary axis.
   double logBase = 10;
@@ -348,25 +433,34 @@ class VarietyCartesianGeometry {
   /// The rectangles of every banded point, indexed by series then point.
   final List<List<Rect?>> bandRects = <List<Rect?>>[];
 
-  /// The horizontal centre of each category slot.
-  final List<double> slotCenters = <double>[];
+  /// The horizontal centre of each category slot, per horizontal axis.
+  final List<List<double>> axisSlotCenters = <List<double>>[];
 
-  /// The width of one slot in logical pixels.
-  double slotWidth = 0;
+  /// The width of one slot in logical pixels, per horizontal axis.
+  final List<double> axisSlotWidths = <double>[];
+
+  /// The horizontal centre of each category slot of the primary axis.
+  List<double> get slotCenters => axisSlotCenters[0];
+
+  /// The width of one slot of the primary axis, in logical pixels.
+  double get slotWidth => axisSlotWidths[0];
 
   /// The drawables produced by this layout, in painting order.
   final List<VarietyElement> elements = <VarietyElement>[];
 
-  /// The date time ticks, populated for date time axes.
-  final List<DateTime> dateTimeTicks = <DateTime>[];
+  /// The date time ticks of each horizontal axis.
+  final List<List<DateTime>> axisDateTimeTicks = <List<DateTime>>[];
 
-  /// The pattern used to caption the date time ticks.
+  /// The pattern each horizontal axis uses to caption its date time ticks.
   ///
   /// Resolved against the ticks that were actually generated, so that no two
   /// of them can render the same caption. Stays null when the axis supplies
   /// its own `dateFormat`, when a `labelFormatter` owns the captions, or
   /// before any ticks exist.
-  String? _dateTimeLabelFormat;
+  final List<String?> _axisDateTimeLabelFormats = <String?>[];
+
+  /// The date time ticks of the primary horizontal axis.
+  List<DateTime> get dateTimeTicks => axisDateTimeTicks[0];
 
   /// The series colours, cycled by series index. Null uses the built-in
   /// palette, which is what a chart with no themed palette of its own wants.
@@ -382,10 +476,6 @@ class VarietyCartesianGeometry {
   double get _ySpan => math.max(yMaximum - yMinimum, 1e-9);
 
   bool get _isLogarithmic => yAxisType == VarietyAxisType.logarithmic;
-
-  bool get _isDateTimePrimary =>
-      xAxisType == VarietyAxisType.dateTime ||
-      xAxisType == VarietyAxisType.dateTimeCategory;
 
   /// The Y pixel of the value `0` on the given axis.
   double baselineYOn(int axisIndex) {
@@ -443,33 +533,70 @@ class VarietyCartesianGeometry {
   // ---------------------------------------------------------------------------
 
   void _resolveAxisTypes() {
+    _prepareXAxisStorage();
     if (transposed) {
-      xAxisType = xAxis.type ?? VarietyAxisType.numeric;
+      axisXTypes[0] = xAxis.type ?? VarietyAxisType.numeric;
       yAxisType = yAxis.type ?? VarietyAxisType.category;
       logBase = yAxis.logBase <= 1 ? 10 : yAxis.logBase;
-      return;
-    }
-    if (xAxis.type != null) {
-      xAxisType = xAxis.type!;
     } else {
-      bool allNumeric = true;
-      bool allDateTime = true;
-      for (final VarietySeries item in series) {
-        for (final VarietyChartData point in item.data) {
-          if (point.x is! num) {
-            allNumeric = false;
-          }
-          if (point.x is! DateTime) {
-            allDateTime = false;
-          }
+      axisXTypes[0] = xAxis.type ?? _inferXAxisType(_seriesOnXAxis(0));
+      yAxisType = yAxis.type ?? VarietyAxisType.numeric;
+      logBase = yAxis.logBase <= 1 ? 10 : yAxis.logBase;
+    }
+    for (int i = 1; i < xAxes.length; i++) {
+      // A transposed value axis has no data-driven type to guess from: its
+      // series carry their categories on the vertical edge.
+      axisXTypes[i] = xAxes[i].type ??
+          (transposed
+              ? VarietyAxisType.numeric
+              : _inferXAxisType(_seriesOnXAxis(i)));
+    }
+  }
+
+  /// Gives every horizontal axis a slot in the per-axis state lists.
+  void _prepareXAxisStorage() {
+    for (int i = 0; i < xAxes.length; i++) {
+      axisXTypes.add(VarietyAxisType.numeric);
+      axisCategories.add(<String>[]);
+      axisCategoryValues.add(<dynamic>[]);
+      _axisCategoryKeys.add(<String>[]);
+      axisSlotCenters.add(<double>[]);
+      axisSlotWidths.add(0);
+      axisDateTimeTicks.add(<DateTime>[]);
+      _axisDateTimeLabelFormats.add(null);
+    }
+  }
+
+  /// The indexes of the series plotted against horizontal axis [axisIndex].
+  List<int> _seriesOnXAxis(int axisIndex) => <int>[
+        for (int s = 0; s < series.length; s++)
+          if (seriesXAxis[s] == axisIndex) s,
+      ];
+
+  /// Guesses the type of a horizontal axis from the data its series carry.
+  ///
+  /// Only the series bound to that axis are consulted, so adding a second
+  /// horizontal axis does not change how the first one reads its data.
+  VarietyAxisType _inferXAxisType(List<int> seriesIndexes) {
+    if (seriesIndexes.isEmpty) {
+      return VarietyAxisType.numeric;
+    }
+    bool allNumeric = true;
+    bool allDateTime = true;
+    for (final int s in seriesIndexes) {
+      for (final VarietyChartData point in series[s].data) {
+        if (point.x is! num) {
+          allNumeric = false;
+        }
+        if (point.x is! DateTime) {
+          allDateTime = false;
         }
       }
-      xAxisType = allDateTime && !allNumeric
-          ? VarietyAxisType.dateTime
-          : (allNumeric ? VarietyAxisType.numeric : VarietyAxisType.category);
     }
-    yAxisType = yAxis.type ?? VarietyAxisType.numeric;
-    logBase = yAxis.logBase <= 1 ? 10 : yAxis.logBase;
+    if (allDateTime && !allNumeric) {
+      return VarietyAxisType.dateTime;
+    }
+    return allNumeric ? VarietyAxisType.numeric : VarietyAxisType.category;
   }
 
   void _resolveData() {
@@ -492,8 +619,12 @@ class VarietyCartesianGeometry {
         }
       }
     }
-    _categoryKeys.addAll(order);
-    categories.addAll(categoryValues.map(_categoryCaption));
+    _axisCategoryKeys[0].addAll(order);
+    axisCategories[0].addAll(
+      axisCategoryValues[0].map(
+        (dynamic x) => _categoryCaption(_categoryAxis, x),
+      ),
+    );
     resolvedData = List<List<VarietyChartData>>.generate(
       sourceData.length,
       (int s) => List<VarietyChartData>.generate(
@@ -501,7 +632,7 @@ class VarietyCartesianGeometry {
         (int p) {
           final VarietyChartData point = sourceData[s][p];
           final String key = point.label ?? _categoryKey(point.x);
-          final int index = _categoryKeys.indexOf(key);
+          final int index = _axisCategoryKeys[0].indexOf(key);
           return VarietyChartData(
             point.y ?? 0,
             index < 0 ? p.toDouble() : index.toDouble(),
@@ -694,28 +825,40 @@ class VarietyCartesianGeometry {
     if (transposed) {
       return;
     }
-    if (xAxisType != VarietyAxisType.category &&
-        xAxisType != VarietyAxisType.dateTimeCategory) {
-      return;
-    }
-    final Set<String> seen = <String>{};
-    for (final List<VarietyChartData> points in resolvedData) {
-      for (final VarietyChartData point in points) {
-        final String key = point.label ?? _categoryKey(point.x);
-        if (seen.add(key)) {
-          _categoryKeys.add(key);
-          categoryValues.add(point.x);
+    for (int i = 0; i < xAxes.length; i++) {
+      if (axisXTypes[i] != VarietyAxisType.category &&
+          axisXTypes[i] != VarietyAxisType.dateTimeCategory) {
+        continue;
+      }
+      final Set<String> seen = <String>{};
+      for (final int s in _seriesOnXAxis(i)) {
+        for (final VarietyChartData point in resolvedData[s]) {
+          final String key = point.label ?? _categoryKey(point.x);
+          if (seen.add(key)) {
+            _axisCategoryKeys[i].add(key);
+            axisCategoryValues[i].add(point.x);
+          }
         }
       }
+      // Captions are resolved once every value is known, because the pattern
+      // has to be fine enough to tell them all apart.
+      axisCategories[i].addAll(
+        axisCategoryValues[i].map(
+          (dynamic x) => _categoryCaption(xAxes[i], x),
+        ),
+      );
     }
-    // Captions are resolved once every value is known, because the pattern has
-    // to be fine enough to tell them all apart.
-    categories.addAll(categoryValues.map(_categoryCaption));
   }
 
-  /// The slot index of [point], or -1 when it carries no category.
-  int categoryIndexOf(VarietyChartData point) =>
-      _categoryKeys.indexOf(point.label ?? _categoryKey(point.x));
+  /// The slot index of [point] on horizontal axis [axisIndex], or -1 when it
+  /// carries no category there.
+  int categoryIndexOf(VarietyChartData point, [int axisIndex = 0]) {
+    if (axisIndex < 0 || axisIndex >= _axisCategoryKeys.length) {
+      return -1;
+    }
+    return _axisCategoryKeys[axisIndex]
+        .indexOf(point.label ?? _categoryKey(point.x));
+  }
 
   /// The identity of a category.
   ///
@@ -730,12 +873,12 @@ class VarietyCartesianGeometry {
     return x?.toString() ?? '';
   }
 
-  /// The caption the axis prints for a category value.
-  String _categoryCaption(dynamic x) {
+  /// The caption an axis prints for a category value.
+  String _categoryCaption(VarietyAxis axis, dynamic x) {
     if (x is DateTime) {
       return varietyFormatDateTime(
         x,
-        _categoryAxis.dateFormat ?? _autoCategoryDateFormat(),
+        axis.dateFormat ?? _autoCategoryDateFormat(axis),
       );
     }
     return x?.toString() ?? '';
@@ -746,9 +889,12 @@ class VarietyCartesianGeometry {
   /// A date only pattern prints the same caption for every point of a day,
   /// which reads as if they shared a slot. The ladder walks towards finer
   /// patterns until each category gets a caption of its own.
-  String _autoCategoryDateFormat() {
+  String _autoCategoryDateFormat(VarietyAxis axis) {
+    final int index = xAxes.indexOf(axis);
+    final List<dynamic> values =
+        index < 0 ? categoryValues : axisCategoryValues[index];
     final List<DateTime> times =
-        categoryValues.whereType<DateTime>().toList(growable: false);
+        values.whereType<DateTime>().toList(growable: false);
     if (times.isEmpty) {
       return 'dd MMM';
     }
@@ -772,22 +918,34 @@ class VarietyCartesianGeometry {
   }
 
   void _resolveRanges() {
-    _resolvePrimaryRange();
+    for (int i = 0; i < xAxes.length; i++) {
+      _resolveXRange(i);
+    }
     _resolveSecondaryRange();
   }
 
-  void _resolvePrimaryRange() {
-    switch (xAxisType) {
+  /// Resolves the window, the tick grid and the captions of horizontal axis
+  /// [axisIndex] from the series bound to it.
+  ///
+  /// Only the series bound to the axis contribute, so a series moved onto a
+  /// second horizontal axis stops widening this one — which is the whole
+  /// point of the second axis.
+  void _resolveXRange(int axisIndex) {
+    final VarietyAxis axis = xAxes[axisIndex];
+    final List<int> owners = _seriesOnXAxis(axisIndex);
+    double minimum;
+    double maximum;
+    double interval = 1;
+    switch (axisXTypes[axisIndex]) {
       case VarietyAxisType.category:
       case VarietyAxisType.dateTimeCategory:
-        final int count = math.max(categories.length, 1);
-        xMinimum = 0;
-        xMaximum = count.toDouble();
+        minimum = 0;
+        maximum = math.max(axisCategories[axisIndex].length, 1).toDouble();
       case VarietyAxisType.dateTime:
         double? min;
         double? max;
-        for (final List<VarietyChartData> points in resolvedData) {
-          for (final VarietyChartData point in points) {
+        for (final int s in owners) {
+          for (final VarietyChartData point in resolvedData[s]) {
             if (point.x is! DateTime || point.isEmpty) {
               continue;
             }
@@ -797,18 +955,17 @@ class VarietyCartesianGeometry {
             max = max == null ? ms : math.max(max, ms);
           }
         }
-        xMinimum = xAxis.minimum ?? min ?? 0;
-        xMaximum = xAxis.maximum ?? max ?? xMinimum + 86400000;
-        if (xMaximum - xMinimum < 1) {
-          xMaximum = xMinimum + 86400000;
+        minimum = axis.minimum ?? min ?? 0;
+        maximum = axis.maximum ?? max ?? minimum + 86400000;
+        if (maximum - minimum < 1) {
+          maximum = minimum + 86400000;
         }
-        _buildDateTimeTicks();
       case VarietyAxisType.numeric:
       case VarietyAxisType.logarithmic:
         double? min;
         double? max;
-        for (final List<VarietyChartData> points in resolvedData) {
-          for (final VarietyChartData point in points) {
+        for (final int s in owners) {
+          for (final VarietyChartData point in resolvedData[s]) {
             if (point.x is! num || point.isEmpty) {
               continue;
             }
@@ -817,33 +974,42 @@ class VarietyCartesianGeometry {
             max = max == null ? value : math.max(max, value);
           }
         }
-        double lo = xAxis.minimum ?? min ?? 0;
-        double hi = xAxis.maximum ?? max ?? 1;
-        if (transposed) {
+        double lo = axis.minimum ?? min ?? 0;
+        double hi = axis.maximum ?? max ?? 1;
+        if (transposed && axisIndex == 0) {
           // The primary axis carries the values in a transposed layout, so the
           // bars must start from a zero baseline.
-          if (xAxis.minimum == null) {
+          if (axis.minimum == null) {
             lo = math.min(lo, 0);
           }
-          if (xAxis.maximum == null) {
+          if (axis.maximum == null) {
             hi = math.max(hi, 0);
           }
         }
         if ((hi - lo).abs() < 1e-9) {
           hi = lo + 1;
         }
-        final _NiceRange nice = _niceRange(lo, hi, xAxis.desiredIntervals);
+        final _NiceRange nice = _niceRange(lo, hi, axis.desiredIntervals);
         final (double, double, double) padded =
-            _applyRangePadding(lo, hi, xAxis, nice);
-        xMinimum = xAxis.minimum ?? padded.$1;
-        xMaximum = xAxis.maximum ?? padded.$2;
-        xInterval = xAxis.interval ?? padded.$3;
+            _applyRangePadding(lo, hi, axis, nice);
+        minimum = axis.minimum ?? padded.$1;
+        maximum = axis.maximum ?? padded.$2;
+        interval = axis.interval ?? padded.$3;
     }
-    xTickOrigin = xMinimum;
+    axisXTickOrigins[axisIndex] = minimum;
+    // The zoom window is expressed in the primary axis' units, so it can only
+    // address the primary axis. A second axis keeps its whole range: a window
+    // in someone else's units would mean nothing on its scale.
     final (double, double)? zoom = visibleXRange;
-    if (zoom != null && zoom.$2 > zoom.$1) {
-      xMinimum = zoom.$1;
-      xMaximum = zoom.$2;
+    if (axisIndex == 0 && zoom != null && zoom.$2 > zoom.$1) {
+      minimum = zoom.$1;
+      maximum = zoom.$2;
+    }
+    axisXMinimums[axisIndex] = minimum;
+    axisXMaximums[axisIndex] = maximum;
+    axisXIntervals[axisIndex] = interval;
+    if (axisXTypes[axisIndex] == VarietyAxisType.dateTime) {
+      _buildDateTimeTicks(axisIndex);
     }
   }
 
@@ -1173,25 +1339,30 @@ class VarietyCartesianGeometry {
   // ---------------------------------------------------------------------------
 
   void _buildPositions() {
-    slotWidth = _slotWidth();
-    if (!transposed &&
-        (xAxisType == VarietyAxisType.category ||
-            xAxisType == VarietyAxisType.dateTimeCategory)) {
-      for (int i = 0; i < categories.length; i++) {
-        slotCenters.add(
-          _mirrorPrimary(plotRect.left + slotWidth * (i - xMinimum + 0.5)),
+    for (int i = 0; i < xAxes.length; i++) {
+      axisSlotWidths[i] = _slotWidthFor(i);
+      if (!_slotsOnX || !_isCategoryType(axisXTypes[i])) {
+        continue;
+      }
+      final List<double> centers = axisSlotCenters[i];
+      for (int c = 0; c < axisCategories[i].length; c++) {
+        centers.add(
+          _mirrorXOn(
+            i,
+            plotRect.left + axisSlotWidths[i] * (c - axisXMinimums[i] + 0.5),
+          ),
         );
       }
     }
     for (int s = 0; s < series.length; s++) {
-      final VarietySeries item = series[s];
       final List<VarietyChartData> points = resolvedData[s];
       final List<Offset> positions = <Offset>[];
       final List<Rect?> rects = <Rect?>[];
       for (int p = 0; p < points.length; p++) {
-        // The horizontal pixel always follows the primary axis. Vertically a
-        // transposed layout follows the category index instead of the value.
-        final double x = pixelXFor(item, p, points[p]);
+        // The horizontal pixel follows whichever horizontal axis the series
+        // belongs to. Vertically a transposed layout follows the category index
+        // instead of the value.
+        final double x = pixelXFor(s, p, points[p]);
         final int axisIndex = axisIndexOf(s);
         final double vertical = transposed
             ? pixelY(points[p].y ?? p.toDouble())
@@ -1204,30 +1375,38 @@ class VarietyCartesianGeometry {
     }
   }
 
-  double _slotWidth() {
+  /// Whether an axis type lays its values out in discrete slots.
+  static bool _isCategoryType(VarietyAxisType type) =>
+      type == VarietyAxisType.category ||
+      type == VarietyAxisType.dateTimeCategory;
+
+  double _slotWidthFor(int axisIndex) {
     final double extent = transposed ? plotRect.height : plotRect.width;
-    if (!transposed &&
-        (xAxisType == VarietyAxisType.category ||
-            xAxisType == VarietyAxisType.dateTimeCategory)) {
+    if (_slotsOnX && _isCategoryType(axisXTypes[axisIndex])) {
       // A zoomed-in window shows fewer slots across the same extent, so the
       // divisor is the visible span rather than the full category count.
-      return extent / math.max(xMaximum - xMinimum, 1);
+      return extent /
+          math.max(
+            axisXMaximums[axisIndex] - axisXMinimums[axisIndex],
+            1,
+          );
     }
-    final int count = _slotCount();
+    final int count = _slotCountFor(axisIndex);
     return extent / math.max(count, 1);
   }
 
-  int _slotCount() {
-    if (transposed) {
+  /// A transposed layout carves its slots out of the vertical edge, which every
+  /// horizontal axis shares, so they all count the same slots.
+  int _slotCountFor(int axisIndex) {
+    if (!_slotsOnX) {
       return math.max(categories.length, 1);
     }
-    if (xAxisType == VarietyAxisType.category ||
-        xAxisType == VarietyAxisType.dateTimeCategory) {
-      return math.max(categories.length, 1);
+    if (_isCategoryType(axisXTypes[axisIndex])) {
+      return math.max(axisCategories[axisIndex].length, 1);
     }
     int count = 0;
-    for (final List<VarietyChartData> points in resolvedData) {
-      count = math.max(count, points.length);
+    for (final int s in _seriesOnXAxis(axisIndex)) {
+      count = math.max(count, resolvedData[s].length);
     }
     return math.max(count, 1);
   }
@@ -1283,23 +1462,23 @@ class VarietyCartesianGeometry {
     return 0;
   }
 
-  /// The horizontal pixel of a point.
-  double pixelXFor(VarietySeries item, int pointIndex, VarietyChartData point) {
-    if (xAxisType == VarietyAxisType.category ||
-        xAxisType == VarietyAxisType.dateTimeCategory) {
-      final int index = categoryIndexOf(point);
+  /// The horizontal pixel of a point, against the axis its series belongs to.
+  double pixelXFor(int seriesIndex, int pointIndex, VarietyChartData point) {
+    final int axisIndex = xAxisIndexOf(seriesIndex);
+    if (_isCategoryType(axisXTypes[axisIndex])) {
+      final int index = categoryIndexOf(point, axisIndex);
       final int resolved = index < 0 ? pointIndex : index;
-      return _mirrorPrimary(
-        plotRect.left + slotWidth * (resolved - xMinimum + 0.5),
+      return _mirrorXOn(
+        axisIndex,
+        plotRect.left +
+            axisSlotWidths[axisIndex] *
+                (resolved - axisXMinimums[axisIndex] + 0.5),
       );
     }
-    return _mirrorPrimary(
-      plotRect.left +
-          (numericX(point.x, pointIndex) - xMinimum) / _xSpan * plotRect.width,
-    );
+    return pixelXOn(axisIndex, numericX(point.x, pointIndex));
   }
 
-  /// The numeric position of a point along the primary axis.
+  /// The numeric position of a point along a horizontal axis.
   double numericX(dynamic x, int fallbackIndex) {
     if (x is DateTime) {
       return x.millisecondsSinceEpoch.toDouble();
@@ -1310,9 +1489,24 @@ class VarietyCartesianGeometry {
     return fallbackIndex.toDouble();
   }
 
+  /// Converts a value on horizontal axis [axisIndex] into a pixel.
+  double pixelXOn(int axisIndex, double value) => _mirrorXOn(
+        axisIndex,
+        plotRect.left +
+            (value - axisXMinimums[axisIndex]) /
+                math.max(
+                  axisXMaximums[axisIndex] - axisXMinimums[axisIndex],
+                  1e-9,
+                ) *
+                plotRect.width,
+      );
+
+  /// Mirrors a horizontal pixel when horizontal axis [axisIndex] is inverted.
+  double _mirrorXOn(int axisIndex, double x) =>
+      xAxes[axisIndex].isInversed ? plotRect.left + plotRect.right - x : x;
+
   /// Mirrors a horizontal pixel when the primary axis is inverted.
-  double _mirrorPrimary(double x) =>
-      xAxis.isInversed ? plotRect.left + plotRect.right - x : x;
+  double _mirrorPrimary(double x) => _mirrorXOn(0, x);
 
   /// Mirrors a vertical pixel when the secondary axis is inverted.
   double _mirrorSecondary(double y) =>
@@ -2155,19 +2349,27 @@ class VarietyCartesianGeometry {
     return 0.7;
   }
 
+  static bool _isColumnLike(VarietySeries item) =>
+      item is VarietyColumnSeries ||
+      item is VarietyBarSeries ||
+      item is VarietyRangeColumnSeries;
+
   void _buildColumnLike(int seriesIndex, VarietySeries item) {
     final List<VarietyChartData> points = resolvedData[seriesIndex];
     final List<Rect?> rects = bandRects[seriesIndex];
-    final int bandCount = series
-        .where((VarietySeries s) =>
-            s is VarietyColumnSeries ||
-            s is VarietyBarSeries ||
-            s is VarietyRangeColumnSeries)
-        .length;
-    final double band = slotWidth;
-    final double width = band * _bandFactor(item) / math.max(bandCount, 1);
+    // Bands are shared only by the series that stand on the same slot axis, so
+    // a column on a second horizontal axis carves its slots on its own rather
+    // than being crowded by the first axis' columns.
+    final int slotAxis = _slotAxisIndexOf(seriesIndex);
+    final List<int> band = <int>[
+      for (int s = 0; s < series.length; s++)
+        if (_isColumnLike(series[s]) && _slotAxisIndexOf(s) == slotAxis) s,
+    ];
+    final double slot = axisSlotWidths[xAxisIndexOf(seriesIndex)];
+    final double width = slot * _bandFactor(item) / math.max(band.length, 1);
+    final int slotInBand = math.max(band.indexOf(seriesIndex), 0);
     final double shift =
-        bandCount > 1 ? (seriesIndex - (bandCount - 1) / 2) * width : 0;
+        band.length > 1 ? (slotInBand - (band.length - 1) / 2) * width : 0;
     for (int p = 0; p < points.length; p++) {
       final VarietyChartData point = points[p];
       if (point.isEmpty) {
@@ -2196,9 +2398,10 @@ class VarietyCartesianGeometry {
         bottom = baseValue(seriesIndex, p);
       }
       final int axisIndex = axisIndexOf(seriesIndex);
+      final int valueAxis = xAxisIndexOf(seriesIndex);
       if (transposed) {
-        final double v0 = toPixel(bottom, 0).dx;
-        final double v1 = toPixel(top, 0).dx;
+        final double v0 = pixelXOn(valueAxis, bottom);
+        final double v1 = pixelXOn(valueAxis, top);
         final double animated0 = math.min(v0, v1) +
             (math.max(v0, v1) - math.min(v0, v1)) * progress.clamp(0.0, 1.0);
         top = math.min(v0, v1);
@@ -3056,29 +3259,30 @@ class VarietyCartesianGeometry {
   // Date time ticks
   // ---------------------------------------------------------------------------
 
-  void _buildDateTimeTicks() {
-    if (!_isDateTimePrimary) {
-      return;
-    }
-    final DateTime start =
-        DateTime.fromMillisecondsSinceEpoch(xMinimum.round());
-    final DateTime end = DateTime.fromMillisecondsSinceEpoch(xMaximum.round());
+  void _buildDateTimeTicks(int axisIndex) {
+    final VarietyAxis axis = xAxes[axisIndex];
+    final double minimum = axisXMinimums[axisIndex];
+    final double maximum = axisXMaximums[axisIndex];
+    final List<DateTime> ticks = axisDateTimeTicks[axisIndex];
+    ticks.clear();
+    final DateTime start = DateTime.fromMillisecondsSinceEpoch(minimum.round());
+    final DateTime end = DateTime.fromMillisecondsSinceEpoch(maximum.round());
     final Duration span = end.difference(start);
-    VarietyDateTimeIntervalType type = xAxis.dateTimeIntervalType;
+    VarietyDateTimeIntervalType type = axis.dateTimeIntervalType;
     if (type == VarietyDateTimeIntervalType.auto) {
       type = _autoIntervalType(span);
     }
-    final int step = xAxis.dateTimeInterval != null
-        ? math.max(xAxis.dateTimeInterval!.round(), 1)
+    final int step = axis.dateTimeInterval != null
+        ? math.max(axis.dateTimeInterval!.round(), 1)
         : _autoIntervalStep(span, type);
     DateTime cursor = _floorTo(start, type);
     int guard = 0;
-    while (cursor.millisecondsSinceEpoch <= xMaximum && guard < 500) {
-      dateTimeTicks.add(cursor);
+    while (cursor.millisecondsSinceEpoch <= maximum && guard < 500) {
+      ticks.add(cursor);
       cursor = _advance(cursor, type, step);
       guard++;
     }
-    _resolveDateTimeFormat(type);
+    _resolveDateTimeFormat(axisIndex, type);
   }
 
   /// How many ticks an automatic date time axis aims for.
@@ -3160,23 +3364,25 @@ class VarietyCartesianGeometry {
   /// minute), and a coarse pattern would then print the same caption for
   /// several ticks in a row. The ladder walks towards more complete patterns
   /// and stops at the first one that keeps every caption distinct.
-  void _resolveDateTimeFormat(VarietyDateTimeIntervalType type) {
-    if (xAxis.dateFormat != null || dateTimeTicks.isEmpty) {
+  void _resolveDateTimeFormat(int axisIndex, VarietyDateTimeIntervalType type) {
+    final VarietyAxis axis = xAxes[axisIndex];
+    final List<DateTime> ticks = axisDateTimeTicks[axisIndex];
+    if (axis.dateFormat != null || ticks.isEmpty) {
       return;
     }
     final List<String> ladder = _formatLadder(type);
     for (final String pattern in ladder) {
-      if (_captionsAreUnique(pattern)) {
-        _dateTimeLabelFormat = pattern;
+      if (_captionsAreUnique(ticks, pattern)) {
+        _axisDateTimeLabelFormats[axisIndex] = pattern;
         return;
       }
     }
-    _dateTimeLabelFormat = ladder.last;
+    _axisDateTimeLabelFormats[axisIndex] = ladder.last;
   }
 
-  bool _captionsAreUnique(String pattern) {
+  bool _captionsAreUnique(List<DateTime> ticks, String pattern) {
     final Set<String> seen = <String>{};
-    for (final DateTime tick in dateTimeTicks) {
+    for (final DateTime tick in ticks) {
       if (!seen.add(varietyFormatDateTime(tick, pattern))) {
         return false;
       }
@@ -3283,13 +3489,16 @@ class VarietyCartesianGeometry {
     return ticks;
   }
 
-  /// The minor tick positions of the primary axis, in logical pixels.
-  List<double> get xMinorTickPositions {
-    final int parts = xAxis.minorTicksPerInterval;
+  /// The minor tick positions of the primary horizontal axis, in pixels.
+  List<double> get xMinorTickPositions => xMinorTickPositionsOn(0);
+
+  /// The minor tick positions of horizontal axis [axisIndex], in pixels.
+  List<double> xMinorTickPositionsOn(int axisIndex) {
+    final int parts = xAxes[axisIndex].minorTicksPerInterval;
     if (parts <= 0) {
       return const <double>[];
     }
-    final List<double> majors = _primaryTickPositions();
+    final List<double> majors = xTickPositionsOn(axisIndex);
     if (majors.length < 2) {
       return const <double>[];
     }
@@ -3303,33 +3512,33 @@ class VarietyCartesianGeometry {
     return positions;
   }
 
-  /// The primary axis tick positions, in logical pixels.
-  List<double> _primaryTickPositions() {
-    switch (xAxisType) {
+  /// The tick positions of horizontal axis [axisIndex], in logical pixels.
+  List<double> xTickPositionsOn(int axisIndex) {
+    switch (axisXTypes[axisIndex]) {
       case VarietyAxisType.category:
       case VarietyAxisType.dateTimeCategory:
-        return slotCenters;
+        return axisSlotCenters[axisIndex];
       case VarietyAxisType.dateTime:
-        return dateTimeTicks
+        return axisDateTimeTicks[axisIndex]
             .map(
-              (DateTime tick) => toPixel(
+              (DateTime tick) => pixelXOn(
+                axisIndex,
                 tick.millisecondsSinceEpoch.toDouble(),
-                yMinimum,
-              ).dx,
+              ),
             )
             .toList(growable: false);
       case VarietyAxisType.numeric:
       case VarietyAxisType.logarithmic:
-        return xNumericTicks
-            .map((double value) => toPixel(value, yMinimum).dx)
+        return xNumericTicksOn(axisIndex)
+            .map((double value) => pixelXOn(axisIndex, value))
             .toList(growable: false);
     }
   }
 
-  /// The primary axis tick values on a numeric axis.
+  /// The tick values of horizontal axis [axisIndex] on a numeric axis.
   ///
   /// Honours `VarietyAxis.interval` the way [yTicks] honours it on the secondary
-  /// axis: the ticks are laid on a fixed grid, `xTickOrigin + k * interval`, and
+  /// axis: the ticks are laid on a fixed grid, `origin + k * interval`, and
   /// only then clipped to the visible window. Because the grid is anchored on
   /// the axis origin rather than on the window, zooming and panning leave every
   /// tick on exactly the same value — which is what keeps a tick on the data
@@ -3337,10 +3546,14 @@ class VarietyCartesianGeometry {
   ///
   /// Without an interval the visible span is split into `desiredIntervals` equal
   /// parts, which is what every numeric axis did before.
-  List<double> get xNumericTicks {
-    final double? interval = xAxis.interval;
+  List<double> xNumericTicksOn(int axisIndex) {
+    final VarietyAxis axis = xAxes[axisIndex];
+    final double minimum = axisXMinimums[axisIndex];
+    final double maximum = axisXMaximums[axisIndex];
+    final double origin = axisXTickOrigins[axisIndex];
+    final double? interval = axis.interval;
     if (interval != null && interval > 0) {
-      final double span = xMaximum - xMinimum;
+      final double span = maximum - minimum;
       // Keep the caller's grid exactly, but refine it when the visible window is
       // narrower than a step and a half: zooming in would otherwise leave the
       // axis with no ticks at all. Halving the step (or dropping to 1) keeps
@@ -3352,10 +3565,10 @@ class VarietyCartesianGeometry {
       }
       final List<double> ticks = <double>[];
       const int guard = 2000;
-      final int first = ((xMinimum - xTickOrigin) / step - 1e-9).ceil();
-      double value = xTickOrigin + first * step;
+      final int first = ((minimum - origin) / step - 1e-9).ceil();
+      double value = origin + first * step;
       int count = 0;
-      while (value <= xMaximum + step * 1e-6 && count < guard) {
+      while (value <= maximum + step * 1e-6 && count < guard) {
         ticks.add(value);
         value += step;
         count++;
@@ -3364,13 +3577,16 @@ class VarietyCartesianGeometry {
         return ticks;
       }
     }
-    final double span = xMaximum - xMinimum;
-    final int steps = math.max(xAxis.desiredIntervals, 1);
+    final double span = maximum - minimum;
+    final int steps = math.max(axis.desiredIntervals, 1);
     return List<double>.generate(
       steps + 1,
-      (int i) => xMinimum + span * i / steps,
+      (int i) => minimum + span * i / steps,
     );
   }
+
+  /// The primary horizontal axis tick values on a numeric axis.
+  List<double> get xNumericTicks => xNumericTicksOn(0);
 
   /// The tick values of the given secondary axis.
   List<double> yTicksOn(int axisIndex) {
@@ -3434,13 +3650,34 @@ class VarietyCartesianGeometry {
     return varietyFormatNumber(tick);
   }
 
-  /// The caption for a primary axis tick on a numeric axis.
-  String primaryTickLabel(double value) {
-    if (xAxis.labelFormatter != null) {
-      return xAxis.labelFormatter!(value);
+  /// The caption for a tick on the primary horizontal axis on a numeric axis.
+  String primaryTickLabel(double value) => xTickLabelOn(0, value);
+
+  /// The caption for a tick on horizontal axis [axisIndex].
+  ///
+  /// Category axes print the category caption of the slot the tick sits in;
+  /// every other type hands the value to the axis' formatter.
+  String xTickLabelOn(int axisIndex, double value) {
+    final VarietyAxis axis = xAxes[axisIndex];
+    if (_isCategoryType(axisXTypes[axisIndex])) {
+      final int index = value.round();
+      final List<String> captions = axisCategories[axisIndex];
+      if (index >= 0 && index < captions.length) {
+        return captions[index];
+      }
+      return '';
     }
-    if (xAxis.numberFormat != null) {
-      return varietyFormatPattern(value, xAxis.numberFormat!);
+    if (axisXTypes[axisIndex] == VarietyAxisType.dateTime) {
+      return dateTimeTickLabelOn(
+        axisIndex,
+        DateTime.fromMillisecondsSinceEpoch(value.round()),
+      );
+    }
+    if (axis.labelFormatter != null) {
+      return axis.labelFormatter!(value);
+    }
+    if (axis.numberFormat != null) {
+      return varietyFormatPattern(value, axis.numberFormat!);
     }
     return varietyFormatNumber(value);
   }
@@ -3468,15 +3705,22 @@ class VarietyCartesianGeometry {
     return secondaryTickLabelOn(axisIndexOf(hit.seriesIndex), value);
   }
 
-  /// The caption for a date time tick.
-  String dateTimeTickLabel(DateTime tick) {
-    if (xAxis.labelFormatter != null) {
-      return xAxis.labelFormatter!(tick);
+  /// The caption for a date time tick on the primary horizontal axis.
+  String dateTimeTickLabel(DateTime tick) => dateTimeTickLabelOn(0, tick);
+
+  /// The caption for a date time tick on horizontal axis [axisIndex].
+  String dateTimeTickLabelOn(int axisIndex, DateTime tick) {
+    final VarietyAxis axis = xAxes[axisIndex];
+    if (axis.labelFormatter != null) {
+      return axis.labelFormatter!(tick);
     }
-    final String pattern = xAxis.dateFormat ??
-        _dateTimeLabelFormat ??
+    final String pattern = axis.dateFormat ??
+        _axisDateTimeLabelFormats[axisIndex] ??
         varietyAutoDateFormat(
-          Duration(milliseconds: (xMaximum - xMinimum).round()),
+          Duration(
+            milliseconds:
+                (axisXMaximums[axisIndex] - axisXMinimums[axisIndex]).round(),
+          ),
         );
     return varietyFormatDateTime(tick, pattern);
   }
@@ -3640,56 +3884,48 @@ class VarietyCartesianGeometry {
       }
       return results;
     }
-    if (xAxisType == VarietyAxisType.category ||
-        xAxisType == VarietyAxisType.dateTimeCategory) {
-      if (slotCenters.isEmpty) {
-        return results;
-      }
-      int bestIndex = 0;
-      double bestDistance = double.infinity;
-      for (int i = 0; i < slotCenters.length; i++) {
-        final double distance = (slotCenters[i] - position.dx).abs();
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestIndex = i;
-        }
-      }
-      for (int s = 0; s < series.length; s++) {
-        final VarietySeries item = series[s];
-        if (!item.enableTooltip || !item.enableTrackball) {
-          continue;
-        }
-        for (int p = 0; p < pointPositions[s].length; p++) {
-          if (categoryIndexOf(resolvedData[s][p]) != bestIndex) {
-            continue;
-          }
-          results.add(
-            VarietyHitResult(
-              series: item,
-              seriesIndex: s,
-              point: sourceData[s][p],
-              pointIndex: p,
-              position: Offset(pointPositions[s][p].dx, topPixel(s, p)),
-              band: bandRects[s][p],
-            ),
-          );
-          break;
-        }
-      }
-      return results;
-    }
+    // Each series snaps on its own horizontal axis: a category axis snaps to
+    // the nearest slot, a value axis to the nearest point by pixel. Doing it
+    // per series is what lets a chart mix the two, and on a single-axis chart
+    // it is exactly the old behaviour.
     for (int s = 0; s < series.length; s++) {
       final VarietySeries item = series[s];
-      if (!item.enableTooltip || !item.enableTrackball) {
+      if (!item.enableTooltip ||
+          !item.enableTrackball ||
+          pointPositions[s].isEmpty) {
         continue;
       }
+      final int xAxis = xAxisIndexOf(s);
       int bestIndex = -1;
-      double bestDistance = double.infinity;
-      for (int p = 0; p < pointPositions[s].length; p++) {
-        final double distance = (pointPositions[s][p].dx - position.dx).abs();
-        if (distance < bestDistance) {
-          bestDistance = distance;
+      if (_isCategoryType(axisXTypes[xAxis])) {
+        final List<double> centers = axisSlotCenters[xAxis];
+        if (centers.isEmpty) {
+          continue;
+        }
+        int slot = 0;
+        double slotDistance = double.infinity;
+        for (int i = 0; i < centers.length; i++) {
+          final double distance = (centers[i] - position.dx).abs();
+          if (distance < slotDistance) {
+            slotDistance = distance;
+            slot = i;
+          }
+        }
+        for (int p = 0; p < pointPositions[s].length; p++) {
+          if (categoryIndexOf(resolvedData[s][p], xAxis) != slot) {
+            continue;
+          }
           bestIndex = p;
+          break;
+        }
+      } else {
+        double bestDistance = double.infinity;
+        for (int p = 0; p < pointPositions[s].length; p++) {
+          final double distance = (pointPositions[s][p].dx - position.dx).abs();
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = p;
+          }
         }
       }
       if (bestIndex < 0) {
