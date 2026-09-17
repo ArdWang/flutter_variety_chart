@@ -184,7 +184,7 @@ List<VarietyChartData> accumulationDistribution(List<VarietyChartData> source) {
 class VarietyAdIndicator extends VarietyLineSeries {
   /// Creates an A/D overlay over [source].
   VarietyAdIndicator({
-    required VarietySeries source,
+    required this.source,
     super.name,
     super.color,
     super.strokeWidth,
@@ -192,8 +192,7 @@ class VarietyAdIndicator extends VarietyLineSeries {
     super.dataLabelSettings,
     super.enableTooltip,
     super.legendIconShape,
-  })  : source = source,
-        super(
+  }) : super(
           data: accumulationDistribution(source.data),
           lineStyle: VarietyLineStyle.straight,
         );
@@ -253,7 +252,7 @@ List<VarietyChartData> _rollingValues(
 class VarietySmaIndicator extends VarietyLineSeries {
   /// Creates an SMA overlay over [source].
   VarietySmaIndicator({
-    required VarietySeries source,
+    required this.source,
     this.period = 14,
     super.name,
     super.color,
@@ -262,8 +261,7 @@ class VarietySmaIndicator extends VarietyLineSeries {
     super.dataLabelSettings,
     super.enableTooltip,
     super.legendIconShape,
-  })  : source = source,
-        super(
+  }) : super(
           data: simpleMovingAverage(source.data, period),
           lineStyle: VarietyLineStyle.straight,
         );
@@ -279,7 +277,7 @@ class VarietySmaIndicator extends VarietyLineSeries {
 class VarietyEmaIndicator extends VarietyLineSeries {
   /// Creates an EMA overlay over [source].
   VarietyEmaIndicator({
-    required VarietySeries source,
+    required this.source,
     this.period = 14,
     super.name,
     super.color,
@@ -288,8 +286,7 @@ class VarietyEmaIndicator extends VarietyLineSeries {
     super.dataLabelSettings,
     super.enableTooltip,
     super.legendIconShape,
-  })  : source = source,
-        super(
+  }) : super(
           data: exponentialMovingAverage(source.data, period),
           lineStyle: VarietyLineStyle.straight,
         );
@@ -305,7 +302,7 @@ class VarietyEmaIndicator extends VarietyLineSeries {
 class VarietyWmaIndicator extends VarietyLineSeries {
   /// Creates a WMA overlay over [source].
   VarietyWmaIndicator({
-    required VarietySeries source,
+    required this.source,
     this.period = 14,
     super.name,
     super.color,
@@ -314,8 +311,7 @@ class VarietyWmaIndicator extends VarietyLineSeries {
     super.dataLabelSettings,
     super.enableTooltip,
     super.legendIconShape,
-  })  : source = source,
-        super(
+  }) : super(
           data: weightedMovingAverage(source.data, period),
           lineStyle: VarietyLineStyle.straight,
         );
@@ -331,7 +327,7 @@ class VarietyWmaIndicator extends VarietyLineSeries {
 class VarietyTmaIndicator extends VarietyLineSeries {
   /// Creates a TMA overlay over [source].
   VarietyTmaIndicator({
-    required VarietySeries source,
+    required this.source,
     this.period = 14,
     super.name,
     super.color,
@@ -340,8 +336,7 @@ class VarietyTmaIndicator extends VarietyLineSeries {
     super.dataLabelSettings,
     super.enableTooltip,
     super.legendIconShape,
-  })  : source = source,
-        super(
+  }) : super(
           data: triangularMovingAverage(source.data, period),
           lineStyle: VarietyLineStyle.straight,
         );
@@ -357,7 +352,7 @@ class VarietyTmaIndicator extends VarietyLineSeries {
 class VarietyRsiIndicator extends VarietyLineSeries {
   /// Creates an RSI overlay over [source].
   VarietyRsiIndicator({
-    required VarietySeries source,
+    required this.source,
     this.period = 14,
     super.name,
     super.color,
@@ -366,8 +361,7 @@ class VarietyRsiIndicator extends VarietyLineSeries {
     super.dataLabelSettings,
     super.enableTooltip,
     super.legendIconShape,
-  })  : source = source,
-        super(
+  }) : super(
           data: relativeStrengthIndex(source.data, period),
           lineStyle: VarietyLineStyle.straight,
         );
@@ -383,7 +377,7 @@ class VarietyRsiIndicator extends VarietyLineSeries {
 class VarietyAtrIndicator extends VarietyLineSeries {
   /// Creates an ATR overlay over [source].
   VarietyAtrIndicator({
-    required VarietySeries source,
+    required this.source,
     this.period = 14,
     super.name,
     super.color,
@@ -392,8 +386,7 @@ class VarietyAtrIndicator extends VarietyLineSeries {
     super.dataLabelSettings,
     super.enableTooltip,
     super.legendIconShape,
-  })  : source = source,
-        super(
+  }) : super(
           data: averageTrueRange(source.data, period),
           lineStyle: VarietyLineStyle.straight,
         );
@@ -409,7 +402,7 @@ class VarietyAtrIndicator extends VarietyLineSeries {
 class VarietyMomentumIndicator extends VarietyLineSeries {
   /// Creates a momentum overlay over [source].
   VarietyMomentumIndicator({
-    required VarietySeries source,
+    required this.source,
     this.period = 10,
     super.name,
     super.color,
@@ -418,8 +411,7 @@ class VarietyMomentumIndicator extends VarietyLineSeries {
     super.dataLabelSettings,
     super.enableTooltip,
     super.legendIconShape,
-  })  : source = source,
-        super(
+  }) : super(
           data: momentum(source.data, period),
           lineStyle: VarietyLineStyle.straight,
         );
@@ -435,7 +427,7 @@ class VarietyMomentumIndicator extends VarietyLineSeries {
 class VarietyRocIndicator extends VarietyLineSeries {
   /// Creates a ROC overlay over [source].
   VarietyRocIndicator({
-    required VarietySeries source,
+    required this.source,
     this.period = 10,
     super.name,
     super.color,
@@ -444,8 +436,7 @@ class VarietyRocIndicator extends VarietyLineSeries {
     super.dataLabelSettings,
     super.enableTooltip,
     super.legendIconShape,
-  })  : source = source,
-        super(
+  }) : super(
           data: rateOfChange(source.data, period),
           lineStyle: VarietyLineStyle.straight,
         );
