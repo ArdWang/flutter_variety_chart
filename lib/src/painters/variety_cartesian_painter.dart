@@ -446,6 +446,47 @@ class VarietyCartesianPainter extends CustomPainter {
     );
   }
 
+  /// The y the x axis line sits on.
+  ///
+  /// `VarietyAxis.crossesAt` on the y axis moves the line to that reading on
+  /// the y scale, which is how a chart runs its x axis through zero without
+  /// giving up the baseline. Otherwise the line stays on the plot edge that
+  /// `opposedPosition` picks. A crossing outside the visible range is clamped
+  /// to the edge, so the captions never leave the drawing area.
+  double _xAxisLineY() {
+    final double? at = geometry.yAxis.crossesAt;
+    if (at != null) {
+      return geometry
+          .pixelY(at)
+          .clamp(geometry.plotRect.top, geometry.plotRect.bottom);
+    }
+    return geometry.xAxis.opposedPosition
+        ? geometry.plotRect.top
+        : geometry.plotRect.bottom;
+  }
+
+  /// The x the y axis line sits on, the mirror of [_xAxisLineY].
+  double _yAxisLineX() {
+    final double? at = geometry.xAxis.crossesAt;
+    if (at != null) {
+      return geometry
+          .toPixel(at, geometry.yMinimum)
+          .dx
+          .clamp(geometry.plotRect.left, geometry.plotRect.right);
+    }
+    return geometry.yAxis.opposedPosition
+        ? geometry.plotRect.right
+        : geometry.plotRect.left;
+  }
+
+  /// Whether a vertical axis line sits on the right of the plot area. Its
+  /// captions go on the side it is on, which is what puts them off the plot.
+  bool _axisLineOnRight(double axisX) => axisX >= geometry.plotRect.center.dx;
+
+  /// Whether a horizontal axis line sits at the bottom of the plot area, and
+  /// so carries its captions below it.
+  bool _axisLineBelow(double axisY) => axisY >= geometry.plotRect.center.dy;
+
   void _paintChartFrame(Canvas canvas, Size size) {
     final Color? stroke = borderColor;
     if (borderWidth <= 0 || stroke == null) {
@@ -599,9 +640,7 @@ class VarietyCartesianPainter extends CustomPainter {
 
   void _paintAxisLines(Canvas canvas) {
     if (geometry.yAxis.visible && geometry.yAxis.showAxisLine) {
-      final double x = geometry.yAxis.opposedPosition
-          ? geometry.plotRect.right
-          : geometry.plotRect.left;
+      final double x = _yAxisLineX();
       canvas.drawLine(
         Offset(x, geometry.plotRect.top),
         Offset(x, geometry.plotRect.bottom),
@@ -613,9 +652,7 @@ class VarietyCartesianPainter extends CustomPainter {
       );
     }
     if (geometry.xAxis.visible && geometry.xAxis.showAxisLine) {
-      final double y = geometry.xAxis.opposedPosition
-          ? geometry.plotRect.top
-          : geometry.plotRect.bottom;
+      final double y = _xAxisLineY();
       canvas.drawLine(
         Offset(geometry.plotRect.left, y),
         Offset(geometry.plotRect.right, y),
@@ -737,9 +774,8 @@ class VarietyCartesianPainter extends CustomPainter {
     }
     final TextStyle style =
         axis.labelStyle ?? TextStyle(fontSize: 11, color: theme.labelColor);
-    final bool opposed = axis.opposedPosition;
-    final double axisX =
-        opposed ? geometry.plotRect.right : geometry.plotRect.left;
+    final double axisX = _yAxisLineX();
+    final bool opposed = _axisLineOnRight(axisX);
     final Offset outward = Offset(opposed ? 1 : -1, 0);
     for (final double tick in geometry.yTicks) {
       final double y = geometry.pixelY(tick);
@@ -859,14 +895,13 @@ class VarietyCartesianPainter extends CustomPainter {
     if (ticks.isEmpty) {
       return;
     }
-    // The marks sit on the axis line itself, which is the plot area edge, and
-    // they are painted before the captions so a thinned or dropped caption
-    // cannot take a mark with it.
+    // The marks sit on the axis line itself, which is the plot area edge
+    // unless the y axis crosses it somewhere else, and they are painted before
+    // the captions so a thinned or dropped caption cannot take a mark with it.
+    final double axisLineY = _xAxisLineY();
+    final bool below = _axisLineBelow(axisLineY);
     if (axis.showTicks) {
-      final double axisLineY = axis.opposedPosition
-          ? geometry.plotRect.top
-          : geometry.plotRect.bottom;
-      final Offset outward = Offset(0, axis.opposedPosition ? -1 : 1);
+      final Offset outward = Offset(0, below ? 1 : -1);
       for (final _AxisTick tick in ticks) {
         _paintTickMark(canvas, axis, Offset(tick.position, axisLineY), outward);
       }
@@ -924,9 +959,19 @@ class VarietyCartesianPainter extends CustomPainter {
     }
 
     final bool inside = axis.labelPlacement == VarietyLabelPlacement.inside;
-    final double baseY = axis.opposedPosition
-        ? geometry.plotRect.top - axis.labelOffset
-        : geometry.plotRect.bottom + axis.labelOffset;
+    // A line through the middle of the plot cannot have its captions below it
+    // without printing them over the series, so a crossing puts them on
+    // whichever side it is on. Without a crossing the placement is unchanged.
+    final double baseY;
+    if (geometry.yAxis.crossesAt != null) {
+      baseY = below
+          ? axisLineY + axis.labelOffset
+          : axisLineY - axis.labelOffset - _primaryLabelHeight(style);
+    } else {
+      baseY = axis.opposedPosition
+          ? geometry.plotRect.top - axis.labelOffset
+          : geometry.plotRect.bottom + axis.labelOffset;
+    }
     for (int i = 0; i < ticks.length; i++) {
       if (!visible[i]) {
         continue;

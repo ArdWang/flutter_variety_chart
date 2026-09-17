@@ -1,3 +1,22 @@
+## 0.5.12
+
+### The axes can cross where the data says
+
+`VarietyAxis.crossesAt` was declared and never read, so there was no way to run
+the x axis through zero -- the line, its marks and its captions all stayed on
+the bottom edge. A chart of signed data had to keep a baseline it did not mean.
+
+`crossesAt` on an axis now moves the opposite axis line to that reading: the
+line lands on the value, the marks point away from it and the x captions sit on
+whichever side of it they have room on, so a line through the middle of the
+plot does not print its labels over the series. Readings outside the visible
+range clamp to the edge.
+
+An axis that sets no `crossesAt` draws exactly what it drew before, including
+`opposedPosition` handling.
+
+Covered by test/render/variety_axis_crossing_test.dart.
+
 ## 0.5.11
 
 ### Tick marks were half wired and half missing
