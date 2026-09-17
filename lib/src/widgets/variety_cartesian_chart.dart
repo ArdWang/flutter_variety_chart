@@ -229,6 +229,12 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   double _yZoomFactor = 1;
   double _yZoomPosition = 0;
 
+  // The x window auto scrolling seeded, while it is in force. Comparing the
+  // normalised state against it is how the chart tells an untouched auto scroll
+  // window from one the reader has pinched, panned or zoomed by hand.
+  double? _autoScrolledFactor;
+  double? _autoScrolledPosition;
+
   // The full, un-zoomed range of each axis. Zoom gestures are always measured
   // against this, never against the current window, otherwise zooming back out
   // would be clamped to the window the gesture started from.
@@ -253,8 +259,19 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   Offset? _selectionStart;
   Rect? _selectionRect;
 
-  /// Whether either axis currently shows a zoomed window.
-  bool get _hasZoom => _xZoomFactor < 1 || _yZoomFactor < 1;
+  /// Whether the x window is still the one auto scrolling put there.
+  bool get _autoScrollingInForce =>
+      _autoScrolledFactor != null &&
+      _xZoomFactor == _autoScrolledFactor &&
+      _xZoomPosition == _autoScrolledPosition;
+
+  /// Whether either axis currently shows a window the reader asked for.
+  ///
+  /// The auto scrolling window does not count: it is where the chart starts,
+  /// not a zoom, and treating it as one would flip a double tap from zooming
+  /// in to resetting on a chart nobody has touched.
+  bool get _hasZoom =>
+      _yZoomFactor < 1 || (_xZoomFactor < 1 && !_autoScrollingInForce);
 
   List<VarietySeries> get _items {
     final List<VarietySeries> all = widget.series
@@ -674,9 +691,13 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     );
     _baseXMin = base.xMinimum;
     _baseXMax = base.xMaximum;
-    _baseYMin = base.yMinimum;
-    _baseYMax = base.yMaximum;
+    _applyAutoScrolling();
     _zoomX = _windowFor(_baseXMin, _baseXMax, _xZoomPosition, _xZoomFactor);
+    // Each value axis reads its own `anchorRangeToVisiblePoints`, so the window
+    // only has to be handed over for the axis to fit itself to it.
+    final VarietyCartesianGeometry yRange = _yRangeBase(base, plotRect);
+    _baseYMin = yRange.yMinimum;
+    _baseYMax = yRange.yMaximum;
     _zoomY = _windowFor(_baseYMin, _baseYMax, _yZoomPosition, _yZoomFactor);
     final VarietyCartesianGeometry display = VarietyCartesianGeometry(
       series: _items,
@@ -692,6 +713,78 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     );
     _reportRangeChanges(base, display);
     return (base, display);
+  }
+
+  /// Seeds the x window with the span `autoScrollingDelta` keeps visible.
+  ///
+  /// The delta is a span in axis units, which on a category axis means the
+  /// number of points: a delta of 20 keeps the last twenty categories in view,
+  /// and `VarietyAutoScrollingMode.start` keeps the first twenty instead.
+  ///
+  /// It is seeded into the zoom state rather than clamped into the range,
+  /// because the points outside the window still have to be reachable by
+  /// panning. Doing it that way also means a fresh window is seeded whenever a
+  /// point is appended, so the chart keeps showing the newest data.
+  ///
+  /// A window the reader has moved by hand is left alone, so setting the delta
+  /// and then pinching into the data does not fight the gesture.
+  void _applyAutoScrolling() {
+    final double? delta = widget.primaryXAxis.autoScrollingDelta;
+    if (delta == null || delta <= 0) {
+      return;
+    }
+    final double span = _baseXMax - _baseXMin;
+    // Fewer points than the delta shows all of them, which is what the plain
+    // full range already does.
+    if (span <= 0 || delta >= span) {
+      return;
+    }
+    final bool untouched =
+        (_xZoomFactor >= 1 && _xZoomPosition == 0) || _autoScrollingInForce;
+    if (!untouched) {
+      return;
+    }
+    final bool fromStart =
+        widget.primaryXAxis.autoScrollingMode == VarietyAutoScrollingMode.start;
+    final double factor = delta / span;
+    _xZoomFactor = factor;
+    _xZoomPosition = fromStart ? 0 : 1 - factor;
+    _autoScrolledFactor = _xZoomFactor;
+    _autoScrolledPosition = _xZoomPosition;
+  }
+
+  /// The geometry the value axes take their range from.
+  ///
+  /// Normally that is the full-range [base]. While the x window is narrower
+  /// than the data, an axis whose [VarietyAxis.anchorRangeToVisiblePoints] is
+  /// set fits itself to the points inside the window instead, which is what
+  /// makes a value axis rescale as the reader pans along a long series.
+  VarietyCartesianGeometry _yRangeBase(
+    VarietyCartesianGeometry base,
+    Rect plotRect,
+  ) {
+    final (double, double)? window = _zoomX;
+    if (window == null || (window.$1 <= _baseXMin && window.$2 >= _baseXMax)) {
+      return base;
+    }
+    final bool anchored = widget.primaryYAxis.anchorRangeToVisiblePoints ||
+        widget.secondaryYAxes.any(
+          (VarietyAxis axis) => axis.anchorRangeToVisiblePoints,
+        );
+    if (!anchored) {
+      return base;
+    }
+    return VarietyCartesianGeometry(
+      series: _items,
+      xAxis: widget.primaryXAxis,
+      yAxis: widget.primaryYAxis,
+      plotRect: plotRect,
+      progress: _progress,
+      visibleXRange: window,
+      dataLabelResolver: _resolveDataLabel,
+      secondaryYAxes: widget.secondaryYAxes,
+      palette: VarietyChartTheme.of(context).palette,
+    );
   }
 
   EdgeInsets _insetsFor(VarietyCartesianGeometry probe) {

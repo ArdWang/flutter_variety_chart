@@ -445,13 +445,27 @@ class VarietyAxis {
   /// Extra space reserved after the last plot point.
   final double plotOffsetEnd;
 
-  /// Whether the range ignores points that are scrolled out of view.
+  /// Whether a value axis fits itself to the points inside the visible window.
+  ///
+  /// On by default, which is what makes panning into a long series rescale the
+  /// value axis to what is actually on screen. Setting it to `false` keeps the
+  /// range on every point there is, so the value axis holds still while the
+  /// window moves. Only a value axis reads it.
   final bool anchorRangeToVisiblePoints;
 
-  /// The span kept visible when auto scrolling is enabled.
+  /// The span auto scrolling keeps visible, in axis units.
+  ///
+  /// On a category axis one unit is one point, so a delta of `20` keeps the
+  /// last twenty categories in view and the rest reachable by panning. A
+  /// value axis reads the delta in its own units. Fewer points than the delta
+  /// shows all of them, and a window the reader has moved by hand is left
+  /// alone. `null` disables auto scrolling.
   final double? autoScrollingDelta;
 
-  /// How the window slides when auto scrolling is enabled.
+  /// Where the window starts when auto scrolling is enabled.
+  ///
+  /// `end` keeps the newest points in view, `start` the oldest. Defaults to
+  /// [VarietyAutoScrollingMode.end].
   final VarietyAutoScrollingMode? autoScrollingMode;
 
   /// Whether the axis is laid out at all.

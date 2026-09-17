@@ -1,3 +1,33 @@
+## 0.5.13
+
+### Auto scrolling and the anchored value range
+
+Two more axis fields were declared, documented and never read.
+
+Added
+
+* `autoScrollingDelta` and `autoScrollingMode` now keep a window of the axis in
+  view. The delta is a span in axis units, so on a category axis it is the number
+  of points: a delta of 20 keeps the last twenty categories visible and leaves
+  the rest reachable by panning. `VarietyAutoScrollingMode.start` keeps the
+  oldest points instead of the newest, fewer points than the delta shows all of
+  them, and an appended point slides the window along. A window the reader has
+  moved by hand is left alone, so the delta never fights a gesture.
+* `anchorRangeToVisiblePoints` now decides whether a value axis fits itself to
+  the points inside the visible window. It is on by default, which is what makes
+  panning into a long series rescale the value axis to what is on screen.
+
+Changed
+
+* **Zooming one axis can now rescale another.** With the default
+  `anchorRangeToVisiblePoints: true`, narrowing the x window re-fits the value
+  axis to the points left in view, so the reading under the pointer is no longer
+  fixed on the y axis while x zooms. Set `anchorRangeToVisiblePoints: false` on
+  the value axis for the previous behaviour, where its range covers every point.
+
+Covered by test/widgets/variety_auto_scrolling_test.dart and the
+`anchorRangeToVisiblePoints` pair in test/widgets/variety_pinch_zoom_test.dart.
+
 ## 0.5.12
 
 ### The axes can cross where the data says

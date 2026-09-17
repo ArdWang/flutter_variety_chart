@@ -847,6 +847,25 @@ class VarietyCartesianGeometry {
     }
   }
 
+  /// Whether a point counts towards the range [yAxis]'s scale is built from.
+  ///
+  /// A value axis that anchors to the visible points takes its range from the
+  /// points inside [visibleXRange] alone, which is what makes panning into a
+  /// long series rescale the y axis to what is actually on screen. Turning
+  /// [VarietyAxis.anchorRangeToVisiblePoints] off keeps the range on every
+  /// point there is, so the y axis holds still while the x window moves.
+  bool _countsTowardsRange(VarietyAxis yAxis, int seriesIndex, int index) {
+    if (!yAxis.anchorRangeToVisiblePoints) {
+      return true;
+    }
+    final (double, double)? window = visibleXRange;
+    if (window == null) {
+      return true;
+    }
+    final double x = numericX(resolvedData[seriesIndex][index].x, index);
+    return x >= window.$1 && x <= window.$2;
+  }
+
   void _resolveSecondaryRange() {
     axisMinimums[0] = yMinimum;
     axisMaximums[0] = yMaximum;
@@ -891,8 +910,9 @@ class VarietyCartesianGeometry {
       if (item.isStacked) {
         continue;
       }
-      for (final VarietyChartData point in resolvedData[s]) {
-        if (point.isEmpty) {
+      for (int p = 0; p < resolvedData[s].length; p++) {
+        final VarietyChartData point = resolvedData[s][p];
+        if (point.isEmpty || !_countsTowardsRange(yAxis, s, p)) {
           continue;
         }
         final (double, double) bounds = _pointBounds(item, point);
@@ -966,8 +986,9 @@ class VarietyCartesianGeometry {
         if (axisIndexOf(s) != axisIndex) {
           continue;
         }
-        for (final VarietyChartData point in resolvedData[s]) {
-          if (point.isEmpty) {
+        for (int p = 0; p < resolvedData[s].length; p++) {
+          final VarietyChartData point = resolvedData[s][p];
+          if (point.isEmpty || !_countsTowardsRange(axis, s, p)) {
             continue;
           }
           final (double, double) bounds = _pointBounds(series[s], point);
@@ -1072,6 +1093,10 @@ class VarietyCartesianGeometry {
       }
       for (int p = 0; p < resolvedData[s].length; p++) {
         final double value = valueAt(s, p);
+        final VarietyChartData point = resolvedData[s][p];
+        if (point.isEmpty || !_countsTowardsRange(yAxis, s, p)) {
+          continue;
+        }
         final (double, double) current = totals[p] ?? (0, 0);
         const double positive = 0;
         final double up = current.$1 + math.max(value, positive);

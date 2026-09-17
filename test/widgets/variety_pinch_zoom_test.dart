@@ -83,10 +83,12 @@ Future<void> pumpChart(
   VarietyZoomMode mode = VarietyZoomMode.pinch,
   VarietyZoomAxisMode axisMode = VarietyZoomAxisMode.xy,
   List<VarietySeries> series = const <VarietySeries>[],
+  VarietyAxis? yAxis,
 }) async {
   await tester.pumpWidget(
     host(
       VarietyCartesianChart(
+        primaryYAxis: yAxis ?? const VarietyAxis(type: VarietyAxisType.numeric),
         zoomPanBehavior: VarietyZoomPanBehavior(
           mode: mode,
           axisMode: axisMode,
@@ -122,9 +124,16 @@ void main() {
     expect(after.slotWidth, greaterThan(slotWidthBefore * 1.5));
   });
 
-  testWidgets('pinch leaves the Y axis alone when only the X axis is zoomed',
+  testWidgets('pinch leaves the Y axis alone when it does not anchor',
       (WidgetTester tester) async {
-    await pumpChart(tester, axisMode: VarietyZoomAxisMode.x);
+    await pumpChart(
+      tester,
+      axisMode: VarietyZoomAxisMode.x,
+      yAxis: const VarietyAxis(
+        type: VarietyAxisType.numeric,
+        anchorRangeToVisiblePoints: false,
+      ),
+    );
     final dynamic before = currentGeometry(tester);
     final double ySpanBefore = before.yMaximum - before.yMinimum;
 
@@ -218,7 +227,7 @@ void main() {
     );
   });
 
-  testWidgets('the wheel pins the value under the pointer on both axes',
+  testWidgets('the wheel pins the value under the pointer on the X axis',
       (WidgetTester tester) async {
     await pumpChart(tester);
     final dynamic before = currentGeometry(tester);
@@ -231,7 +240,6 @@ void main() {
     );
     final Offset global = tester.getTopLeft(chartCanvas()) + local;
     final double xBefore = xValueAt(before, local.dx);
-    final double yBefore = yValueAt(before, local.dy);
 
     await wheel(tester, global, -100);
 
@@ -241,7 +249,25 @@ void main() {
       lessThan(before.xMaximum - before.xMinimum),
     );
     expect(xValueAt(after, local.dx), moreOrLessEquals(xBefore, epsilon: 1e-6));
-    expect(yValueAt(after, local.dy), moreOrLessEquals(yBefore, epsilon: 1e-6));
+    // The y axis is deliberately not pinned: it fits itself to the points still
+    // in view, which is what `anchorRangeToVisiblePoints` asks for, so the value
+    // under the pointer is expected to move when the window narrows.
+  });
+
+  testWidgets('pinch fits the Y axis to the visible points when it anchors',
+      (WidgetTester tester) async {
+    // The default, and the counterpart of the test above: same pinch, but the
+    // y range follows the window instead of holding still.
+    await pumpChart(tester, axisMode: VarietyZoomAxisMode.x);
+    final dynamic before = currentGeometry(tester);
+    final double ySpanBefore = before.yMaximum - before.yMinimum;
+
+    await pinchOut(tester, tester.getCenter(chartCanvas()), 80);
+
+    final dynamic after = currentGeometry(tester);
+    expect(after.xMaximum - after.xMinimum,
+        lessThan(before.xMaximum - before.xMinimum));
+    expect(after.yMaximum - after.yMinimum, isNot(ySpanBefore));
   });
 
   testWidgets('a long press drags out a selection zoom in both mode',
