@@ -238,6 +238,12 @@ abstract class VarietySeries {
 
   /// Whether this series draws a box plot.
   bool get isBoxPlot => false;
+
+  /// The interpolation a curved line uses.
+  ///
+  /// Only the line-like series carry a `splineType` field of their own and
+  /// override this; every other kind ignores it.
+  VarietySplineType get splineType => VarietySplineType.cardinal;
 }
 
 /// A series that connects its points with a stroked path.
@@ -298,6 +304,7 @@ class VarietyLineSeries extends VarietySeries {
   final VarietyLineStyle lineStyle;
 
   /// The interpolation used when [lineStyle] is [VarietyLineStyle.curved].
+  @override
   final VarietySplineType splineType;
 
   /// The stroke thickness in logical pixels.
@@ -383,6 +390,7 @@ class VarietyAreaSeries extends VarietySeries {
   final VarietyLineStyle lineStyle;
 
   /// The interpolation used when [lineStyle] is [VarietyLineStyle.curved].
+  @override
   final VarietySplineType splineType;
 
   /// The stroke thickness of the outline.
@@ -451,6 +459,7 @@ class VarietyRangeAreaSeries extends VarietySeries {
   final VarietyLineStyle lineStyle;
 
   /// The interpolation used when [lineStyle] is [VarietyLineStyle.curved].
+  @override
   final VarietySplineType splineType;
 
   /// The stroke thickness of the outline.
@@ -1556,6 +1565,7 @@ class VarietySplineAreaSeries extends VarietySeries {
   });
 
   /// The interpolation used between points.
+  @override
   final VarietySplineType splineType;
 
   /// The stroke thickness of the outline.
@@ -1688,6 +1698,7 @@ class VarietySplineRangeAreaSeries extends VarietySeries {
   });
 
   /// The interpolation used between points.
+  @override
   final VarietySplineType splineType;
 
   /// The stroke thickness of the outline.

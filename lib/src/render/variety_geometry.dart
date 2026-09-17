@@ -2573,7 +2573,7 @@ class VarietyCartesianGeometry {
       return;
     }
     final Color color = colorFor(item, seriesIndex, 0);
-    final Path path = _joinPath(upper, style);
+    final Path path = _joinPath(upper, style, item.splineType);
     for (int i = lower.length - 1; i >= 0; i--) {
       path.lineTo(lower[i].dx, lower[i].dy);
     }
@@ -2641,7 +2641,7 @@ class VarietyCartesianGeometry {
         baseRun.clear();
         return;
       }
-      final Path path = _joinPath(topRun, style);
+      final Path path = _joinPath(topRun, style, item.splineType);
       for (int i = baseRun.length - 1; i >= 0; i--) {
         path.lineTo(baseRun[i].dx, baseRun[i].dy);
       }
@@ -2730,7 +2730,7 @@ class VarietyCartesianGeometry {
       elements.add(
         VarietyPathElement(
           seriesIndex: seriesIndex,
-          path: _joinPath(run, item.lineStyle),
+          path: _joinPath(run, item.lineStyle, item.splineType),
           strokeColor: color,
           strokeWidth: item.strokeWidth,
           dashPattern: item.dashPattern,
@@ -2802,7 +2802,11 @@ class VarietyCartesianGeometry {
         pixelYOn(axisIndex, topValue(seriesIndex, pointIndex)), axisIndex);
   }
 
-  Path _joinPath(List<Offset> points, VarietyLineStyle style) {
+  Path _joinPath(
+    List<Offset> points,
+    VarietyLineStyle style, [
+    VarietySplineType spline = VarietySplineType.cardinal,
+  ]) {
     final Path path = Path()..moveTo(points.first.dx, points.first.dy);
     if (style == VarietyLineStyle.stepped) {
       for (int i = 1; i < points.length; i++) {
@@ -2821,21 +2825,152 @@ class VarietyCartesianGeometry {
       }
       return path;
     }
+    // The curve is a cubic Hermite run, so the four interpolation kinds differ
+    // only in the tangent they put at each point.
+    final List<Offset> m = _splineTangents(points, spline);
     for (int i = 0; i < points.length - 1; i++) {
-      final Offset p0 = i == 0 ? points[i] : points[i - 1];
       final Offset p1 = points[i];
       final Offset p2 = points[i + 1];
-      final Offset p3 = i + 2 < points.length ? points[i + 2] : p2;
       path.cubicTo(
-        p1.dx + (p2.dx - p0.dx) / 6,
-        p1.dy + (p2.dy - p0.dy) / 6,
-        p2.dx - (p3.dx - p1.dx) / 6,
-        p2.dy - (p3.dy - p1.dy) / 6,
+        p1.dx + m[i].dx / 3,
+        p1.dy + m[i].dy / 3,
+        p2.dx - m[i + 1].dx / 3,
+        p2.dy - m[i + 1].dy / 3,
         p2.dx,
         p2.dy,
       );
     }
     return path;
+  }
+
+  /// The tangent a cubic Hermite run carries at every point.
+  ///
+  /// Each axis is interpolated as its own scalar sequence, which is what makes
+  /// this a parametric spline rather than a function of x.
+  static List<Offset> _splineTangents(
+    List<Offset> points,
+    VarietySplineType type,
+  ) {
+    final List<double> tx = _splineTangents1D(
+      points.map((Offset p) => p.dx).toList(growable: false),
+      type,
+    );
+    final List<double> ty = _splineTangents1D(
+      points.map((Offset p) => p.dy).toList(growable: false),
+      type,
+    );
+    return List<Offset>.generate(
+      points.length,
+      (int i) => Offset(tx[i], ty[i]),
+      growable: false,
+    );
+  }
+
+  /// Tangents for one scalar sequence sampled at a unit parameter step.
+  static List<double> _splineTangents1D(
+    List<double> v,
+    VarietySplineType type,
+  ) {
+    final int n = v.length;
+    final List<double> m = List<double>.filled(n, 0);
+    if (n < 2) {
+      return m;
+    }
+    switch (type) {
+      case VarietySplineType.cardinal:
+        // Catmull-Rom: the tangent is the slope of the neighbouring chord, and
+        // each end mirrors its only neighbour.
+        for (int i = 0; i < n; i++) {
+          final double previous = v[i == 0 ? 0 : i - 1];
+          final double next = v[i == n - 1 ? n - 1 : i + 1];
+          m[i] = (next - previous) / 2;
+        }
+      case VarietySplineType.natural:
+      case VarietySplineType.clamped:
+        // Both solve the same tridiagonal system and differ only in the end
+        // conditions: `clamped` pins a flat tangent at each end, `natural`
+        // sets the second derivative to zero there.
+        final List<double> rhs = List<double>.filled(n, 0);
+        final List<double> lower = List<double>.filled(n, 1);
+        final List<double> diag = List<double>.filled(n, 4);
+        final List<double> upper = List<double>.filled(n, 1);
+        for (int i = 1; i < n - 1; i++) {
+          rhs[i] = 3 * (v[i + 1] - v[i - 1]);
+        }
+        rhs[0] = 3 * (v[1] - v[0]);
+        rhs[n - 1] = 3 * (v[n - 1] - v[n - 2]);
+        if (type == VarietySplineType.clamped) {
+          diag[0] = 1;
+          upper[0] = 0;
+          rhs[0] = 0;
+          diag[n - 1] = 1;
+          lower[n - 1] = 0;
+          rhs[n - 1] = 0;
+        } else {
+          diag[0] = 2;
+          diag[n - 1] = 2;
+        }
+        _solveTridiagonal(lower, diag, upper, rhs, m);
+      case VarietySplineType.monotonic:
+        // Fritsch-Carlson: start from the average chord slope, then pull the
+        // tangents back inside the monotone cone so the curve cannot overshoot
+        // the points it passes through.
+        final List<double> chord =
+            List<double>.generate(n - 1, (int i) => v[i + 1] - v[i]);
+        m[0] = chord[0];
+        m[n - 1] = chord[n - 2];
+        for (int i = 1; i < n - 1; i++) {
+          m[i] = (chord[i - 1] + chord[i]) / 2;
+        }
+        for (int i = 0; i < n - 1; i++) {
+          if (chord[i] == 0) {
+            m[i] = 0;
+            m[i + 1] = 0;
+            continue;
+          }
+          final double a = m[i] / chord[i];
+          final double b = m[i + 1] / chord[i];
+          if (a < 0) {
+            m[i] = 0;
+          }
+          if (b < 0) {
+            m[i + 1] = 0;
+          }
+          final double sum = a * a + b * b;
+          if (sum > 9) {
+            final double scale = 3 / math.sqrt(sum);
+            m[i] = scale * a * chord[i];
+            m[i + 1] = scale * b * chord[i];
+          }
+        }
+    }
+    return m;
+  }
+
+  /// Solves a tridiagonal system, writing the answer into [out].
+  static void _solveTridiagonal(
+    List<double> lower,
+    List<double> diag,
+    List<double> upper,
+    List<double> rhs,
+    List<double> out,
+  ) {
+    final int n = diag.length;
+    final List<double> c = List<double>.filled(n, 0);
+    final List<double> d = List<double>.filled(n, 0);
+    final double first = diag[0] == 0 ? 1 : diag[0];
+    c[0] = upper[0] / first;
+    d[0] = rhs[0] / first;
+    for (int i = 1; i < n; i++) {
+      final double denom = diag[i] - lower[i] * c[i - 1];
+      final double safe = denom == 0 ? 1 : denom;
+      c[i] = upper[i] / safe;
+      d[i] = (rhs[i] - lower[i] * d[i - 1]) / safe;
+    }
+    out[n - 1] = d[n - 1];
+    for (int i = n - 2; i >= 0; i--) {
+      out[i] = d[i] - c[i] * out[i + 1];
+    }
   }
 
   void _addDataLabel(

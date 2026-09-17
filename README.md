@@ -13,7 +13,7 @@ No `intl`, no native plugins, no license keys — just Flutter.
 
 | Area | What is included |
 | --- | --- |
-| Cartesian series | Line (straight / curved / stepped / fast), area, spline area, step area, range area, spline range area, column, range column, bar, scatter, bubble, candle, hi-lo, hi-lo-open-close, waterfall, histogram, box and whisker, error bar |
+| Cartesian series | Line (straight / curved / stepped / fast, with natural / cardinal / clamped / monotonic splines), area, spline area, step area, range area, spline range area, column, range column, bar, scatter, bubble, candle, hi-lo, hi-lo-open-close, waterfall, histogram, box and whisker, error bar |
 | Stacking | `none`, `normal` and `percent100` for column, bar, area and line series |
 | Circular series | Pie, doughnut, radial bar |
 | Special series | Funnel, pyramid |
@@ -76,7 +76,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  flutter_variety_chart: ^0.5.9
+  flutter_variety_chart: ^0.5.10
 ```
 
 Import it:

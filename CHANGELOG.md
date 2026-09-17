@@ -1,3 +1,32 @@
+## 0.5.10
+
+### `splineType` now picks the interpolation
+
+`VarietyLineSeries.splineType` (and the four other line-like series that carry
+one) was declared, documented and then never read: every curved series was
+drawn with the same cardinal spline, so `natural`, `clamped` and `monotonic`
+all produced the identical curve.
+
+A curve is a cubic Hermite run, so the four kinds differ only in the tangent
+carried at each point, and each axis is interpolated as its own scalar
+sequence. That makes the curve a parametric spline rather than a function of
+x, which is what the existing shape already assumed.
+
+* `cardinal` -- Catmull-Rom, the previous behaviour and still the default, so
+  charts that never set the field are unchanged.
+* `natural` -- solves the tridiagonal system with a zero second derivative at
+  each end.
+* `clamped` -- the same system with a flat tangent pinned at each end.
+* `monotonic` -- Fritsch-Carlson, which pulls the tangents back inside the
+  monotone cone so the curve cannot overshoot the points it passes through.
+
+`VarietySeries` gains a `splineType` getter defaulting to `cardinal`, so the
+renderer can ask any series for one; the non-line series ignore it.
+
+Covered by test/render/variety_spline_type_test.dart, which pins the overshoot
+behaviour of `cardinal` against `monotonic` and would have passed trivially
+before, since every kind drew the same path.
+
 ## 0.5.9
 
 ### Tooltip styling reaches the circular and funnel charts
