@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
 import 'variety_enums.dart';
+import 'variety_options.dart';
 
 /// A single data point consumed by every series in this package.
 ///
@@ -149,6 +150,8 @@ class VarietyDataLabelSettings {
     this.borderWidth = 0,
     this.borderRadius = 4,
     this.angle = 0,
+    this.opacity = 1,
+    this.connectorLineSettings,
   });
 
   /// Whether labels are painted at all.
@@ -201,4 +204,55 @@ class VarietyDataLabelSettings {
 
   /// Rotation of the caption about its own centre, in degrees.
   final double angle;
+
+  /// A multiplier applied to the alpha of the caption and its card.
+  final double opacity;
+
+  /// Draws a line from the caption back to its point.
+  ///
+  /// Without one a label pushed clear of a crowded plot loses the point it
+  /// belongs to. Null draws nothing.
+  final VarietyConnectorLineSettings? connectorLineSettings;
+}
+
+/// The line joining a data label to the point it captions.
+///
+/// The line is drawn from the edge of the label nearest the point, so the two
+/// do not overlap however far the label has been pushed away.
+@immutable
+class VarietyConnectorLineSettings {
+  /// Creates connector line settings.
+  const VarietyConnectorLineSettings({
+    this.length = 12,
+    this.width = 1.5,
+    this.color,
+    this.type = VarietyConnectorType.line,
+  });
+
+  /// How long the line is, in logical pixels.
+  final double length;
+
+  /// The thickness of the line.
+  final double width;
+
+  /// The line colour. Falls back to the series colour.
+  final Color? color;
+
+  /// Whether the line is straight or curved.
+  final VarietyConnectorType type;
+
+  /// Returns a copy of these settings with the supplied fields replaced.
+  VarietyConnectorLineSettings copyWith({
+    double? length,
+    double? width,
+    Color? color,
+    VarietyConnectorType? type,
+  }) {
+    return VarietyConnectorLineSettings(
+      length: length ?? this.length,
+      width: width ?? this.width,
+      color: color ?? this.color,
+      type: type ?? this.type,
+    );
+  }
 }

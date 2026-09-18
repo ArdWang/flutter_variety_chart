@@ -110,6 +110,10 @@ class VarietyPlotBand {
     this.labelStyle,
     this.isVisible = true,
     this.repeatEvery,
+    this.associatedAxisStart,
+    this.associatedAxisEnd,
+    this.gradient,
+    this.dashArray = const <double>[],
   });
 
   /// The lower bound of the band.
@@ -136,6 +140,24 @@ class VarietyPlotBand {
   /// When set, the band repeats every `repeatEvery` units across the axis.
   final num? repeatEvery;
 
+  /// Where the band starts on the *opposite* axis.
+  ///
+  /// Set either of these and the band stops spanning the whole plot: a band on
+  /// the value axis is then bounded horizontally, and a band on the category
+  /// axis vertically. Both are read in the opposite axis' own unit, and each
+  /// one defaults to that axis' full extent.
+  final num? associatedAxisStart;
+
+  /// Where the band ends on the opposite axis. See [associatedAxisStart].
+  final num? associatedAxisEnd;
+
+  /// A gradient used instead of [color], which lets a band fade out rather
+  /// than sitting on the plot as a flat block of colour.
+  final Gradient? gradient;
+
+  /// A dash pattern applied to the band's outline. Empty draws no outline.
+  final List<double> dashArray;
+
   /// Returns a copy of this band with the supplied fields replaced.
   VarietyPlotBand copyWith({
     num? start,
@@ -146,6 +168,10 @@ class VarietyPlotBand {
     TextStyle? labelStyle,
     bool? isVisible,
     num? repeatEvery,
+    num? associatedAxisStart,
+    num? associatedAxisEnd,
+    Gradient? gradient,
+    List<double>? dashArray,
   }) {
     return VarietyPlotBand(
       start: start ?? this.start,
@@ -156,6 +182,10 @@ class VarietyPlotBand {
       labelStyle: labelStyle ?? this.labelStyle,
       isVisible: isVisible ?? this.isVisible,
       repeatEvery: repeatEvery ?? this.repeatEvery,
+      associatedAxisStart: associatedAxisStart ?? this.associatedAxisStart,
+      associatedAxisEnd: associatedAxisEnd ?? this.associatedAxisEnd,
+      gradient: gradient ?? this.gradient,
+      dashArray: dashArray ?? this.dashArray,
     );
   }
 }
@@ -263,7 +293,7 @@ class VarietyAxis {
     this.labelStyle,
     this.labelRotation = 0.0,
     this.labelOffset = 8.0,
-    this.labelAlignment = VarietyLabelPosition.auto,
+    this.labelAlignment = VarietyLabelAlignment.center,
     this.labelPlacement = VarietyLabelPlacement.outside,
     this.labelIntersectAction = VarietyLabelIntersectAction.hide,
     this.edgeLabelPlacement = VarietyEdgeLabelPlacement.none,
@@ -296,6 +326,8 @@ class VarietyAxis {
     this.anchorRangeToVisiblePoints = true,
     this.autoScrollingDelta,
     this.autoScrollingMode,
+    this.initialZoomFactor = 1,
+    this.initialZoomPosition = 0,
     this.visible = true,
   });
 
@@ -352,8 +384,14 @@ class VarietyAxis {
   /// The gap between the axis line and its labels.
   final double labelOffset;
 
-  /// Where tick labels are anchored relative to the axis line.
-  final VarietyLabelPosition labelAlignment;
+  /// Where a tick label sits relative to its grid line.
+  ///
+  /// `start` puts the label's leading edge on the line, `end` its trailing
+  /// edge, and `center` straddles it, which is what a chart with room to
+  /// spare wants. The label still moves to the other side of the plot when
+  /// `opposedPosition` or `crossesAt` asks for it; this only decides the
+  /// alignment along the axis.
+  final VarietyLabelAlignment labelAlignment;
 
   /// Whether labels sit inside or outside the plot area.
   final VarietyLabelPlacement labelPlacement;
@@ -468,6 +506,18 @@ class VarietyAxis {
   /// [VarietyAutoScrollingMode.end].
   final VarietyAutoScrollingMode? autoScrollingMode;
 
+  /// The fraction of the full range the axis shows when the chart appears.
+  ///
+  /// `1` means the whole range, which is the un-zoomed default; `0.25` opens
+  /// the chart on the first quarter of the data. The reader can still pan and
+  /// zoom from there, and a double tap resets to the full range.
+  final double initialZoomFactor;
+
+  /// Where the initial window starts, as a fraction of the full range.
+  ///
+  /// `0` puts it at the low end and `1 - initialZoomFactor` at the high end.
+  final double initialZoomPosition;
+
   /// Whether the axis is laid out at all.
   final bool visible;
 
@@ -490,7 +540,7 @@ class VarietyAxis {
     TextStyle? labelStyle,
     double? labelRotation,
     double? labelOffset,
-    VarietyLabelPosition? labelAlignment,
+    VarietyLabelAlignment? labelAlignment,
     VarietyLabelPlacement? labelPlacement,
     VarietyLabelIntersectAction? labelIntersectAction,
     VarietyEdgeLabelPlacement? edgeLabelPlacement,
@@ -523,6 +573,8 @@ class VarietyAxis {
     bool? anchorRangeToVisiblePoints,
     double? autoScrollingDelta,
     VarietyAutoScrollingMode? autoScrollingMode,
+    double? initialZoomFactor,
+    double? initialZoomPosition,
     bool? visible,
   }) {
     return VarietyAxis(
@@ -578,6 +630,8 @@ class VarietyAxis {
           anchorRangeToVisiblePoints ?? this.anchorRangeToVisiblePoints,
       autoScrollingDelta: autoScrollingDelta ?? this.autoScrollingDelta,
       autoScrollingMode: autoScrollingMode ?? this.autoScrollingMode,
+      initialZoomFactor: initialZoomFactor ?? this.initialZoomFactor,
+      initialZoomPosition: initialZoomPosition ?? this.initialZoomPosition,
       visible: visible ?? this.visible,
     );
   }

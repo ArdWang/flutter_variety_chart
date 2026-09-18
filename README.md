@@ -18,15 +18,16 @@ No `intl`, no native plugins, no license keys — just Flutter.
 | Circular series | Pie, doughnut, radial bar |
 | Special series | Funnel, pyramid |
 | Spark charts | `VarietySparkLineChart`, `VarietySparkAreaChart`, `VarietySparkBarChart`, `VarietySparkWinLossChart` with markers, data labels, plot bands, point colour overrides, dash patterns and a trackball |
-| Axes | Multiple Y axes and multiple X axes (`secondaryYAxes` / `secondaryXAxes`, bound from a series through `yAxisName` / `xAxisName`), each resolving its own range, ticks, captions and column slot width; numeric, category, date-time, date-time-category and logarithmic; plot bands, multi-level labels (rectangle / brace / curly bracket), tick marks on both axes (length, thickness, colour, inside or outside), major tick and major grid line style objects, minor ticks and minor grid lines, an axis crossing value (`crossesAt`), auto scrolling (`autoScrollingDelta` / `autoScrollingMode`), value axes that fit themselves to the visible points (`anchorRangeToVisiblePoints`), label intersection handling, the full range padding set (`none`, `normal`, `round`, `extra`, `additional`, `additionalStart`, `additionalEnd`, `roundStart`, `roundEnd`, `auto`), inversion, plot offsets and numeric patterns |
+| Axes | Multiple Y axes and multiple X axes (`secondaryYAxes` / `secondaryXAxes`, bound from a series through `yAxisName` / `xAxisName`), each resolving its own range, ticks, captions and column slot width; numeric, category, date-time, date-time-category and logarithmic; cross-axis plot bands with gradients and dashed outlines, multi-level labels with merging and a configurable row height, tick marks on both axes (length, thickness, colour, inside or outside), major tick and major grid line style objects, minor ticks and minor grid lines (each with its own style), a caption cap (`maximumLabels`), caption alignment (`labelAlignment`), `trim` as a label intersection action, an axis crossing value (`crossesAt`), auto scrolling (`autoScrollingDelta` / `autoScrollingMode`), value axes that fit themselves to the visible points (`anchorRangeToVisiblePoints`), label intersection handling, the full range padding set (`none`, `normal`, `round`, `extra`, `additional`, `additionalStart`, `additionalEnd`, `roundStart`, `roundEnd`, `auto`), an initial zoom window (`initialZoomFactor` / `initialZoomPosition`), inversion, plot offsets, legend placement that resolves itself (`VarietyLegendPosition.auto`) and numeric patterns |
 | Axis value boxes | While a crosshair or trackball is up, the current x is shown on the x axis and the current y on the y axis, styled through `VarietyAxisTooltipSettings` |
-| Interactions | Tooltip with value formatting (the same `VarietyTooltipBehavior` styles the card on the cartesian, circular and funnel charts) (`format`, `decimalPlaces`), a configurable card (fill, border, radius, opacity, elevation, marker dot) and a shared/nearest/float trackball (vertical / horizontal / both guides) with value boxes pinned to the axes; crosshair; point, series and cluster selection with `VarietySelectionController`, multi selection and full selected / unselected styling (colour, border, opacity); pinch zoom, pan, mouse-wheel zoom, double-tap zoom, rubber-band zoom, axis zoom modes |
-| Data labels | Position, pixel offset, per-series colour, card background, border and corner radius, rotation, and zero suppression |
-| Markers | Nine glyphs (circle, square, diamond, triangle, inverted triangle, plus, cross, pentagon, vertical and horizontal strokes) with size, fill and border |
+| Interactions | Tooltip with value formatting (the same `VarietyTooltipBehavior` styles the card on the cartesian, circular and funnel charts) (`format`, `decimalPlaces`), a configurable card (fill, border, radius, opacity, elevation, marker dot) and a shared/nearest/float trackball (vertical / horizontal / both / no guide) with value boxes pinned to the axes; a tooltip that follows the pointer instead of the point (`tooltipPosition`) and a `header` caption; crosshair; point, series and cluster selection with `VarietySelectionController`, multi selection and full selected / unselected styling (colour, border, opacity); pinch zoom, pan, mouse-wheel zoom, double-tap zoom, rubber-band zoom, axis zoom modes, a chart wide colour cycle (`palette`), an optional delay before a hovered tooltip appears (`showDuration`) and an option to defer the repaint of a pinch until the fingers are off (`enableDeferredZooming: false`) |
+| Data labels | Position, pixel offset, per-series colour, card background, border and corner radius, rotation, zero suppression, opacity, connector lines back to the point, and running totals on stacked series |
+| Markers | Nine glyphs (circle, square, diamond, triangle, inverted triangle, plus, cross, pentagon, vertical and horizontal strokes) plus `none` to draw nothing, with size, fill and border |
 | Analysis | Trendlines (linear, exponential, logarithmic, polynomial, power, moving average) and technical indicators (SMA, EMA, WMA, TMA, RSI, ATR, momentum, ROC, Bollinger bands, MACD, stochastic, accumulation / distribution) |
 | Decorations | Text, line, rectangle, ellipse, arrow and image annotations; plot area fill and border; chart frame |
-| Callbacks | `onPointTap`, `onPointHover`, `onLegendTapped`, `onTooltipRender`, `onDataLabelRender`, `onAxisLabelTapped`, `onActualRangeChanged`, `onZoomStart`, `onZoomEnd` |
-| Empty points | `gap`, `zero`, `average` and `drop` modes |
+| Callbacks | `onPointTap`, `onPointHover`, `onLegendTapped`, `onTooltipRender`, `onDataLabelRender`, `onAxisLabelTapped`, `onActualRangeChanged`, `onZoomStart`, `onZooming`, `onZoomEnd`, `onZoomReset`, `onChartTouchInteractionDown` / `Move` / `Up`, `onPlotAreaSwipe` |
+| Export and incremental loading | `toImage({pixelRatio})` on the chart state, plus `onPlotAreaSwipe` / `loadMoreIndicatorBuilder` for an infinite scroll |
+| Empty points | `gap`, `zero`, `average` and `drop` modes, plus `showMarker` to decide whether a substituted reading is marked |
 | Theming | Automatic light/dark adaptation from the ambient `ThemeData`, plus `VarietyChartTheme` / `VarietyChartThemeScope` to restyle grid lines, minor grid, tick marks, axis titles, tick labels, chart title, legend, tooltip, plot area fill and border, crosshair, rubber-band selection, data labels and the series palette in one place |
 
 ### Theming
@@ -76,7 +77,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  flutter_variety_chart: ^0.5.14
+  flutter_variety_chart: ^0.5.15
 ```
 
 Import it:
@@ -390,6 +391,51 @@ grid lines and plot bands. The zoom window does too — pinching zooms the prima
 axis only, because a window expressed in its units means nothing on another
 scale. In a bar chart the layouts transpose, so the horizontal family carries the
 values and a second horizontal axis is a second value axis.
+
+---
+
+## Export, swipe and incremental loading
+
+`toImage` renders the chart through its own repaint boundary, so the picture is
+the chart and nothing that happens to sit behind it:
+
+```dart
+final GlobalKey<VarietyCartesianChartState> key =
+    GlobalKey<VarietyCartesianChartState>();
+
+VarietyCartesianChart(key: key, series: series);
+
+final ui.Image image = await key.currentState!.toImage(pixelRatio: 3);
+```
+
+`onPlotAreaSwipe` reports a pan that ran out of data at one end of the axis, and
+`loadMoreIndicatorBuilder` shows a widget over the bottom of the plot while the
+reader is sitting there. Together they are what a chart that pages its data
+needs:
+
+```dart
+VarietyCartesianChart(
+  series: <VarietySeries>[VarietyLineSeries(data: readings)],
+  primaryXAxis: const VarietyAxis(
+    type: VarietyAxisType.category,
+    initialZoomFactor: 0.25, // open on a window, not the whole range
+  ),
+  zoomPanBehavior: const VarietyZoomPanBehavior(),
+  onPlotAreaSwipe: (VarietySwipeDirection direction) => _fetchMore(direction),
+  loadMoreIndicatorBuilder: (BuildContext context) =>
+      const Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()),
+)
+```
+
+## Upgrading from 0.5.14
+
+Three names changed to match the reference implementation:
+
+| Was | Now |
+| --- | --- |
+| `VarietyAxis.labelAlignment: VarietyLabelPosition.outside` | `VarietyAxis.labelAlignment: VarietyLabelAlignment.start` (a `VarietyLabelPosition` no longer fits this field) |
+| `VarietyTrackballVisibilityMode.always` | `VarietyTrackballVisibilityMode.visible` |
+| `VarietyMultiLevelBorderType.curlyBracket` / `.brace` | `VarietyMultiLevelBorderType.curlyBrace` / `.squareBrace` |
 
 ---
 

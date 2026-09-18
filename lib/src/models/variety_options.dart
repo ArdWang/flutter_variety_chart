@@ -21,6 +21,9 @@ enum VarietyLabelIntersectAction {
   /// Overlapping labels are split onto two lines.
   wrap,
 
+  /// Overlapping labels have their tail clipped away until they fit.
+  trim,
+
   /// Overlapping labels are stacked onto several rows.
   multipleRows,
 }
@@ -71,6 +74,21 @@ enum VarietyEdgeLabelPlacement {
   shift,
 }
 
+/// How a tick label is aligned to the grid line it belongs to.
+///
+/// This is the axis counterpart of the caption alignment used by data labels,
+/// and mirrors `LabelAlignment` in the reference implementation.
+enum VarietyLabelAlignment {
+  /// The label's leading edge sits on the grid line.
+  start,
+
+  /// The label is centred on the grid line.
+  center,
+
+  /// The label's trailing edge sits on the grid line.
+  end,
+}
+
 /// Where tick labels sit relative to the axis line.
 enum VarietyLabelPlacement {
   /// Labels sit on the plot side of the axis.
@@ -96,6 +114,10 @@ enum VarietyAxisBorderType {
 
   /// Only the two axis lines.
   line,
+
+  /// A rectangle with its top and bottom edges left out, so the two value axes
+  /// are joined by a pair of rules running across the plot area.
+  withoutTopAndBottom,
 }
 
 /// How an empty point is rendered.
@@ -141,6 +163,15 @@ enum VarietyLegendIconType {
 
   /// A filled downward triangle.
   invertedTriangle,
+
+  /// A filled five sided polygon.
+  pentagon,
+
+  /// A vertical stroke.
+  verticalLine,
+
+  /// A horizontal stroke.
+  horizontalLine,
 }
 
 /// The direction a legend lays its items out in.
@@ -191,8 +222,11 @@ enum VarietySortingOrder {
   descending,
 }
 
-/// The shape of the guide drawn by a trackball.
+/// The shape of the guide drawn by a trackball or a crosshair.
 enum VarietyTrackballLineType {
+  /// No guide is drawn.
+  none,
+
   /// A vertical guide only.
   vertical,
 
@@ -220,8 +254,9 @@ enum VarietyTrackballDisplayMode {
 
 /// When a trackball appears.
 enum VarietyTrackballVisibilityMode {
-  /// The trackball is always visible.
-  always,
+  /// The trackball marker is drawn for every series, whatever its own
+  /// `markerSettings.isVisible` says.
+  visible,
 
   /// The trackball appears on activation and fades out afterwards.
   auto,
@@ -278,6 +313,20 @@ enum VarietyBoxPlotMode {
   normal,
 }
 
+/// Which side of the point an error whisker extends to.
+///
+/// Mirrors `Direction` in the reference implementation.
+enum VarietyErrorBarDirection {
+  /// Only the positive side is drawn.
+  plus,
+
+  /// Only the negative side is drawn.
+  minus,
+
+  /// Both sides are drawn, which is the symmetric whisker.
+  both,
+}
+
 /// How the error range is derived.
 enum VarietyErrorBarType {
   /// A constant plus/minus amount.
@@ -321,15 +370,21 @@ enum VarietyChartDataLabelAlignment {
 }
 
 /// The bracket drawn around a group of multi-level labels.
+///
+/// The names follow the reference implementation, so `curlyBrace` is the
+/// curly bracket it has always been and `squareBrace` the plain one.
 enum VarietyMultiLevelBorderType {
   /// A rounded rectangle.
   rectangle,
 
-  /// A curly bracket.
-  curlyBracket,
+  /// A bracket with its top and bottom edges left out.
+  withoutTopAndBottom,
 
   /// A square bracket.
-  brace,
+  squareBrace,
+
+  /// A curly bracket.
+  curlyBrace,
 }
 
 /// The area an annotation is positioned against.
@@ -339,6 +394,16 @@ enum VarietyAnnotationRegion {
 
   /// Coordinates are read against the plot area.
   plotArea,
+}
+
+/// Where the tooltip card is anchored while a pointer is over the plot.
+enum VarietyTooltipPosition {
+  /// The card is placed so that it never leaves the chart, flipping to
+  /// whichever side of the point has room for it.
+  auto,
+
+  /// The card follows the pointer itself rather than the data point.
+  pointer,
 }
 
 /// How the entrance animation interpolates.

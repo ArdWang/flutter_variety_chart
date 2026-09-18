@@ -1,4 +1,7 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -84,10 +87,11 @@ class VarietyFunnelChart extends StatefulWidget {
   final ValueChanged<VarietyHitResult?>? onPointTap;
 
   @override
-  State<VarietyFunnelChart> createState() => _VarietyFunnelChartState();
+  State<VarietyFunnelChart> createState() => VarietyFunnelChartState();
 }
 
-class _VarietyFunnelChartState extends State<VarietyFunnelChart>
+/// The state of a [VarietyFunnelChart], which also exposes [toImage].
+class VarietyFunnelChartState extends State<VarietyFunnelChart>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   VarietyHitResult? _hit;
@@ -127,6 +131,32 @@ class _VarietyFunnelChartState extends State<VarietyFunnelChart>
 
   @override
   Widget build(BuildContext context) {
+    // The chart owns a repaint boundary so [toImage] captures the chart and
+    // nothing that happens to sit behind it.
+    return RepaintBoundary(child: _buildContent(context));
+  }
+
+  /// Renders the chart to an image, exactly as it looks right now.
+  ///
+  /// Give the chart a [GlobalKey] typed to this state to reach it:
+  ///
+  /// ```dart
+  /// final GlobalKey<VarietyCartesianChartState> key =
+  ///     GlobalKey<VarietyCartesianChartState>();
+  /// // ...
+  /// final ui.Image image = await key.currentState!.toImage(pixelRatio: 3);
+  /// ```
+  Future<ui.Image> toImage({double pixelRatio = 1.0}) {
+    final RenderObject? object = context.findRenderObject();
+    if (object is! RenderRepaintBoundary) {
+      throw StateError(
+        'The chart has not been laid out yet, so there is nothing to export.',
+      );
+    }
+    return object.toImage(pixelRatio: pixelRatio);
+  }
+
+  Widget _buildContent(BuildContext context) {
     final VarietyChartTheme theme = VarietyChartTheme.of(context);
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
@@ -139,29 +169,46 @@ class _VarietyFunnelChartState extends State<VarietyFunnelChart>
         }
         final bool wantsLegend =
             widget.showLegend && widget.series.name != null;
+        final VarietyLegendPosition legendPosition =
+            VarietyLegend.resolvePosition(
+          widget.legendPosition,
+          Size(constraints.maxWidth, constraints.maxHeight),
+        );
+        final bool legendOnSide =
+            legendPosition == VarietyLegendPosition.left ||
+                legendPosition == VarietyLegendPosition.right;
         final Widget? legend = wantsLegend
             ? VarietyLegend(
                 series: <VarietySeries>[widget.series],
-                position: widget.legendPosition,
+                position: legendPosition,
                 textStyle: widget.legendTextStyle,
                 itemBuilder: widget.legendBuilder,
               )
             : null;
-        if (legend != null &&
-            widget.legendPosition == VarietyLegendPosition.top) {
+        if (legend != null && legendPosition == VarietyLegendPosition.top) {
           column.add(legend);
         }
-        column.add(
-          Expanded(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (BuildContext context, Widget? child) =>
-                  _buildPlot(theme),
-            ),
-          ),
+        final Widget plot = AnimatedBuilder(
+          animation: _controller,
+          builder: (BuildContext context, Widget? child) => _buildPlot(theme),
         );
-        if (legend != null &&
-            widget.legendPosition == VarietyLegendPosition.bottom) {
+        if (legend != null && legendOnSide) {
+          column.add(
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  if (legendPosition == VarietyLegendPosition.left) legend,
+                  Expanded(child: plot),
+                  if (legendPosition == VarietyLegendPosition.right) legend,
+                ],
+              ),
+            ),
+          );
+        } else {
+          column.add(Expanded(child: plot));
+        }
+        if (legend != null && legendPosition == VarietyLegendPosition.bottom) {
           column.add(legend);
         }
         final Widget body = Column(

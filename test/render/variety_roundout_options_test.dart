@@ -110,6 +110,14 @@ void main() {
         final Path path =
             renderer.markerPath(shape, const Offset(100, 100), 10);
         final Rect bounds = path.getBounds();
+        if (shape == VarietyMarkerShape.none) {
+          // `none` is the one shape that is meant to draw nothing at all, so
+          // an empty path is the point of it rather than a bug.
+          expect(bounds.width + bounds.height, 0,
+              reason: '$shape should draw nothing');
+          expect(path.computeMetrics().isEmpty, isTrue);
+          continue;
+        }
         // A stroke-like shape is flat on one axis, so width and height are
         // checked together rather than one at a time.
         expect(bounds.width + bounds.height, greaterThan(0),

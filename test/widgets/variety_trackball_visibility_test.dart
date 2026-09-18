@@ -70,7 +70,7 @@ void main() {
           const VarietyTrackballBehavior(
             activationMode: VarietyActivationMode.tap,
             hideDelay: Duration(seconds: 2),
-            visibilityMode: VarietyTrackballVisibilityMode.always,
+            visibilityMode: VarietyTrackballVisibilityMode.visible,
           ),
         ),
       );

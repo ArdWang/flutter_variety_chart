@@ -1840,6 +1840,13 @@ class VarietyErrorBarSeries extends VarietySeries {
     this.type = VarietyErrorBarType.fixed,
     this.errorValue = 1,
     this.mode = VarietyErrorBarMode.vertical,
+    this.direction = VarietyErrorBarDirection.both,
+    this.verticalErrorValue,
+    this.horizontalErrorValue,
+    this.verticalPositiveErrorValue,
+    this.verticalNegativeErrorValue,
+    this.horizontalPositiveErrorValue,
+    this.horizontalNegativeErrorValue,
     this.strokeWidth = 1.6,
     this.capLength = 8,
     this.showCap = true,
@@ -1849,10 +1856,40 @@ class VarietyErrorBarSeries extends VarietySeries {
   final VarietyErrorBarType type;
 
   /// The magnitude used by the fixed, percentage, deviation and error types.
+  ///
+  /// It applies to whichever direction [mode] selects; [verticalErrorValue]
+  /// and [horizontalErrorValue] override it for one direction each.
   final double errorValue;
 
   /// The direction the whisker extends in.
   final VarietyErrorBarMode mode;
+
+  /// Which side of the point the whisker reaches.
+  ///
+  /// `plus` draws only the upper (or right hand) half, `minus` only the lower
+  /// (or left hand) half, and `both` the symmetric whisker.
+  final VarietyErrorBarDirection direction;
+
+  /// The vertical magnitude, overriding [errorValue] when set.
+  final double? verticalErrorValue;
+
+  /// The horizontal magnitude, overriding [errorValue] when set.
+  final double? horizontalErrorValue;
+
+  /// The vertical magnitude above the point, used when [type] is
+  /// [VarietyErrorBarType.custom].
+  ///
+  /// Falls back to the point's own `secondaryY` when omitted.
+  final double? verticalPositiveErrorValue;
+
+  /// The vertical magnitude below the point for a custom error bar.
+  final double? verticalNegativeErrorValue;
+
+  /// The horizontal magnitude to the right of the point for a custom bar.
+  final double? horizontalPositiveErrorValue;
+
+  /// The horizontal magnitude to the left of the point for a custom bar.
+  final double? horizontalNegativeErrorValue;
 
   /// The stroke thickness of the whisker.
   final double strokeWidth;

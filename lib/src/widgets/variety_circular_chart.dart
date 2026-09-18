@@ -1,4 +1,7 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -84,10 +87,11 @@ class VarietyCircularChart extends StatefulWidget {
   final Widget? center;
 
   @override
-  State<VarietyCircularChart> createState() => _VarietyCircularChartState();
+  State<VarietyCircularChart> createState() => VarietyCircularChartState();
 }
 
-class _VarietyCircularChartState extends State<VarietyCircularChart>
+/// The state of a [VarietyCircularChart], which also exposes [toImage].
+class VarietyCircularChartState extends State<VarietyCircularChart>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   VarietyHitResult? _hit;
@@ -134,6 +138,32 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
 
   @override
   Widget build(BuildContext context) {
+    // The chart owns a repaint boundary so [toImage] captures the chart and
+    // nothing that happens to sit behind it.
+    return RepaintBoundary(child: _buildContent(context));
+  }
+
+  /// Renders the chart to an image, exactly as it looks right now.
+  ///
+  /// Give the chart a [GlobalKey] typed to this state to reach it:
+  ///
+  /// ```dart
+  /// final GlobalKey<VarietyCartesianChartState> key =
+  ///     GlobalKey<VarietyCartesianChartState>();
+  /// // ...
+  /// final ui.Image image = await key.currentState!.toImage(pixelRatio: 3);
+  /// ```
+  Future<ui.Image> toImage({double pixelRatio = 1.0}) {
+    final RenderObject? object = context.findRenderObject();
+    if (object is! RenderRepaintBoundary) {
+      throw StateError(
+        'The chart has not been laid out yet, so there is nothing to export.',
+      );
+    }
+    return object.toImage(pixelRatio: pixelRatio);
+  }
+
+  Widget _buildContent(BuildContext context) {
     final VarietyChartTheme theme = VarietyChartTheme.of(context);
     final List<VarietySeries> items = _circular;
     return LayoutBuilder(
@@ -147,19 +177,23 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
         }
         final bool wantsLegend =
             widget.showLegend && items.any((VarietySeries s) => s.name != null);
+        final VarietyLegendPosition legendPosition =
+            VarietyLegend.resolvePosition(
+          widget.legendPosition,
+          Size(constraints.maxWidth, constraints.maxHeight),
+        );
         final bool legendOnSide =
-            widget.legendPosition == VarietyLegendPosition.left ||
-                widget.legendPosition == VarietyLegendPosition.right;
+            legendPosition == VarietyLegendPosition.left ||
+                legendPosition == VarietyLegendPosition.right;
         final Widget? legend = wantsLegend
             ? VarietyLegend(
                 series: items,
-                position: widget.legendPosition,
+                position: legendPosition,
                 textStyle: widget.legendTextStyle,
                 itemBuilder: widget.legendBuilder,
               )
             : null;
-        if (legend != null &&
-            widget.legendPosition == VarietyLegendPosition.top) {
+        if (legend != null && legendPosition == VarietyLegendPosition.top) {
           column.add(legend);
         }
         final Widget plot = AnimatedBuilder(
@@ -172,11 +206,9 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  if (widget.legendPosition == VarietyLegendPosition.left)
-                    legend,
+                  if (legendPosition == VarietyLegendPosition.left) legend,
                   Expanded(child: plot),
-                  if (widget.legendPosition == VarietyLegendPosition.right)
-                    legend,
+                  if (legendPosition == VarietyLegendPosition.right) legend,
                 ],
               ),
             ),
@@ -184,8 +216,7 @@ class _VarietyCircularChartState extends State<VarietyCircularChart>
         } else {
           column.add(Expanded(child: plot));
         }
-        if (legend != null &&
-            widget.legendPosition == VarietyLegendPosition.bottom) {
+        if (legend != null && legendPosition == VarietyLegendPosition.bottom) {
           column.add(legend);
         }
         final Widget body = Column(

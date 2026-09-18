@@ -165,6 +165,7 @@ class VarietyCartesianGeometry {
     required VarietyAxis yAxis,
     required Rect plotRect,
     required this.progress,
+    this.seriesProgress,
     this.visibleXRange,
     this.visibleYRange,
     this.dataLabelResolver,
@@ -289,6 +290,34 @@ class VarietyCartesianGeometry {
 
   /// The animation progress, from `0` (collapsed) to `1` (fully drawn).
   final double progress;
+
+  /// A per series override for [progress], one entry per series.
+  ///
+  /// The chart widget fills this in so that a series carrying
+  /// `animationDelay` starts later than the ones before it. Indexes past the
+  /// end of the list, and a `null` list, fall back to [progress], which is
+  /// what keeps the single duration behaviour unchanged for every series that
+  /// does not ask for a delay.
+  final List<double>? seriesProgress;
+
+  /// The progress series [seriesIndex] should be drawn at.
+  double progressFor(int seriesIndex) {
+    final List<double>? overrides = seriesProgress;
+    if (overrides == null ||
+        seriesIndex < 0 ||
+        seriesIndex >= overrides.length) {
+      return progress;
+    }
+    return overrides[seriesIndex];
+  }
+
+  /// The series whose elements are being laid out.
+  ///
+  /// Every per series builder runs to completion before the next one starts,
+  /// so the index can be parked here rather than threaded through the dozens
+  /// of helpers that interpolate a y pixel. It is what [animateY] consults, so
+  /// the parked value has to be set before any builder touches a position.
+  int _animatingSeries = 0;
 
   /// An optional zoom window expressed in primary-axis units.
   final (double, double)? visibleXRange;
@@ -600,7 +629,9 @@ class VarietyCartesianGeometry {
   }
 
   void _resolveData() {
-    sourceData = series.map(_computeSeriesData).toList(growable: false);
+    sourceData = <List<VarietyChartData>>[
+      for (int i = 0; i < series.length; i++) _computeSeriesData(series[i], i),
+    ];
     if (transposed) {
       // fall through to the transposition step below
     }
@@ -652,7 +683,10 @@ class VarietyCartesianGeometry {
       series.isNotEmpty &&
       series.every((VarietySeries item) => item is VarietyBarSeries);
 
-  List<VarietyChartData> _computeSeriesData(VarietySeries item) {
+  List<VarietyChartData> _computeSeriesData(
+    VarietySeries item,
+    int seriesIndex,
+  ) {
     List<VarietyChartData> data = item.data;
     if (item is VarietyHistogramSeries) {
       data = _binHistogram(item);
@@ -660,7 +694,7 @@ class VarietyCartesianGeometry {
       data = _accumulateWaterfall(item);
     }
     data = _sorted(data, item.sortingOrder, item.sortFieldValueMapper);
-    return _resolveEmptyPoints(data, item.emptyPointSettings);
+    return _resolveEmptyPoints(data, item.emptyPointSettings, seriesIndex);
   }
 
   /// Sorts a point list according to the requested order.
@@ -700,9 +734,25 @@ class VarietyCartesianGeometry {
   /// `gap` keeps the point flagged so the renderer breaks the line, `zero`
   /// substitutes `0`, `average` interpolates from the closest valid
   /// neighbours and `drop` removes the point together with its neighbours.
+  /// The point indexes of each series whose value was substituted for an
+  /// empty one. A marker is drawn at those only when
+  /// [VarietyEmptyPointSettings.showMarker] asks for one, so an interpolated
+  /// reading never passes itself off as a measurement.
+  final Map<int, Set<int>> _substitutedEmptyPoints = <int, Set<int>>{};
+
+  /// Whether a marker should be drawn for point [p] of [seriesIndex].
+  bool _markerWanted(int seriesIndex, int p) {
+    final Set<int>? substituted = _substitutedEmptyPoints[seriesIndex];
+    if (substituted == null || !substituted.contains(p)) {
+      return true;
+    }
+    return series[seriesIndex].emptyPointSettings.showMarker;
+  }
+
   List<VarietyChartData> _resolveEmptyPoints(
     List<VarietyChartData> data,
     VarietyEmptyPointSettings settings,
+    int seriesIndex,
   ) {
     if (settings.mode == VarietyEmptyPointMode.gap) {
       return data;
@@ -721,6 +771,9 @@ class VarietyCartesianGeometry {
       switch (settings.mode) {
         case VarietyEmptyPointMode.zero:
           result[i] = result[i].withValue(0).copyWith(isEmpty: false);
+          _substitutedEmptyPoints
+              .putIfAbsent(seriesIndex, () => <int>{})
+              .add(i);
         case VarietyEmptyPointMode.average:
           double? before;
           double? after;
@@ -742,9 +795,14 @@ class VarietyCartesianGeometry {
             (null, final double b) => b,
             _ => null,
           };
-          result[i] = filled == null
-              ? result[i]
-              : result[i].withValue(filled).copyWith(isEmpty: false);
+          if (filled == null) {
+            result[i] = result[i];
+          } else {
+            result[i] = result[i].withValue(filled).copyWith(isEmpty: false);
+            _substitutedEmptyPoints
+                .putIfAbsent(seriesIndex, () => <int>{})
+                .add(i);
+          }
         case VarietyEmptyPointMode.drop:
           if (i > 0) {
             result[i - 1] = result[i - 1].copyWith(isEmpty: true);
@@ -1355,6 +1413,7 @@ class VarietyCartesianGeometry {
       }
     }
     for (int s = 0; s < series.length; s++) {
+      _animatingSeries = s;
       final List<VarietyChartData> points = resolvedData[s];
       final List<Offset> positions = <Offset>[];
       final List<Rect?> rects = <Rect?>[];
@@ -1559,12 +1618,17 @@ class VarietyCartesianGeometry {
   }
 
   /// Maps a raw Y pixel into its animated position for the current progress.
+  ///
+  /// The progress is the one belonging to the series being laid out, so a
+  /// series held back by `animationDelay` starts its own rise later without
+  /// the callers having to know anything about it.
   double animateY(double target, [int axisIndex = 0]) {
-    if (progress >= 1) {
+    final double current = progressFor(_animatingSeries);
+    if (current >= 1) {
       return target;
     }
     final double base = baselineYOn(axisIndex);
-    return base + (target - base) * progress.clamp(0.0, 1.0);
+    return base + (target - base) * current.clamp(0.0, 1.0);
   }
 
   /// Converts a data-space pair into a pixel position inside the plot area.
@@ -1587,6 +1651,7 @@ class VarietyCartesianGeometry {
   }
 
   void _buildSeriesElements(int s, VarietySeries item) {
+    _animatingSeries = s;
     if (item is VarietyBoxAndWhiskerSeries) {
       _buildBoxPlot(s, item);
       _buildAttachedErrorBar(s, item);
@@ -1738,7 +1803,9 @@ class VarietyCartesianGeometry {
     }
     final List<VarietyMarker> markers = <VarietyMarker>[];
     for (int p = 0; p < points.length; p++) {
-      if (points[p].isEmpty || points[p].y == null) {
+      if (points[p].isEmpty ||
+          points[p].y == null ||
+          !_markerWanted(seriesIndex, p)) {
         continue;
       }
       markers.add(
@@ -1815,11 +1882,14 @@ class VarietyCartesianGeometry {
     final double standardError =
         values.isEmpty ? 0 : deviation / math.sqrt(values.length.toDouble());
 
-    double magnitudeOf(VarietyChartData point) {
+    /// The symmetric magnitude the configured error type asks for.
+    double magnitudeOf(VarietyChartData point, {required bool vertical}) {
       final double value = point.y ?? 0;
       switch (bar.type) {
         case VarietyErrorBarType.fixed:
-          return bar.errorValue;
+          return vertical
+              ? (bar.verticalErrorValue ?? bar.errorValue)
+              : (bar.horizontalErrorValue ?? bar.errorValue);
         case VarietyErrorBarType.percentage:
           return value.abs() * bar.errorValue / 100;
         case VarietyErrorBarType.standardDeviation:
@@ -1831,6 +1901,32 @@ class VarietyCartesianGeometry {
       }
     }
 
+    /// How far the whisker reaches above (or right of) a point.
+    double plusOf(VarietyChartData point, {required bool vertical}) {
+      if (bar.type == VarietyErrorBarType.custom) {
+        final double? explicit = vertical
+            ? bar.verticalPositiveErrorValue
+            : bar.horizontalPositiveErrorValue;
+        if (explicit != null) {
+          return explicit.abs();
+        }
+      }
+      return magnitudeOf(point, vertical: vertical);
+    }
+
+    /// How far the whisker reaches below (or left of) a point.
+    double minusOf(VarietyChartData point, {required bool vertical}) {
+      if (bar.type == VarietyErrorBarType.custom) {
+        final double? explicit = vertical
+            ? bar.verticalNegativeErrorValue
+            : bar.horizontalNegativeErrorValue;
+        if (explicit != null) {
+          return explicit.abs();
+        }
+      }
+      return magnitudeOf(point, vertical: vertical);
+    }
+
     final Color color = bar.color ?? colorFor(owner, seriesIndex, 0);
     final List<VarietySegment> stems = <VarietySegment>[];
     final List<VarietySegment> caps = <VarietySegment>[];
@@ -1840,56 +1936,70 @@ class VarietyCartesianGeometry {
       }
       final Offset position = pointPositions[seriesIndex][p];
       final double value = points[p].y ?? 0;
-      final double magnitude = magnitudeOf(points[p]);
-      if (magnitude <= 0) {
-        continue;
-      }
+      // `direction` decides which halves exist, so a one sided whisker simply
+      // leaves the other reach at zero.
+      final bool drawsPlus = bar.direction != VarietyErrorBarDirection.minus;
+      final bool drawsMinus = bar.direction != VarietyErrorBarDirection.plus;
       final int axisIndex = axisIndexOf(seriesIndex);
       if (bar.mode == VarietyErrorBarMode.vertical ||
           bar.mode == VarietyErrorBarMode.both) {
-        final double top =
-            animateY(pixelYOn(axisIndex, value + magnitude), axisIndex);
-        final double bottom =
-            animateY(pixelYOn(axisIndex, value - magnitude), axisIndex);
-        stems.add(VarietySegment(
-            Offset(position.dx, top), Offset(position.dx, bottom)));
-        if (bar.showCap) {
-          caps.add(
-            VarietySegment(
-              Offset(position.dx - bar.capLength / 2, top),
-              Offset(position.dx + bar.capLength / 2, top),
-            ),
-          );
-          caps.add(
-            VarietySegment(
-              Offset(position.dx - bar.capLength / 2, bottom),
-              Offset(position.dx + bar.capLength / 2, bottom),
-            ),
-          );
+        final double up = drawsPlus ? plusOf(points[p], vertical: true) : 0;
+        final double down = drawsMinus ? minusOf(points[p], vertical: true) : 0;
+        if (up > 0 || down > 0) {
+          final double top =
+              animateY(pixelYOn(axisIndex, value + up), axisIndex);
+          final double bottom =
+              animateY(pixelYOn(axisIndex, value - down), axisIndex);
+          stems.add(VarietySegment(
+              Offset(position.dx, top), Offset(position.dx, bottom)));
+          if (bar.showCap) {
+            if (up > 0) {
+              caps.add(
+                VarietySegment(
+                  Offset(position.dx - bar.capLength / 2, top),
+                  Offset(position.dx + bar.capLength / 2, top),
+                ),
+              );
+            }
+            if (down > 0) {
+              caps.add(
+                VarietySegment(
+                  Offset(position.dx - bar.capLength / 2, bottom),
+                  Offset(position.dx + bar.capLength / 2, bottom),
+                ),
+              );
+            }
+          }
         }
       }
       if (bar.mode == VarietyErrorBarMode.horizontal ||
           bar.mode == VarietyErrorBarMode.both) {
-        final double dx = _horizontalOffset(value, magnitude);
-        stems.add(
-          VarietySegment(
-            Offset(position.dx - dx, position.dy),
-            Offset(position.dx + dx, position.dy),
-          ),
-        );
-        if (bar.showCap) {
-          caps.add(
+        final double right = drawsPlus ? plusOf(points[p], vertical: false) : 0;
+        final double left =
+            drawsMinus ? minusOf(points[p], vertical: false) : 0;
+        if (right > 0 || left > 0) {
+          final double dxRight =
+              right > 0 ? _horizontalOffset(value, right) : 0;
+          final double dxLeft = left > 0 ? _horizontalOffset(value, left) : 0;
+          stems.add(
             VarietySegment(
-              Offset(position.dx - dx, position.dy - bar.capLength / 2),
-              Offset(position.dx - dx, position.dy + bar.capLength / 2),
+              Offset(position.dx - dxLeft, position.dy),
+              Offset(position.dx + dxRight, position.dy),
             ),
           );
-          caps.add(
-            VarietySegment(
-              Offset(position.dx + dx, position.dy - bar.capLength / 2),
-              Offset(position.dx + dx, position.dy + bar.capLength / 2),
-            ),
-          );
+          if (bar.showCap) {
+            for (final double dx in <double>[
+              if (right > 0) dxRight,
+              if (left > 0) -dxLeft,
+            ]) {
+              caps.add(
+                VarietySegment(
+                  Offset(position.dx + dx, position.dy - bar.capLength / 2),
+                  Offset(position.dx + dx, position.dy + bar.capLength / 2),
+                ),
+              );
+            }
+          }
         }
       }
     }
@@ -2403,7 +2513,8 @@ class VarietyCartesianGeometry {
         final double v0 = pixelXOn(valueAxis, bottom);
         final double v1 = pixelXOn(valueAxis, top);
         final double animated0 = math.min(v0, v1) +
-            (math.max(v0, v1) - math.min(v0, v1)) * progress.clamp(0.0, 1.0);
+            (math.max(v0, v1) - math.min(v0, v1)) *
+                progressFor(seriesIndex).clamp(0.0, 1.0);
         top = math.min(v0, v1);
         bottom = math.max(animated0, math.min(v0, v1));
       } else {
@@ -2623,6 +2734,9 @@ class VarietyCartesianGeometry {
       if (point.isEmpty || point.y == null) {
         continue;
       }
+      if (!_markerWanted(seriesIndex, p)) {
+        continue;
+      }
       markers.add(
         VarietyMarker(pointPositions[seriesIndex][p],
             color: colorFor(item, seriesIndex, p)),
@@ -2673,7 +2787,7 @@ class VarietyCartesianGeometry {
       bubbles.add(
         VarietyBubble(
           pointPositions[seriesIndex][p],
-          radius * progress.clamp(0.0, 1.0),
+          radius * progressFor(seriesIndex).clamp(0.0, 1.0),
           color: colorFor(item, seriesIndex, p),
         ),
       );
@@ -2725,7 +2839,9 @@ class VarietyCartesianGeometry {
           Offset(x - item.tickWidth / 2, close),
           Offset(x + item.tickWidth / 2, close),
         ));
-      } else if (item is VarietyHiLoSeries && item.showMarkers) {
+      } else if (item is VarietyHiLoSeries &&
+          item.showMarkers &&
+          _markerWanted(seriesIndex, p)) {
         markers.add(VarietyMarker(Offset(x, high)));
         markers.add(VarietyMarker(Offset(x, low)));
       }
@@ -2916,7 +3032,9 @@ class VarietyCartesianGeometry {
     }
     final List<VarietyMarker> markers = <VarietyMarker>[];
     for (int p = 0; p < points.length; p++) {
-      if (points[p].isEmpty || points[p].y == null) {
+      if (points[p].isEmpty ||
+          points[p].y == null ||
+          !_markerWanted(seriesIndex, p)) {
         continue;
       }
       final Offset anchor = Offset(
@@ -2983,7 +3101,9 @@ class VarietyCartesianGeometry {
       final Color? override = _markerColorOf(item);
       final List<VarietyMarker> markers = <VarietyMarker>[];
       for (int p = 0; p < points.length; p++) {
-        if (points[p].isEmpty || points[p].y == null) {
+        if (points[p].isEmpty ||
+            points[p].y == null ||
+            !_markerWanted(seriesIndex, p)) {
           continue;
         }
         final Offset anchor = Offset(
@@ -3220,8 +3340,13 @@ class VarietyCartesianGeometry {
     if (!settings.showZeroValue && (point.y ?? 0) == 0) {
       return;
     }
+    // A stacked series can caption the running total instead of its own step,
+    // which is what turns a stack into a set of readable milestones.
+    final double captionValue = settings.showCumulativeTotal && item.isStacked
+        ? topValue(seriesIndex, pointIndex)
+        : (point.y ?? 0);
     String caption =
-        settings.builder?.call(point) ?? varietyFormatNumber(point.y ?? 0);
+        settings.builder?.call(point) ?? varietyFormatNumber(captionValue);
     final String? overridden =
         dataLabelResolver?.call(item, seriesIndex, point, pointIndex, caption);
     if (overridden != null) {
@@ -3248,6 +3373,13 @@ class VarietyCartesianGeometry {
             borderRadius: settings.borderRadius,
             angle: settings.angle,
             shift: settings.offset,
+            opacity: settings.opacity,
+            connectorLength: settings.connectorLineSettings?.length ?? 0,
+            connectorWidth: settings.connectorLineSettings?.width ?? 1.5,
+            connectorColor: settings.connectorLineSettings?.color ??
+                colorFor(item, seriesIndex, pointIndex),
+            connectorType: settings.connectorLineSettings?.type ??
+                VarietyConnectorType.line,
           ),
         ],
         style: settings.textStyle,
@@ -3488,6 +3620,37 @@ class VarietyCartesianGeometry {
     }
     return ticks;
   }
+
+  /// The minor tick values of vertical axis [axisIndex].
+  ///
+  /// Mirrors [yMinorTicks] for the primary axis and works off the resolved
+  /// interval of a secondary one, so an extra value axis draws its own
+  /// subdivision instead of the primary axis' one.
+  List<double> yMinorTicksOn(int axisIndex) {
+    final VarietyAxis axis = yAxes[axisIndex];
+    final int parts = axis.minorTicksPerInterval;
+    final double interval = axisIntervals[axisIndex];
+    if (parts <= 0 || interval <= 0) {
+      return const <double>[];
+    }
+    final List<double> majors = yTicksOn(axisIndex);
+    if (majors.length < 2) {
+      return const <double>[];
+    }
+    final List<double> ticks = <double>[];
+    final double step = interval / (parts + 1);
+    for (int i = 0; i < majors.length - 1; i++) {
+      for (int part = 1; part <= parts; part++) {
+        ticks.add(majors[i] + step * part);
+      }
+    }
+    return ticks;
+  }
+
+  /// The minor tick positions of vertical axis [axisIndex], in pixels.
+  List<double> yMinorTickPositionsOn(int axisIndex) => yMinorTicksOn(axisIndex)
+      .map((double value) => pixelYOn(axisIndex, value))
+      .toList(growable: false);
 
   /// The minor tick positions of the primary horizontal axis, in pixels.
   List<double> get xMinorTickPositions => xMinorTickPositionsOn(0);

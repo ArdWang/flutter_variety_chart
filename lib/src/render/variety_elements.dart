@@ -1,6 +1,7 @@
 import 'package:flutter/painting.dart';
 
 import '../models/variety_enums.dart';
+import '../models/variety_options.dart';
 
 /// Base class for every drawable produced by a chart layout.
 ///
@@ -234,6 +235,11 @@ class VarietyLabelItem {
     this.borderRadius = 4,
     this.angle = 0,
     this.shift = Offset.zero,
+    this.opacity = 1,
+    this.connectorLength = 0,
+    this.connectorWidth = 1.5,
+    this.connectorColor,
+    this.connectorType = VarietyConnectorType.line,
   });
 
   /// The point the caption is anchored to.
@@ -268,6 +274,22 @@ class VarietyLabelItem {
 
   /// An extra translation applied once [position] is resolved.
   final Offset shift;
+
+  /// A multiplier applied to the alpha of the text and its card.
+  final double opacity;
+
+  /// How far a connector line runs from the caption towards the point. Zero
+  /// draws no connector.
+  final double connectorLength;
+
+  /// The thickness of the connector line.
+  final double connectorWidth;
+
+  /// The colour of the connector line. Falls back to the caption colour.
+  final Color? connectorColor;
+
+  /// Whether the connector is straight or curved.
+  final VarietyConnectorType connectorType;
 }
 
 /// A set of text captions that share one style.

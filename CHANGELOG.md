@@ -1,3 +1,107 @@
+## 0.5.15
+
+### The rest of the dead configuration, and the first export hook
+
+An option that is declared, documented and then never read is worse than no
+option at all: the chart silently ignores what the caller asked for. The sweep
+that has been clearing that list now comes back empty — every field it found is
+read by the renderer — and the options this package was missing next to the
+reference implementation are added with them.
+
+Added
+
+* `VarietyAxis.minorTickLines` is drawn at last, with `size`, `width` and
+  `color`, on both axes and on every extra axis. Minor ticks follow
+  `minorTicksPerInterval` exactly as before; only their styling was missing.
+* `VarietyAxis.maximumLabels` caps the captions at that many per 100 logical
+  pixels, which is the reference implementation's rule and its default of three.
+  Captions are dropped on a regular stride, and the two ends are always kept.
+* `VarietyAxis.labelAlignment` places a caption by its leading edge, its centre
+  or its trailing edge.
+* `VarietyMultiLevelLabels.merge` folds neighbouring groups that share a caption
+  and touch into one bracket, and `rowHeight` sets how far a nested row sits
+  below the axis.
+* `VarietyPlotBand.associatedAxisStart` / `associatedAxisEnd` bound a band on the
+  opposite axis, turning a full-height stripe into a rectangle;
+  `VarietyPlotBand.gradient` replaces the flat fill; `dashArray` outlines the
+  band.
+* `VarietyErrorBarSeries.direction` draws a one-sided whisker, and
+  `verticalErrorValue` / `horizontalErrorValue` plus the four per-side
+  magnitudes give each direction its own reach (the per-side ones apply to
+  `VarietyErrorBarType.custom`).
+* `VarietyAxis.initialZoomFactor` / `initialZoomPosition` open the chart on a
+  window rather than the whole range, still pan and zoom-able from there.
+* `VarietyCartesianChart.palette` overrides the colour cycle for one chart.
+* `VarietyCartesianChart.onChartTouchInteractionDown` / `Move` / `Up` report
+  every raw pointer position, whether or not it landed on a series.
+* `VarietyCartesianChart.onPlotAreaSwipe` fires when a pan runs out of data at
+  one end of the axis, and `loadMoreIndicatorBuilder` shows a widget over the
+  bottom of the plot while the reader is sitting at that end — the pair an
+  infinite scroll needs.
+* `toImage({double pixelRatio})` on `VarietyCartesianChartState`,
+  `VarietyCircularChartState` and `VarietyFunnelChartState`, reached through a
+  `GlobalKey` of the state type. Every chart now owns a `RepaintBoundary`, so the
+  export is the chart and nothing behind it.
+* `VarietyZoomPanBehavior.onZooming` reports the window on every frame of a
+  gesture, and `onZoomReset` reports a return to the full range.
+* `VarietyTooltipBehavior.tooltipPosition` pins the card to the point or lets it
+  follow the pointer, and `header` captions it.
+* `VarietyLegendPosition.auto` picks a side from the shape of the chart: taller
+  than wide puts the legend underneath, wider puts it at the right.
+* `VarietyMarkerShape.none` draws no glyph at all, which is how one series in a
+  chart disables markers for itself.
+* `VarietyLegendIconType.pentagon` / `verticalLine` / `horizontalLine`, and a
+  series' own `legendIconType` now wins over the chart wide setting.
+* `VarietyLabelIntersectAction.trim` shortens a caption that would collide
+  instead of dropping it.
+* `VarietyAxisBorderType.withoutTopAndBottom` joins the two value axes with
+  upright rules and leaves the top and bottom edges out.
+* `VarietyTrackballLineType.none` draws no guide, and
+  `VarietyActivationMode.doubleTap` lets a trackball or crosshair claim the
+  double tap when zoom is not using it.
+* `VarietyDataLabelSettings.connectorLineSettings`
+  (a `VarietyConnectorLineSettings` with `length`, `width`, `color` and `type`)
+  draws a line from a caption back to its point, `opacity` fades the caption and
+  its card, and `showCumulativeTotal` captions a stack with its running total.
+* `VarietySeries.selectionColor` colours the highlight of a selected point;
+  `VarietySeries.legendIconType`, `initialSelectedDataIndexes` and
+  `animationDelay` are all consumed now, so a series can pick its own legend
+  glyph, open the chart already selected, and be staggered behind the series
+  before it.
+* `VarietyEmptyPointSettings.showMarker` decides whether a point whose value was
+  substituted for an empty one gets a marker. It defaults to `false`, so an
+  interpolated reading no longer passes itself off as a measurement.
+* `VarietyTooltipBehavior.showDuration` waits that long before a hovered card
+  appears, so a pointer crossing the plot no longer flashes one at every point
+  it passes.
+* `VarietyZoomPanBehavior.enableDeferredZooming: false` keeps the zoom state
+  moving during a pinch but holds the repaint back until the fingers are off,
+  which is what makes pinching a very large data set cheap.
+* New value types: `VarietyLabelAlignment`, `VarietyErrorBarDirection`,
+  `VarietyTooltipPosition`, `VarietySwipeDirection`, `VarietyChartTouchArgs`,
+  `VarietyConnectorLineSettings`.
+
+Changed
+
+* **Breaking.** `VarietyAxis.labelAlignment` is now a `VarietyLabelAlignment`
+  (`start`, `center`, `end`), the axis counterpart of the reference
+  implementation's `LabelAlignment`. It used to be a `VarietyLabelPosition`,
+  which described a different idea. The default is `center`, so nothing moves
+  for a chart that does not set it.
+* **Breaking.** `VarietyTrackballVisibilityMode.always` is now `visible`, the
+  spelling the reference implementation uses.
+* **Breaking.** `VarietyMultiLevelBorderType.curlyBracket` and `brace` are now
+  `curlyBrace` and `squareBrace`, and `withoutTopAndBottom` was added.
+
+Fixed
+
+* A plain pan reported nothing, so `onZoomEnd` never fired after panning. It
+  does now, and a pan that runs out of data reports the end through
+  `onPlotAreaSwipe`.
+* The room reserved for a multi-level label band was hard coded to 22 pixels a
+  row while the painter drew the rows at `rowHeight`. Both now read the same
+  value, which is the same half-wired mistake the tick label style used to have.
+
 ## 0.5.14
 
 ### Multiple horizontal axes

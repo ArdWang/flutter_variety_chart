@@ -23,6 +23,9 @@ class VarietyTooltipBehavior {
     this.canShowMarker = true,
     this.decimalPlaces,
     this.format,
+    this.tooltipPosition = VarietyTooltipPosition.auto,
+    this.animationDuration = const Duration(milliseconds: 150),
+    this.header,
   });
 
   /// Whether the tooltip is shown at all.
@@ -65,6 +68,19 @@ class VarietyTooltipBehavior {
   /// Wraps the captioned value. `{value}` is replaced by the formatted
   /// number, so `'{value} kg'` prints `12 kg`.
   final String? format;
+
+  /// Whether the card is pinned to the data point or follows the pointer.
+  final VarietyTooltipPosition tooltipPosition;
+
+  /// How long the card takes to fade in and out.
+  ///
+  /// Zero shows and hides it in a single frame, which is what a test that
+  /// pumps once and then asserts expects.
+  final Duration animationDuration;
+
+  /// A caption printed above the entries. When `null` the card leads with the
+  /// x value of the slot instead.
+  final String? header;
 }
 
 /// Configures the value box a crosshair or trackball pins to an axis.
@@ -223,7 +239,7 @@ class VarietyTrackballBehavior {
 
   /// When the trackball appears and disappears.
   ///
-  /// `always` keeps it up until the pointer leaves, `hidden` refuses to show
+  /// `visible` keeps it up until the pointer leaves, `hidden` refuses to show
   /// it at all, and `auto` lets it expire after [hideDelay].
   final VarietyTrackballVisibilityMode visibilityMode;
 
@@ -235,7 +251,7 @@ class VarietyTrackballBehavior {
 
   /// Whether the trackball stays on screen after the first activation.
   ///
-  /// The older spelling of [visibilityMode]'s `always`.
+  /// The older spelling of [visibilityMode]'s `visible`.
   final bool shouldAlwaysShow;
 
   /// The value boxes pinned to the axes while the trackball is up.
@@ -312,7 +328,9 @@ class VarietyZoomPanBehavior {
     this.axisMode = VarietyZoomAxisMode.xy,
     this.enableDeferredZooming = true,
     this.onZoomStart,
+    this.onZooming,
     this.onZoomEnd,
+    this.onZoomReset,
   });
 
   /// Whether zooming reacts to input.
@@ -362,8 +380,18 @@ class VarietyZoomPanBehavior {
   /// Called as soon as a zoom gesture starts.
   final void Function(VarietyZoomDetails details)? onZoomStart;
 
+  /// Called on every frame of a zoom gesture, so a readout can follow it.
+  ///
+  /// [onZoomEnd] is the settled value; this one fires while the fingers are
+  /// still moving.
+  final void Function(VarietyZoomDetails details)? onZooming;
+
   /// Called once a zoom gesture settles.
   final void Function(VarietyZoomDetails details)? onZoomEnd;
+
+  /// Called when the window is restored to the full range, by a double tap or
+  /// by [VarietyZoomPanBehavior.enableDoubleTapZooming]'s counterpart.
+  final void Function(VarietyZoomDetails details)? onZoomReset;
 }
 
 /// Configures point and series selection.

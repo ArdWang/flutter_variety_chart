@@ -240,69 +240,126 @@ class VarietyCartesianPainter extends CustomPainter {
   // Background furniture
   // ---------------------------------------------------------------------------
 
+  /// Fills the plot bands of both axes.
+  ///
+  /// A band spans the whole plot unless it names a range on the opposite axis
+  /// through `associatedAxisStart` / `associatedAxisEnd`, which is what turns
+  /// a full height stripe into a rectangle.
   void _paintPlotBands(Canvas canvas) {
     for (final VarietyPlotBand band in geometry.yAxis.plotBands) {
       if (!band.isVisible) {
         continue;
       }
-      final Paint paint = Paint()
-        ..color =
-            (band.color ?? theme.gridLineColor).withValues(alpha: band.opacity);
       final double from = band.start.toDouble();
       final double to = band.end.toDouble();
+      final double span = math.max(to - from, 0);
+      final double left = band.associatedAxisStart == null
+          ? geometry.plotRect.left
+          : _bandX(band.associatedAxisStart!.toDouble());
+      final double right = band.associatedAxisEnd == null
+          ? geometry.plotRect.right
+          : _bandX(band.associatedAxisEnd!.toDouble());
+      final double bandLeft = math.min(left, right);
+      final double bandRight = math.max(left, right);
       final num? repeat = band.repeatEvery;
       if (repeat != null && repeat > 0) {
         for (double value = from;
             value <= geometry.yMaximum;
             value += repeat.toDouble()) {
-          final double top = geometry.pixelY(value + (to - from));
-          final double bottom = geometry.pixelY(value);
-          canvas.drawRect(
+          _paintBand(
+            canvas,
+            band,
             Rect.fromLTRB(
-                geometry.plotRect.left, top, geometry.plotRect.right, bottom),
-            paint,
+              bandLeft,
+              geometry.pixelY(value + span),
+              bandRight,
+              geometry.pixelY(value),
+            ),
           );
         }
         continue;
       }
-      final double top = geometry.pixelY(math.max(from, to));
-      final double bottom = geometry.pixelY(math.min(from, to));
-      canvas.drawRect(
+      _paintBand(
+        canvas,
+        band,
         Rect.fromLTRB(
-            geometry.plotRect.left, top, geometry.plotRect.right, bottom),
-        paint,
+          bandLeft,
+          geometry.pixelY(math.max(from, to)),
+          bandRight,
+          geometry.pixelY(math.min(from, to)),
+        ),
       );
-      if (band.label != null) {
-        final TextPainter painter = _renderer.layoutText(
-          band.label!,
-          band.labelStyle ?? TextStyle(fontSize: 11, color: theme.labelColor),
-        );
-        painter.paint(
-          canvas,
-          Offset(
-            geometry.plotRect.right - painter.width - 6,
-            (top + bottom) / 2 - painter.height / 2,
-          ),
-        );
-      }
     }
     for (final VarietyPlotBand band in geometry.xAxis.plotBands) {
       if (!band.isVisible) {
         continue;
       }
-      final Paint paint = Paint()
-        ..color =
-            (band.color ?? theme.gridLineColor).withValues(alpha: band.opacity);
       final double left = _bandX(band.start.toDouble());
       final double right = _bandX(band.end.toDouble());
-      canvas.drawRect(
+      final double top = band.associatedAxisStart == null
+          ? geometry.plotRect.top
+          : geometry
+              .pixelY(band.associatedAxisStart!.toDouble())
+              .clamp(geometry.plotRect.top, geometry.plotRect.bottom);
+      final double bottom = band.associatedAxisEnd == null
+          ? geometry.plotRect.bottom
+          : geometry
+              .pixelY(band.associatedAxisEnd!.toDouble())
+              .clamp(geometry.plotRect.top, geometry.plotRect.bottom);
+      _paintBand(
+        canvas,
+        band,
         Rect.fromLTRB(
           math.min(left, right),
-          geometry.plotRect.top,
+          math.min(top, bottom),
           math.max(left, right),
-          geometry.plotRect.bottom,
+          math.max(top, bottom),
         ),
-        paint,
+      );
+    }
+  }
+
+  /// Fills one band rectangle and draws its optional outline and caption.
+  ///
+  /// A gradient wins over [VarietyPlotBand.color], and a dash array turns the
+  /// outline on; without one the band is a pure fill.
+  void _paintBand(Canvas canvas, VarietyPlotBand band, Rect rect) {
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+    final Paint fill = Paint()..isAntiAlias = true;
+    final Gradient? gradient = band.gradient;
+    if (gradient != null) {
+      fill.shader = gradient.createShader(rect);
+    } else {
+      fill.color =
+          (band.color ?? theme.gridLineColor).withValues(alpha: band.opacity);
+    }
+    canvas.drawRect(rect, fill);
+    if (band.dashArray.isNotEmpty) {
+      _renderer.dashPath(
+        canvas,
+        Path()..addRect(rect),
+        Paint()
+          ..color = band.color ?? theme.gridLineColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..isAntiAlias = true,
+        band.dashArray,
+      );
+    }
+    final String? label = band.label;
+    if (label != null && label.isNotEmpty) {
+      final TextPainter painter = _renderer.layoutText(
+        label,
+        band.labelStyle ?? TextStyle(fontSize: 11, color: theme.labelColor),
+      );
+      painter.paint(
+        canvas,
+        Offset(
+          rect.right - painter.width - 6,
+          rect.center.dy - painter.height / 2,
+        ),
       );
     }
   }
@@ -405,6 +462,101 @@ class VarietyCartesianPainter extends CustomPainter {
       lines?.width ?? 1,
       lines?.color ?? axis.axisLineColor ?? theme.axisLineColor,
     );
+  }
+
+  /// The length, thickness and colour a minor tick mark is drawn with.
+  ///
+  /// `minorTickLines` is the sibling of `majorTickLines`: both win over the
+  /// plain `tickLength` field, and both fall back to the axis line colour.
+  (double, double, Color) _minorTickStyle(VarietyAxis axis) {
+    final VarietyMinorTickLines? lines = axis.minorTickLines;
+    return (
+      lines?.size ?? 2.5,
+      lines?.width ?? 1,
+      lines?.color ?? axis.axisLineColor ?? theme.axisLineColor,
+    );
+  }
+
+  /// Draws one minor tick mark, the shorter companion of [_paintTickMark].
+  void _paintMinorTickMark(
+    Canvas canvas,
+    VarietyAxis axis,
+    Offset anchor,
+    Offset outward,
+  ) {
+    final (double size, double width, Color color) = _minorTickStyle(axis);
+    if (size <= 0) {
+      return;
+    }
+    canvas.drawLine(
+      anchor,
+      anchor + outward * (size * _tickDirection(axis)),
+      Paint()
+        ..color = color
+        ..strokeWidth = width
+        ..style = PaintingStyle.stroke
+        ..isAntiAlias = true,
+    );
+  }
+
+  /// How far a label of [extent] has to move so that its leading or trailing
+  /// edge lands on the grid line instead of straddling it.
+  ///
+  /// `center` returns zero, which is why the default leaves every existing
+  /// caption exactly where it was.
+  double _labelAlignmentShift(VarietyAxis axis, double extent) {
+    switch (axis.labelAlignment) {
+      case VarietyLabelAlignment.start:
+        return extent / 2;
+      case VarietyLabelAlignment.end:
+        return -extent / 2;
+      case VarietyLabelAlignment.center:
+        return 0;
+    }
+  }
+
+  /// Drops labels until at most [VarietyAxis.maximumLabels] remain per 100
+  /// logical pixels of [extent].
+  ///
+  /// This is the reference implementation's rule, and its default of three
+  /// means a 400 pixel axis prints at most twelve captions. Ticks are only
+  /// dropped once the cap is exceeded, they are dropped on a regular stride so
+  /// the survivors stay evenly spread, and the two ends are always kept so the
+  /// axis never loses its first and last reading.
+  void _capLabelCount(
+    int count,
+    VarietyAxis axis,
+    double extent,
+    List<bool> visible,
+  ) {
+    final List<int> shown = <int>[
+      for (int i = 0; i < count; i++)
+        if (visible[i]) i,
+    ];
+    if (shown.isEmpty) {
+      return;
+    }
+    final int cap = math.max(1, (extent / 100 * axis.maximumLabels).floor());
+    if (shown.length <= cap) {
+      return;
+    }
+    final int step = (shown.length / cap).ceil();
+    final Set<int> keep = <int>{};
+    for (int k = 0; k < shown.length; k += step) {
+      keep.add(shown[k]);
+    }
+    if (!keep.contains(shown.last)) {
+      // Swap the last stride pick for the final label rather than adding to
+      // the set, or the cap would be exceeded by one every time the stride
+      // does not land on the end.
+      keep.remove(shown[((shown.length - 1) ~/ step) * step]);
+      keep.add(shown.last);
+    }
+    for (final int index in shown) {
+      if (!keep.contains(index)) {
+        visible[index] = false;
+      }
+    }
   }
 
   /// Which way a tick points: `1` away from the plot area, `-1` into it.
@@ -641,19 +793,35 @@ class VarietyCartesianPainter extends CustomPainter {
           ..isAntiAlias = true,
       );
     }
+    final Paint borderPaint = Paint()
+      ..color = geometry.yAxis.axisLineColor ?? theme.axisLineColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(
+        geometry.yAxis.axisLineWidth,
+        geometry.xAxis.axisLineWidth,
+      )
+      ..isAntiAlias = true;
     if (geometry.yAxis.borderType == VarietyAxisBorderType.rectangle ||
         geometry.xAxis.borderType == VarietyAxisBorderType.rectangle) {
-      canvas.drawRect(
-        geometry.plotRect,
-        Paint()
-          ..color = geometry.yAxis.axisLineColor ?? theme.axisLineColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = math.max(
-            geometry.yAxis.axisLineWidth,
-            geometry.xAxis.axisLineWidth,
-          )
-          ..isAntiAlias = true,
-      );
+      canvas.drawRect(geometry.plotRect, borderPaint);
+    }
+    // `withoutTopAndBottom` keeps the two upright rules and leaves the top and
+    // bottom edges out, which is what joins a pair of value axes either side of
+    // the plot without boxing the series in.
+    final bool upright = geometry.yAxis.borderType ==
+            VarietyAxisBorderType.withoutTopAndBottom ||
+        geometry.xAxis.borderType == VarietyAxisBorderType.withoutTopAndBottom;
+    if (upright) {
+      for (final double x in <double>[
+        geometry.plotRect.left,
+        geometry.plotRect.right,
+      ]) {
+        canvas.drawLine(
+          Offset(x, geometry.plotRect.top),
+          Offset(x, geometry.plotRect.bottom),
+          borderPaint,
+        );
+      }
     }
     _paintSecondaryLabels(canvas);
     _paintExtraAxes(canvas);
@@ -701,25 +869,34 @@ class VarietyCartesianPainter extends CustomPainter {
           linePaint,
         );
       }
-      for (final double tick in ticks) {
-        final double y = geometry.pixelYOn(i, tick);
+      if (axis.showTicks) {
+        for (final double minor in geometry.yMinorTickPositionsOn(i)) {
+          _paintMinorTickMark(
+              canvas, axis, Offset(axisX, minor), const Offset(1, 0));
+        }
+      }
+      final List<bool> visible = List<bool>.filled(ticks.length, true);
+      _capLabelCount(ticks.length, axis, geometry.plotRect.height, visible);
+      for (int t = 0; t < ticks.length; t++) {
+        final double y = geometry.pixelYOn(i, ticks[t]);
         if (y < geometry.plotRect.top - 0.5 ||
             y > geometry.plotRect.bottom + 0.5) {
           continue;
         }
         // Extra axes sit on the right, so away from the plot area is +x.
         _paintTickMark(canvas, axis, Offset(axisX, y), const Offset(1, 0));
-        if (!axis.showLabels) {
+        if (!axis.showLabels || !visible[t]) {
           continue;
         }
-        final String caption = geometry.secondaryTickLabelOn(i, tick);
+        final String caption = geometry.secondaryTickLabelOn(i, ticks[t]);
         if (caption.isEmpty) {
           continue;
         }
         final TextPainter painter = _renderer.layoutText(caption, style);
+        final double centreY = y + _labelAlignmentShift(axis, painter.height);
         painter.paint(
           canvas,
-          Offset(axisX + axis.labelOffset, y - painter.height / 2),
+          Offset(axisX + axis.labelOffset, centreY - painter.height / 2),
         );
       }
       final String? title = axis.title;
@@ -753,22 +930,31 @@ class VarietyCartesianPainter extends CustomPainter {
     final double axisX = _yAxisLineX();
     final bool opposed = _axisLineOnRight(axisX);
     final Offset outward = Offset(opposed ? 1 : -1, 0);
-    for (final double tick in geometry.yTicks) {
-      final double y = geometry.pixelY(tick);
+    if (axis.showTicks) {
+      for (final double minor in geometry.yMinorTickPositionsOn(0)) {
+        _paintMinorTickMark(canvas, axis, Offset(axisX, minor), outward);
+      }
+    }
+    final List<double> ticks = geometry.yTicks;
+    final List<bool> visible = List<bool>.filled(ticks.length, true);
+    _capLabelCount(ticks.length, axis, geometry.plotRect.height, visible);
+    for (int i = 0; i < ticks.length; i++) {
+      final double y = geometry.pixelY(ticks[i]);
       if (y < geometry.plotRect.top - 0.5 ||
           y > geometry.plotRect.bottom + 0.5) {
         continue;
       }
       _paintTickMark(canvas, axis, Offset(axisX, y), outward);
-      if (!axis.showLabels) {
+      if (!axis.showLabels || !visible[i]) {
         continue;
       }
-      final String caption = geometry.secondaryTickLabel(tick);
+      final String caption = geometry.secondaryTickLabel(ticks[i]);
       if (caption.isEmpty) {
         continue;
       }
       final TextPainter painter = _renderer.layoutText(caption, style);
       final bool inside = axis.labelPlacement == VarietyLabelPlacement.inside;
+      final double centreY = y + _labelAlignmentShift(axis, painter.height);
       painter.paint(
         canvas,
         opposed
@@ -777,14 +963,14 @@ class VarietyCartesianPainter extends CustomPainter {
                     (inside
                         ? -axis.labelOffset - painter.width
                         : axis.labelOffset),
-                y - painter.height / 2,
+                centreY - painter.height / 2,
               )
             : Offset(
                 axisX +
                     (inside
                         ? axis.labelOffset
                         : -axis.labelOffset - painter.width),
-                y - painter.height / 2,
+                centreY - painter.height / 2,
               ),
       );
     }
@@ -910,8 +1096,11 @@ class VarietyCartesianPainter extends CustomPainter {
     if (ticks.isEmpty) {
       return 0;
     }
+    final Offset outward = Offset(0, below ? 1 : -1);
     if (axis.showTicks) {
-      final Offset outward = Offset(0, below ? 1 : -1);
+      for (final double minor in geometry.xMinorTickPositionsOn(axisIndex)) {
+        _paintMinorTickMark(canvas, axis, Offset(minor, lineY), outward);
+      }
       for (final _AxisTick tick in ticks) {
         _paintTickMark(canvas, axis, Offset(tick.position, lineY), outward);
       }
@@ -928,6 +1117,7 @@ class VarietyCartesianPainter extends CustomPainter {
       case VarietyLabelIntersectAction.none:
       case VarietyLabelIntersectAction.hide:
       case VarietyLabelIntersectAction.wrap:
+      case VarietyLabelIntersectAction.trim:
       case VarietyLabelIntersectAction.multipleRows:
         break;
     }
@@ -949,6 +1139,7 @@ class VarietyCartesianPainter extends CustomPainter {
         visible[i] = false;
       }
     }
+    _capLabelCount(ticks.length, axis, geometry.plotRect.width, visible);
     final bool thinning =
         axis.labelIntersectAction == VarietyLabelIntersectAction.hide ||
             axis.labelIntersectAction == VarietyLabelIntersectAction.rotate45 ||
@@ -975,7 +1166,7 @@ class VarietyCartesianPainter extends CustomPainter {
         continue;
       }
       final TextPainter painter = painters[i];
-      double x = ticks[i].position;
+      double x = ticks[i].position + _labelAlignmentShift(axis, extents[i]);
       if (axis.edgeLabelPlacement != VarietyEdgeLabelPlacement.none) {
         final double half = extents[i] / 2;
         if (x - half < geometry.plotRect.left) {
@@ -1000,11 +1191,24 @@ class VarietyCartesianPainter extends CustomPainter {
       }
       final double anchorY =
           baseY + (inside ? -painter.height - 4 : 0) + rowOffset;
+      // `trim` keeps every caption but shortens the ones that would run into
+      // their neighbour, so a long category name still says something instead
+      // of disappearing the way `hide` makes it.
+      TextPainter? trimmed;
+      double drawnWidth = extents[i];
+      if (axis.labelIntersectAction == VarietyLabelIntersectAction.trim) {
+        trimmed = _renderer.trimText(
+          ticks[i].text,
+          style,
+          _trimWidth(axisIndex, ticks, i),
+        );
+        drawnWidth = trimmed.width;
+      }
       labelHits?.add(
         VarietyAxisLabelHit(
           rect: Rect.fromCenter(
             center: Offset(x, anchorY + painter.height / 2),
-            width: math.max(extents[i], 8),
+            width: math.max(drawnWidth, 8),
             height: painter.height + 4,
           ),
           text: ticks[i].text,
@@ -1012,6 +1216,10 @@ class VarietyCartesianPainter extends CustomPainter {
           axis: axis,
         ),
       );
+      if (trimmed != null) {
+        trimmed.paint(canvas, Offset(x - trimmed.width / 2, anchorY));
+        continue;
+      }
       if (axis.labelIntersectAction == VarietyLabelIntersectAction.wrap &&
           extents[i] > geometry.axisSlotWidths[axisIndex] * 0.95 &&
           ticks[i].text.contains(' ')) {
@@ -1039,6 +1247,16 @@ class VarietyCartesianPainter extends CustomPainter {
       consumed += 6 + painter.height;
     }
     return consumed;
+  }
+
+  /// How wide a trimmed caption on horizontal axis [axisIndex] may be.
+  ///
+  /// The room a caption has is the gap to the next one, so trimming to that
+  /// width is what stops two neighbours from touching.
+  double _trimWidth(int axisIndex, List<_AxisTick> ticks, int i) {
+    final double right =
+        i + 1 < ticks.length ? ticks[i + 1].position : geometry.plotRect.right;
+    return math.max(right - ticks[i].position - 4, 12);
   }
 
   /// The style an axis title is painted in.
@@ -1163,9 +1381,10 @@ class VarietyCartesianPainter extends CustomPainter {
         geometry.xAxis.labelOffset +
         _primaryLabelHeight(_tickLabelStyle(geometry.xAxis)) +
         6;
-    for (final VarietyLabelGroup group in groups.groups) {
-      final double top = baseY + group.level * 22;
-      final double bottom = top + 22 - groups.margin.vertical;
+    final double rowHeight = math.max(groups.rowHeight, 8);
+    for (final VarietyLabelGroup group in _resolvedLabelGroups(groups)) {
+      final double top = baseY + group.level * rowHeight;
+      final double bottom = top + rowHeight - groups.margin.vertical;
       final double left = geometry
           .slotCenters[group.start.clamp(0, geometry.slotCenters.length - 1)];
       final double right = geometry
@@ -1191,7 +1410,7 @@ class VarietyCartesianPainter extends CustomPainter {
             ),
             border,
           );
-        case VarietyMultiLevelBorderType.brace:
+        case VarietyMultiLevelBorderType.squareBrace:
           canvas.drawPath(
             Path()
               ..moveTo(rect.left, rect.bottom)
@@ -1200,7 +1419,16 @@ class VarietyCartesianPainter extends CustomPainter {
               ..lineTo(rect.right, rect.bottom),
             border,
           );
-        case VarietyMultiLevelBorderType.curlyBracket:
+        case VarietyMultiLevelBorderType.withoutTopAndBottom:
+          canvas.drawPath(
+            Path()
+              ..moveTo(rect.left, rect.top)
+              ..lineTo(rect.left, rect.bottom)
+              ..moveTo(rect.right, rect.top)
+              ..lineTo(rect.right, rect.bottom),
+            border,
+          );
+        case VarietyMultiLevelBorderType.curlyBrace:
           final double midY = rect.center.dy;
           final double notch = math.min(6, rect.height / 3);
           canvas.drawPath(
@@ -1224,6 +1452,38 @@ class VarietyCartesianPainter extends CustomPainter {
             rect.center.dy - painter.height / 2),
       );
     }
+  }
+
+  /// The groups to draw, with neighbouring duplicates folded together when
+  /// [VarietyMultiLevelLabels.merge] is set.
+  ///
+  /// Two groups merge only when they sit on the same row, carry the same
+  /// caption and touch each other, so a merged bracket never spans a gap it
+  /// should not.
+  List<VarietyLabelGroup> _resolvedLabelGroups(VarietyMultiLevelLabels config) {
+    if (!config.merge) {
+      return config.groups;
+    }
+    final List<VarietyLabelGroup> ordered = List<VarietyLabelGroup>.of(
+      config.groups,
+    )..sort((VarietyLabelGroup a, VarietyLabelGroup b) => a.level == b.level
+        ? a.start.compareTo(b.start)
+        : a.level.compareTo(b.level));
+    final List<VarietyLabelGroup> merged = <VarietyLabelGroup>[];
+    for (final VarietyLabelGroup group in ordered) {
+      if (merged.isNotEmpty) {
+        final VarietyLabelGroup last = merged.last;
+        if (last.level == group.level &&
+            last.text == group.text &&
+            group.start <= last.end + 1) {
+          merged[merged.length - 1] =
+              last.copyWith(end: math.max(last.end, group.end));
+          continue;
+        }
+      }
+      merged.add(group);
+    }
+    return merged;
   }
 
   double _primaryLabelHeight(TextStyle style) {
@@ -1432,6 +1692,8 @@ class VarietyCartesianPainter extends CustomPainter {
     bool horizontal,
   ) {
     switch (type) {
+      case VarietyTrackballLineType.none:
+        return (false, false);
       case VarietyTrackballLineType.vertical:
         return (true, false);
       case VarietyTrackballLineType.horizontal:
@@ -1520,7 +1782,7 @@ class VarietyCartesianPainter extends CustomPainter {
       double alpha = 1;
       if (styled) {
         if (selected.contains(hit)) {
-          color = sel.selectedColor ?? color;
+          color = hit.series.selectionColor ?? sel.selectedColor ?? color;
           border = sel.selectedBorderColor ?? border;
           borderWidth = sel.selectedBorderWidth;
           alpha = sel.selectedOpacity;

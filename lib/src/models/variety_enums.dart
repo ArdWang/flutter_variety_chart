@@ -51,6 +51,12 @@ enum VarietyDateTimeIntervalType {
 
 /// The placement of a legend relative to the plot area.
 enum VarietyLegendPosition {
+  /// Picks a side from the shape of the chart: a chart taller than it is wide
+  /// puts the legend underneath, a wider one puts it at the right.
+  ///
+  /// This mirrors `LegendPosition.auto` in the reference implementation.
+  auto,
+
   /// Renders the legend above the plot area.
   top,
 
@@ -66,6 +72,12 @@ enum VarietyLegendPosition {
 
 /// The shape used to render a data marker.
 enum VarietyMarkerShape {
+  /// No glyph is drawn at all.
+  ///
+  /// Useful for switching markers off for one series in a chart that turns
+  /// them on for the rest.
+  none,
+
   /// A filled circle.
   circle,
 
@@ -177,6 +189,13 @@ enum VarietySelectionType {
 enum VarietyActivationMode {
   /// A single tap reveals the overlay.
   tap,
+
+  /// A double tap reveals the overlay.
+  ///
+  /// A chart with both a double-tap zoom and a double-tap overlay on the same
+  /// gesture is ambiguous, so the zoom is the one that wins when it is
+  /// enabled; use [tap] or [longPress] alongside it.
+  doubleTap,
 
   /// A long press reveals the overlay.
   longPress,

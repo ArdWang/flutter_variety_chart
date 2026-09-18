@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 
 import '../models/variety_axis.dart';
 import '../models/variety_chart_data.dart';
@@ -137,6 +138,31 @@ class VarietyZoomDetails {
 
   /// How much the current window is scaled relative to the full range.
   final double factor;
+}
+
+/// The direction a horizontal pan ran out of data in.
+///
+/// Mirrors `ChartSwipeDirection` in the reference implementation.
+enum VarietySwipeDirection {
+  /// The pan reached the low end of the axis.
+  start,
+
+  /// The pan reached the high end of the axis.
+  end,
+}
+
+/// The pointer position of a raw touch interaction.
+///
+/// Unlike the point callbacks this reports every touch, whether or not it
+/// landed on a series, which is what a chart needs in order to drive an
+/// outside control from a drag over the plot.
+@immutable
+class VarietyChartTouchArgs {
+  /// Creates a touch description.
+  const VarietyChartTouchArgs({required this.position});
+
+  /// The position in the chart's own coordinate space.
+  final Offset position;
 }
 
 /// Details handed to the axis label tap callback of a chart.

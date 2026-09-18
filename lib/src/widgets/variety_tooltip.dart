@@ -55,7 +55,10 @@ class VarietyTooltipCard extends StatelessWidget {
     final Color color = point.color ??
         result.series.color ??
         Theme.of(context).colorScheme.primary;
-    final String? caption = point.label ?? point.x?.toString();
+    // A header set on the behaviour leads the card, so one chart can caption
+    // its readings without every point carrying a label of its own.
+    final String? caption =
+        behavior.header ?? point.label ?? point.x?.toString();
     final List<Widget> lines = <Widget>[];
     if (result.series.name != null) {
       lines.add(
@@ -235,7 +238,8 @@ class VarietyTrackballTooltipCard extends StatelessWidget {
     final List<Widget> rows = <Widget>[];
     if (results.isNotEmpty) {
       final VarietyChartData first = results.first.point;
-      final String? caption = first.label ?? first.x?.toString();
+      final String? caption =
+          behavior.header ?? first.label ?? first.x?.toString();
       if (caption != null && caption.isNotEmpty) {
         rows.add(
           Padding(

@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../models/variety_enums.dart';
+import '../models/variety_options.dart';
 import '../models/variety_series.dart';
 import '../render/variety_chart_theme.dart';
 import '../render/variety_elements.dart';
@@ -260,16 +261,21 @@ class VarietyElementRenderer {
   /// Paints a set of captions.
   void drawLabels(Canvas canvas, VarietyLabelsElement element) {
     for (final VarietyLabelItem item in element.labels) {
+      final double alpha = item.opacity.clamp(0.0, 1.0);
       final TextStyle style = (element.style ??
               theme.dataLabelTextStyle ??
               const TextStyle(fontSize: 11))
           .copyWith(
-              color:
-                  item.color ?? element.style?.color ?? theme.dataLabelColor);
+        color: (item.color ?? element.style?.color ?? theme.dataLabelColor)
+            .withValues(alpha: alpha),
+      );
       final TextPainter painter = layoutText(item.text, style);
       final Offset origin = anchorFor(painter, item) + item.shift;
       final Rect bounds = origin & painter.size;
-      drawLabelCard(canvas, item, bounds);
+      // The connector goes under the card so the card always reads cleanly
+      // over the line it belongs to.
+      drawConnector(canvas, item, bounds, alpha);
+      drawLabelCard(canvas, item, bounds, alpha);
       if (item.angle == 0) {
         painter.paint(canvas, origin);
         continue;
@@ -283,8 +289,73 @@ class VarietyElementRenderer {
     }
   }
 
+  /// Draws the line that ties a caption back to its point.
+  ///
+  /// The line leaves the caption on the side that faces the point and stops
+  /// [VarietyLabelItem.connectorLength] short of it, so a label pushed clear
+  /// of a crowded plot still says which point it belongs to.
+  void drawConnector(
+    Canvas canvas,
+    VarietyLabelItem item,
+    Rect bounds,
+    double alpha,
+  ) {
+    if (item.connectorLength <= 0) {
+      return;
+    }
+    final Offset centre = bounds.center;
+    final Offset delta = item.anchor - centre;
+    final double distance = delta.distance;
+    if (distance < 0.5) {
+      return;
+    }
+    final Offset direction = delta / distance;
+    // How far the ray has to travel before it leaves the label box.
+    final double halfWidth = math.max(bounds.width, 1) / 2;
+    final double halfHeight = math.max(bounds.height, 1) / 2;
+    final double toVerticalEdge = direction.dx.abs() < 1e-6
+        ? double.infinity
+        : halfWidth / direction.dx.abs();
+    final double toHorizontalEdge = direction.dy.abs() < 1e-6
+        ? double.infinity
+        : halfHeight / direction.dy.abs();
+    final double exit = math.min(toVerticalEdge, toHorizontalEdge);
+    final Offset start = centre + direction * exit;
+    final double span = math.min(
+      item.connectorLength,
+      math.max(distance - exit, 0),
+    );
+    if (span <= 0.5) {
+      return;
+    }
+    final Offset end = start + direction * span;
+    final Paint paint = Paint()
+      ..color = (item.connectorColor ?? item.color ?? theme.dataLabelColor)
+          .withValues(alpha: alpha)
+      ..strokeWidth = item.connectorWidth
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke
+      ..isAntiAlias = true;
+    if (item.connectorType == VarietyConnectorType.bezier) {
+      final Offset control = Offset(start.dx, end.dy);
+      canvas.drawPath(
+        Path()
+          ..moveTo(start.dx, start.dy)
+          ..quadraticBezierTo(control.dx, control.dy, end.dx, end.dy),
+        paint,
+      );
+      return;
+    }
+    canvas.drawLine(start, end, paint);
+  }
+
   /// Draws the optional card behind a caption.
-  void drawLabelCard(Canvas canvas, VarietyLabelItem item, Rect bounds) {
+  void drawLabelCard(
+    Canvas canvas,
+    VarietyLabelItem item,
+    Rect bounds, [
+    double alpha = 1,
+  ]) {
     if (item.backgroundColor == null && item.borderWidth <= 0) {
       return;
     }
@@ -295,14 +366,17 @@ class VarietyElementRenderer {
     );
     final Color? fill = item.backgroundColor;
     if (fill != null) {
-      canvas.drawRRect(card, Paint()..color = fill);
+      canvas.drawRRect(
+        card,
+        Paint()..color = fill.withValues(alpha: fill.a * alpha),
+      );
     }
     final Color? stroke = item.borderColor;
     if (item.borderWidth > 0 && stroke != null) {
       canvas.drawRRect(
         card,
         Paint()
-          ..color = stroke
+          ..color = stroke.withValues(alpha: stroke.a * alpha)
           ..style = PaintingStyle.stroke
           ..strokeWidth = item.borderWidth,
       );
@@ -336,6 +410,20 @@ class VarietyElementRenderer {
           item.anchor.dy - painter.height - item.offset,
         );
     }
+  }
+
+  /// Lays out a single-line text run, shortened with an ellipsis when it is
+  /// wider than [maxWidth].
+  ///
+  /// This is what the `trim` label intersect action needs: a caption that
+  /// cannot fit keeps its head and loses its tail rather than vanishing.
+  TextPainter trimText(String text, TextStyle style, double maxWidth) {
+    return TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+      ellipsis: '\u2026',
+    )..layout(maxWidth: math.max(maxWidth, 1));
   }
 
   /// Lays out a single-line text run.
@@ -395,6 +483,10 @@ class VarietyElementRenderer {
     final double half = size / 2;
     final Path path = Path();
     switch (shape) {
+      case VarietyMarkerShape.none:
+        // An empty path: nothing is filled and nothing is stroked, which is
+        // what switching markers off for one series should look like.
+        break;
       case VarietyMarkerShape.circle:
         path.addOval(Rect.fromCircle(center: center, radius: half));
       case VarietyMarkerShape.square:

@@ -1,4 +1,7 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
 
 import 'dart:async';
 
@@ -36,6 +39,7 @@ class VarietyCartesianChart extends StatefulWidget {
     this.primaryYAxis = const VarietyAxis(type: VarietyAxisType.numeric),
     this.secondaryYAxes = const <VarietyAxis>[],
     this.secondaryXAxes = const <VarietyAxis>[],
+    this.palette,
     this.title,
     this.titleStyle,
     this.showLegend = true,
@@ -68,6 +72,11 @@ class VarietyCartesianChart extends StatefulWidget {
     this.onActualRangeChanged,
     this.renderingMode = VarietyRenderingMode.onLoading,
     this.loadingBuilder,
+    this.onChartTouchInteractionDown,
+    this.onChartTouchInteractionMove,
+    this.onChartTouchInteractionUp,
+    this.onPlotAreaSwipe,
+    this.loadMoreIndicatorBuilder,
   });
 
   /// The series plotted by the chart.
@@ -98,6 +107,12 @@ class VarietyCartesianChart extends StatefulWidget {
   /// window: pinching zooms the primary axis only, because a window expressed
   /// in its units is meaningless on another scale.
   final List<VarietyAxis> secondaryXAxes;
+
+  /// A colour cycle for this chart, overriding the one on the theme.
+  ///
+  /// A series that does not declare its own colour takes the next entry, so
+  /// giving one chart its own palette leaves every other chart alone.
+  final List<Color>? palette;
 
   /// An optional caption rendered above the chart.
   final String? title;
@@ -203,11 +218,38 @@ class VarietyCartesianChart extends StatefulWidget {
   /// [VarietyRenderingMode.onDemand] and the user has not interacted yet.
   final WidgetBuilder? loadingBuilder;
 
+  /// Called when a pointer goes down anywhere on the chart.
+  ///
+  /// Unlike [onPointTap] this fires for every touch, series or not, which is
+  /// what driving an outside control from a drag over the plot needs.
+  final void Function(VarietyChartTouchArgs args)? onChartTouchInteractionDown;
+
+  /// Called as a pointer moves anywhere on the chart.
+  final void Function(VarietyChartTouchArgs args)? onChartTouchInteractionMove;
+
+  /// Called when a pointer is lifted anywhere on the chart.
+  final void Function(VarietyChartTouchArgs args)? onChartTouchInteractionUp;
+
+  /// Called when a pan runs out of data at one end of the primary axis.
+  ///
+  /// This is the hook an infinite scroll needs: report the direction, fetch
+  /// the next page, and rebuild with more points. It fires once per arrival at
+  /// an end rather than on every frame of the drag.
+  final void Function(VarietySwipeDirection direction)? onPlotAreaSwipe;
+
+  /// A widget shown over the bottom of the plot while the reader is sitting at
+  /// an end of the axis.
+  ///
+  /// Typical use is a "loading more" spinner that the app shows after
+  /// [onPlotAreaSwipe] asked for another page.
+  final WidgetBuilder? loadMoreIndicatorBuilder;
+
   @override
-  State<VarietyCartesianChart> createState() => _VarietyCartesianChartState();
+  State<VarietyCartesianChart> createState() => VarietyCartesianChartState();
 }
 
-class _VarietyCartesianChartState extends State<VarietyCartesianChart>
+/// The state of a [VarietyCartesianChart], which also exposes [toImage].
+class VarietyCartesianChartState extends State<VarietyCartesianChart>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   Duration _effectiveAnimationDuration() {
@@ -221,16 +263,68 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     return longest;
   }
 
+  /// The whole entrance timeline, delays included.
+  ///
+  /// A series held back by `animationDelay` starts that much later, so the
+  /// controller has to run for the delay *plus* the longest rise or the last
+  /// series would never finish drawing.
+  Duration _timelineDuration() {
+    Duration delay = Duration.zero;
+    for (final VarietySeries item in widget.series) {
+      if (item.animationDelay > delay) {
+        delay = item.animationDelay;
+      }
+    }
+    return _effectiveAnimationDuration() + delay;
+  }
+
+  /// The entrance progress of each series, staggered by `animationDelay`.
+  ///
+  /// A delayed series owns the tail of the same timeline: with a delay worth
+  /// half the total it is only half risen when the chart finishes, which is
+  /// what makes a set of series read as a sequence instead of one block.
+  List<double> get _seriesProgress {
+    final double global = _progress;
+    final Duration total = _timelineDuration();
+    final List<double> out = <double>[];
+    for (int i = 0; i < _items.length; i++) {
+      final Duration delay = _items[i].animationDelay;
+      if (delay <= Duration.zero || total <= Duration.zero) {
+        out.add(global);
+        continue;
+      }
+      final double start =
+          (delay.inMicroseconds / total.inMicroseconds).clamp(0.0, 1.0);
+      if (start >= 1) {
+        out.add(global >= 1 ? 1 : 0);
+        continue;
+      }
+      out.add(((global - start) / (1 - start)).clamp(0.0, 1.0));
+    }
+    return out;
+  }
+
   VarietyHitResult? _hit;
   List<VarietyHitResult> _trackballHits = const <VarietyHitResult>[];
   // Auto-hides the trackball [VarietyTrackballBehavior.hideDelay] after a tap
   // activation. Restarted on every activation, cancelled on clear/dispose.
   Timer? _trackballHideTimer;
+  // Holds a tooltip back for `VarietyTooltipBehavior.showDuration`, so a
+  // pointer crossing the plot does not flash a card at every point it passes.
+  Timer? _tooltipDelayTimer;
   double? _trackballSlot;
   List<VarietyHitResult> _selected = const <VarietyHitResult>[];
   final Set<int> _hiddenSeries = <int>{};
   final List<VarietyAxisLabelHit> _labelHits = <VarietyAxisLabelHit>[];
   bool _revealed = false;
+  bool _initialSelectionSeeded = false;
+  // The end of the axis the last pan ran out at, and whether that has already
+  // been reported, so a drag does not fire the callback over and over.
+  VarietySwipeDirection? _swipeDirection;
+  VarietySwipeDirection? _reportedSwipe;
+  // The last pointer position seen, so `VarietyTooltipPosition.pointer` has
+  // something to follow.
+  Offset? _pointerPosition;
   (double, double)? _lastPrimaryRange;
   (double, double)? _lastSecondaryRange;
 
@@ -324,8 +418,9 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     widget.selectionController?.addListener(_syncSelectionFromController);
     _selected =
         widget.selectionController?.selected ?? const <VarietyHitResult>[];
-    _controller = AnimationController(
-        vsync: this, duration: _effectiveAnimationDuration());
+    _applyInitialZoom();
+    _controller =
+        AnimationController(vsync: this, duration: _timelineDuration());
     if (widget.enableAnimation && _shouldAnimate) {
       _controller.forward();
     } else {
@@ -335,6 +430,26 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   bool get _shouldAnimate =>
       _items.any((VarietySeries item) => item.animate && item.data.isNotEmpty);
+
+  /// Seeds the zoom state an axis declares through `initialZoomFactor` and
+  /// `initialZoomPosition`.
+  ///
+  /// This runs once, so a reader who has pinched, panned or double tapped is
+  /// never overruled by the declared window on a later rebuild.
+  void _applyInitialZoom() {
+    final double factor = widget.primaryXAxis.initialZoomFactor;
+    if (factor < 1) {
+      _xZoomFactor = factor.clamp(0.001, 1.0);
+      _xZoomPosition = widget.primaryXAxis.initialZoomPosition
+          .clamp(0.0, 1.0 - _xZoomFactor);
+    }
+    final double yFactor = widget.primaryYAxis.initialZoomFactor;
+    if (yFactor < 1) {
+      _yZoomFactor = yFactor.clamp(0.001, 1.0);
+      _yZoomPosition = widget.primaryYAxis.initialZoomPosition
+          .clamp(0.0, 1.0 - _yZoomFactor);
+    }
+  }
 
   @override
   void didUpdateWidget(covariant VarietyCartesianChart oldWidget) {
@@ -359,6 +474,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   void dispose() {
     widget.selectionController?.removeListener(_syncSelectionFromController);
     _trackballHideTimer?.cancel();
+    _tooltipDelayTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -487,6 +603,32 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   @override
   Widget build(BuildContext context) {
+    // The chart owns a repaint boundary so [toImage] captures the chart and
+    // nothing that happens to sit behind it.
+    return RepaintBoundary(child: _buildContent(context));
+  }
+
+  /// Renders the chart to an image, exactly as it looks right now.
+  ///
+  /// Give the chart a [GlobalKey] typed to this state to reach it:
+  ///
+  /// ```dart
+  /// final GlobalKey<VarietyCartesianChartState> key =
+  ///     GlobalKey<VarietyCartesianChartState>();
+  /// // ...
+  /// final ui.Image image = await key.currentState!.toImage(pixelRatio: 3);
+  /// ```
+  Future<ui.Image> toImage({double pixelRatio = 1.0}) {
+    final RenderObject? object = context.findRenderObject();
+    if (object is! RenderRepaintBoundary) {
+      throw StateError(
+        'The chart has not been laid out yet, so there is nothing to export.',
+      );
+    }
+    return object.toImage(pixelRatio: pixelRatio);
+  }
+
+  Widget _buildContent(BuildContext context) {
     final VarietyChartTheme theme = VarietyChartTheme.of(context);
     final List<VarietySeries> items = _items;
     return LayoutBuilder(
@@ -500,15 +642,22 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
         }
         final bool wantsLegend =
             widget.showLegend && items.any((VarietySeries s) => s.name != null);
+        // `auto` is resolved against the box the chart was given, so a wide
+        // chart puts the legend beside the plot and a tall one underneath.
+        final VarietyLegendPosition legendPosition =
+            VarietyLegend.resolvePosition(
+          widget.legendPosition,
+          Size(constraints.maxWidth, constraints.maxHeight),
+        );
         final bool legendOnSide =
-            widget.legendPosition == VarietyLegendPosition.left ||
-                widget.legendPosition == VarietyLegendPosition.right;
+            legendPosition == VarietyLegendPosition.left ||
+                legendPosition == VarietyLegendPosition.right;
         final Widget? legend = wantsLegend
             ? VarietyLegend(
                 series: widget.series
                     .where((VarietySeries item) => !item.isCircular)
                     .toList(growable: false),
-                position: widget.legendPosition,
+                position: legendPosition,
                 textStyle: widget.legendTextStyle,
                 itemBuilder: widget.legendBuilder,
                 settings: widget.legendSettings,
@@ -516,8 +665,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
                 onItemTap: _handleLegendTap,
               )
             : null;
-        if (legend != null &&
-            widget.legendPosition == VarietyLegendPosition.top) {
+        if (legend != null && legendPosition == VarietyLegendPosition.top) {
           column.add(legend);
         }
         final Widget plot = AnimatedBuilder(
@@ -530,11 +678,9 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  if (widget.legendPosition == VarietyLegendPosition.left)
-                    legend,
+                  if (legendPosition == VarietyLegendPosition.left) legend,
                   Expanded(child: plot),
-                  if (widget.legendPosition == VarietyLegendPosition.right)
-                    legend,
+                  if (legendPosition == VarietyLegendPosition.right) legend,
                 ],
               ),
             ),
@@ -542,8 +688,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
         } else {
           column.add(Expanded(child: plot));
         }
-        if (legend != null &&
-            widget.legendPosition == VarietyLegendPosition.bottom) {
+        if (legend != null && legendPosition == VarietyLegendPosition.bottom) {
           column.add(legend);
         }
         final Widget body = Column(
@@ -558,12 +703,61 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     );
   }
 
+  /// Applies the selection a series declares through
+  /// `initialSelectedDataIndexes`.
+  ///
+  /// It runs once, on the first layout that has positions to aim at, and only
+  /// when nothing else already owns the selection.
+  void _seedInitialSelection(VarietyCartesianGeometry geometry) {
+    if (_initialSelectionSeeded) {
+      return;
+    }
+    _initialSelectionSeeded = true;
+    if (widget.selectionController != null || _selected.isNotEmpty) {
+      return;
+    }
+    final List<VarietyHitResult> seeded = <VarietyHitResult>[];
+    for (int s = 0; s < geometry.series.length; s++) {
+      final VarietySeries item = geometry.series[s];
+      if (item.initialSelectedDataIndexes.isEmpty) {
+        continue;
+      }
+      final List<Offset> positions = geometry.pointPositions[s];
+      for (final int p in item.initialSelectedDataIndexes) {
+        if (p < 0 || p >= positions.length) {
+          continue;
+        }
+        seeded.add(
+          VarietyHitResult(
+            series: item,
+            seriesIndex: s,
+            point: geometry.sourceData[s][p],
+            pointIndex: p,
+            position: positions[p],
+          ),
+        );
+      }
+    }
+    if (seeded.isEmpty) {
+      return;
+    }
+    _selected = seeded;
+    final void Function(List<VarietyHitResult> selected)? report =
+        widget.selectionBehavior?.onSelectionChanged;
+    if (report != null) {
+      // Reporting during a build would rebuild in the middle of one, so the
+      // callback is deferred to the end of the frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) => report(seeded));
+    }
+  }
+
   Widget _buildPlot(VarietyChartTheme theme) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final Size size = Size(constraints.maxWidth, constraints.maxHeight);
         final (_, VarietyCartesianGeometry display) = _geometries(size);
         _display = display;
+        _seedInitialSelection(display);
         final Widget canvas = CustomPaint(
           size: size,
           painter: VarietyCartesianPainter(
@@ -598,10 +792,32 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
         final VarietyZoomPanBehavior? zoom = widget.zoomPanBehavior;
         final bool zoomEnabled =
             zoom != null && zoom.enabled && zoom.mode != VarietyZoomMode.none;
+        final bool doubleTapOverlay =
+            (widget.trackballBehavior?.enabled ?? false) &&
+                    widget.trackballBehavior!.activationMode ==
+                        VarietyActivationMode.doubleTap ||
+                (widget.crosshairBehavior?.enabled ?? false) &&
+                    widget.crosshairBehavior!.activationMode ==
+                        VarietyActivationMode.doubleTap;
         final bool doubleTapEnabled =
-            zoomEnabled && zoom.enableDoubleTapZooming;
+            doubleTapOverlay || (zoomEnabled && zoom.enableDoubleTapZooming);
         return Listener(
           onPointerSignal: _onPointerSignal,
+          onPointerDown: widget.onChartTouchInteractionDown == null
+              ? null
+              : (PointerDownEvent event) => widget.onChartTouchInteractionDown!(
+                    VarietyChartTouchArgs(position: event.localPosition),
+                  ),
+          onPointerMove: widget.onChartTouchInteractionMove == null
+              ? null
+              : (PointerMoveEvent event) => widget.onChartTouchInteractionMove!(
+                    VarietyChartTouchArgs(position: event.localPosition),
+                  ),
+          onPointerUp: widget.onChartTouchInteractionUp == null
+              ? null
+              : (PointerUpEvent event) => widget.onChartTouchInteractionUp!(
+                    VarietyChartTouchArgs(position: event.localPosition),
+                  ),
           child: MouseRegion(
             onHover: _onHover,
             onExit: (_) => _clearPointerState(),
@@ -628,6 +844,18 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
               child: Stack(
                 children: <Widget>[
                   Positioned.fill(child: canvas),
+                  if (widget.loadMoreIndicatorBuilder != null &&
+                      _swipeDirection != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: IgnorePointer(
+                        child: Center(
+                          child: widget.loadMoreIndicatorBuilder!(context),
+                        ),
+                      ),
+                    ),
                   // The placeholder must not swallow the gestures that reveal
                   // the series, so it is wrapped in an IgnorePointer.
                   if (!_paintsSeries && widget.loadingBuilder != null)
@@ -682,7 +910,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       progress: _progress,
       secondaryYAxes: widget.secondaryYAxes,
       secondaryXAxes: widget.secondaryXAxes,
-      palette: VarietyChartTheme.of(context).palette,
+      palette: widget.palette ?? VarietyChartTheme.of(context).palette,
     );
     final EdgeInsets insets = _insetsFor(probe);
     Rect plotRect = Rect.fromLTRB(
@@ -704,7 +932,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       dataLabelResolver: _resolveDataLabel,
       secondaryYAxes: widget.secondaryYAxes,
       secondaryXAxes: widget.secondaryXAxes,
-      palette: VarietyChartTheme.of(context).palette,
+      palette: widget.palette ?? VarietyChartTheme.of(context).palette,
     );
     _baseXMin = base.xMinimum;
     _baseXMax = base.xMaximum;
@@ -722,12 +950,13 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       yAxis: widget.primaryYAxis,
       plotRect: plotRect,
       progress: _progress,
+      seriesProgress: _seriesProgress,
       visibleXRange: _zoomX,
       visibleYRange: _zoomY,
       dataLabelResolver: _resolveDataLabel,
       secondaryYAxes: widget.secondaryYAxes,
       secondaryXAxes: widget.secondaryXAxes,
-      palette: VarietyChartTheme.of(context).palette,
+      palette: widget.palette ?? VarietyChartTheme.of(context).palette,
     );
     _reportRangeChanges(base, display);
     return (base, display);
@@ -851,7 +1080,10 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       for (final VarietyLabelGroup group in groups.groups) {
         levels = math.max(levels, group.level + 1);
       }
-      bottom += levels * 22 + 4;
+      // The row height the painter will use, so the room reserved here and
+      // the brackets drawn under the captions agree. Hard coding 22 here was
+      // the same half wired mistake the tick label style used to have.
+      bottom += levels * math.max(groups.rowHeight, 8) + 4;
     }
     final (double extraBelow, double extraAbove) = _extraXAxisInset(probe);
     return EdgeInsets.fromLTRB(
@@ -995,6 +1227,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   void _onHover(PointerHoverEvent event) {
     _reveal();
+    _pointerPosition = event.localPosition;
     final VarietyCartesianGeometry? geometry = _display;
     if (geometry == null) {
       return;
@@ -1014,12 +1247,39 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       return;
     }
     if (widget.tooltipBehavior.enabled) {
-      _updateSingleHit(geometry.hitTest(event.localPosition), hover: true);
+      _updateSingleHitAfterDelay(
+        geometry.hitTest(event.localPosition),
+      );
     }
+  }
+
+  /// Reveals a hovered tooltip once the configured delay has passed.
+  ///
+  /// With no delay this is the plain reveal it has always been; with one, the
+  /// timer is restarted on every move and a pointer that keeps travelling
+  /// never shows a card at all.
+  void _updateSingleHitAfterDelay(VarietyHitResult? result) {
+    final Duration delay = widget.tooltipBehavior.showDuration;
+    _tooltipDelayTimer?.cancel();
+    _tooltipDelayTimer = null;
+    if (delay <= Duration.zero || result == null) {
+      // Leaving a point hides the card at once; the delay is only ever about
+      // showing one.
+      _updateSingleHit(result, hover: true);
+      return;
+    }
+    _tooltipDelayTimer = Timer(delay, () {
+      _tooltipDelayTimer = null;
+      if (!mounted) {
+        return;
+      }
+      _updateSingleHit(result, hover: true);
+    });
   }
 
   void _onTap(Offset position, VarietyCartesianGeometry geometry) {
     _reveal();
+    _pointerPosition = position;
     final void Function(VarietyAxisLabelTapDetails)? labelCallback =
         widget.onAxisLabelTapped;
     if (labelCallback != null && _labelHits.isNotEmpty) {
@@ -1069,11 +1329,18 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
           final List<VarietyHitResult> next =
               List<VarietyHitResult>.of(_selected);
           if (alreadySelected) {
-            next.remove(hit);
+            // Without toggling, a second tap on a selected point is a no-op,
+            // so a selection cannot be lost by an accidental extra touch.
+            if (selection.toggleSelection) {
+              next.remove(hit);
+              _applySelection(next);
+            }
           } else {
             next.add(hit);
+            _applySelection(next);
           }
-          _applySelection(next);
+        } else if (alreadySelected && !selection.toggleSelection) {
+          // Keep what is already selected.
         } else {
           _applySelection(
             alreadySelected
@@ -1103,6 +1370,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   void _onLongPressStart(Offset position, VarietyCartesianGeometry geometry) {
     _reveal();
+    _pointerPosition = position;
     // Selection zooming owns the long press whenever it is enabled, so a
     // long-press trackball would never see the gesture.
     if (_selectionZoomEnabled) {
@@ -1167,6 +1435,8 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   void _clearPointerState() {
     _cancelTrackballTimer();
+    _tooltipDelayTimer?.cancel();
+    _tooltipDelayTimer = null;
     if (_hit == null && _trackballHits.isEmpty) {
       return;
     }
@@ -1221,7 +1491,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
   void _scheduleTrackballHide(VarietyTrackballBehavior ball) {
     _cancelTrackballTimer();
     if (ball.shouldAlwaysShow ||
-        ball.visibilityMode == VarietyTrackballVisibilityMode.always) {
+        ball.visibilityMode == VarietyTrackballVisibilityMode.visible) {
       return;
     }
     _trackballHideTimer = Timer(ball.hideDelay, _clearTrackball);
@@ -1313,16 +1583,31 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       }
     }
     final VarietyZoomPanBehavior? behavior = widget.zoomPanBehavior;
-    if (behavior == null ||
-        !behavior.enabled ||
-        !behavior.enableDoubleTapZooming) {
+    if (behavior != null &&
+        behavior.enabled &&
+        behavior.enableDoubleTapZooming) {
+      if (_hasZoom) {
+        _resetZoom(display);
+        return;
+      }
+      _zoomInAndOut(0.5, position, display);
       return;
     }
-    if (_hasZoom) {
-      _resetZoom(display);
+    // No zoom claimed the gesture, so a behaviour that asked for a double tap
+    // can have it.
+    final VarietyTrackballBehavior? ball = widget.trackballBehavior;
+    if (ball != null &&
+        ball.enabled &&
+        ball.activationMode == VarietyActivationMode.doubleTap) {
+      _updateTrackball(position, display);
       return;
     }
-    _zoomInAndOut(0.5, position, display);
+    final VarietyCrosshairBehavior? cross = widget.crosshairBehavior;
+    if (cross != null &&
+        cross.enabled &&
+        cross.activationMode == VarietyActivationMode.doubleTap) {
+      _updateSingleHit(display.hitTest(position), hover: true);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1454,7 +1739,9 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       }
     });
     _gestureChanged = true;
-    _notifyZoom(geometry);
+    // `moving` reports the window while the fingers are still down, which is
+    // what a live readout follows; the settled value comes from `onZoomEnd`.
+    _notifyZoom(geometry, moving: true);
   }
 
   /// Restores both axes to their full range.
@@ -1466,31 +1753,78 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       _yZoomPosition = 0;
     });
     _notifyZoom(geometry);
+    widget.zoomPanBehavior?.onZoomReset?.call(_zoomDetails());
   }
 
-  /// Reports the visible window to the behaviour's zoom callbacks.
-  void _notifyZoom(VarietyCartesianGeometry geometry, {bool start = false}) {
-    final VarietyZoomPanBehavior? behavior = widget.zoomPanBehavior;
-    if (behavior == null) {
+  /// Reports a pan that ran out of data at one end of the primary axis.
+  ///
+  /// The window is read after the gesture settles rather than during it, so a
+  /// long drag reports once instead of once per frame, and the same end is
+  /// never reported twice in a row.
+  void _reportSwipeAtEnd() {
+    // A chart that is not zoomed has nothing to pan, so a drag over it is not
+    // a request for more data.
+    if (!_hasZoom) {
       return;
     }
+    final (double, double)? window = _zoomX;
+    if (window == null) {
+      return;
+    }
+    final double tolerance =
+        math.max((_baseXMax - _baseXMin).abs() * 1e-6, 1e-9);
+    VarietySwipeDirection? direction;
+    if (window.$2 >= _baseXMax - tolerance) {
+      direction = VarietySwipeDirection.end;
+    } else if (window.$1 <= _baseXMin + tolerance) {
+      direction = VarietySwipeDirection.start;
+    }
+    if (direction != _swipeDirection) {
+      setState(() => _swipeDirection = direction);
+    }
+    if (direction == null || direction == _reportedSwipe) {
+      return;
+    }
+    _reportedSwipe = direction;
+    widget.onPlotAreaSwipe?.call(direction);
+  }
+
+  /// The current window, as the zoom callbacks see it.
+  VarietyZoomDetails _zoomDetails() {
     final (double, double)? window = _windowFor(
       _baseXMin,
       _baseXMax,
       _xZoomPosition,
       _xZoomFactor,
     );
-    final VarietyZoomDetails details = VarietyZoomDetails(
+    return VarietyZoomDetails(
       axis: widget.primaryXAxis,
       minimum: window?.$1 ?? _baseXMin,
       maximum: window?.$2 ?? _baseXMax,
       factor: _xZoomFactor,
     );
+  }
+
+  /// Reports the visible window to the behaviour's zoom callbacks.
+  void _notifyZoom(
+    VarietyCartesianGeometry geometry, {
+    bool start = false,
+    bool moving = false,
+  }) {
+    final VarietyZoomPanBehavior? behavior = widget.zoomPanBehavior;
+    if (behavior == null) {
+      return;
+    }
+    final VarietyZoomDetails details = _zoomDetails();
     if (start) {
       behavior.onZoomStart?.call(details);
-    } else {
-      behavior.onZoomEnd?.call(details);
+      return;
     }
+    if (moving) {
+      behavior.onZooming?.call(details);
+      return;
+    }
+    behavior.onZoomEnd?.call(details);
   }
 
   /// Pans a zoomed axis by a pixel delta, the counterpart of Syncfusion's
@@ -1545,10 +1879,15 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     if (nextX == _xZoomPosition && nextY == _yZoomPosition) {
       return;
     }
-    setState(() {
+    if (behavior.enableDeferredZooming) {
+      setState(() {
+        _xZoomPosition = nextX;
+        _yZoomPosition = nextY;
+      });
+    } else {
       _xZoomPosition = nextX;
       _yZoomPosition = nextY;
-    });
+    }
     _gestureChanged = true;
   }
 
@@ -1600,7 +1939,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
           (both ? details.scale : details.horizontalScale);
       final double rawScaleY =
           (_startScaleY ?? 1) * (both ? details.scale : details.verticalScale);
-      setState(() {
+      void applyZoom() {
         if (zoomX) {
           final (double, double) next = _zoomWindow(
             factor: _xZoomFactor,
@@ -1621,7 +1960,17 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
           _yZoomFactor = next.$1;
           _yZoomPosition = next.$2;
         }
-      });
+      }
+
+      if (behavior.enableDeferredZooming) {
+        setState(applyZoom);
+      } else {
+        // Deferred zooming keeps the state moving but holds the repaint back
+        // until the fingers are off, which is what makes a pinch on a very
+        // large data set cheap. The window still ends up exactly where the
+        // gesture put it.
+        applyZoom();
+      }
       _panStarted = false;
       _gestureChanged = true;
       return;
@@ -1632,6 +1981,11 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       return;
     }
     _pan(details.localFocalPoint, geometry);
+    // A drag that cannot move the window any further has run out of data at
+    // one end, which is what an infinite scroll listens for. Reporting while
+    // the finger is still down gives the indicator immediate feedback, and the
+    // callback itself only fires on arriving at an end rather than per frame.
+    _reportSwipeAtEnd();
   }
 
   void _onScaleEnd() {
@@ -1642,6 +1996,11 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     _gestureChanged = false;
     _previousPanPosition = Offset.zero;
     if (geometry != null && wasChanged) {
+      // A deferred gesture has not repainted yet, so this is where its window
+      // finally reaches the screen.
+      if (!widget.zoomPanBehavior!.enableDeferredZooming) {
+        setState(() {});
+      }
       _notifyZoom(geometry);
     }
   }
@@ -1721,8 +2080,16 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     if (hit == null) {
       return const <Widget>[];
     }
-    final String header = hit.point.label ?? hit.point.x?.toString() ?? '';
+    final String header = widget.tooltipBehavior.header ??
+        hit.point.label ??
+        hit.point.x?.toString() ??
+        '';
     final VarietyTooltipBehavior tooltip = widget.tooltipBehavior;
+    final Offset anchor =
+        tooltip.tooltipPosition == VarietyTooltipPosition.pointer &&
+                _pointerPosition != null
+            ? _pointerPosition!
+            : hit.position;
     final String valueText = VarietyTooltipCard.formatValue(
       hit.point.y,
       decimalPlaces: tooltip.decimalPlaces,
@@ -1737,7 +2104,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
     final VarietyCrosshairBehavior? cross = widget.crosshairBehavior;
     if (cross != null && cross.enabled && cross.showTooltip) {
       return _positionedCard(
-        hit.position,
+        anchor,
         VarietyTooltipCard(
           result: hit,
           theme: theme,
@@ -1750,7 +2117,7 @@ class _VarietyCartesianChartState extends State<VarietyCartesianChart>
       return const <Widget>[];
     }
     return _positionedCard(
-      hit.position,
+      anchor,
       VarietyTooltipCard(
         result: hit,
         theme: theme,

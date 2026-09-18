@@ -64,6 +64,23 @@ class VarietyLegend extends StatelessWidget {
   /// The indexes of the series that are currently hidden.
   final Set<int> hiddenIndexes;
 
+  /// Resolves [VarietyLegendPosition.auto] against the room the chart has.
+  ///
+  /// The reference implementation picks a side from the shape of the chart: a
+  /// chart taller than it is wide puts the legend underneath, a wider one puts
+  /// it at the right. Anything else is returned untouched.
+  static VarietyLegendPosition resolvePosition(
+    VarietyLegendPosition position,
+    Size size,
+  ) {
+    if (position != VarietyLegendPosition.auto) {
+      return position;
+    }
+    return size.height > size.width
+        ? VarietyLegendPosition.bottom
+        : VarietyLegendPosition.right;
+  }
+
   bool get _isVertical {
     switch (settings.itemOrientation) {
       case VarietyLegendItemOrientation.vertical:
@@ -198,9 +215,13 @@ class VarietyLegend extends StatelessWidget {
               child: CustomPaint(
                 size: Size(settings.iconWidth, settings.iconHeight),
                 painter: _LegendIconPainter(
-                  settings.iconType == VarietyLegendIconType.seriesType
-                      ? _fromSeries(series)
-                      : settings.iconType,
+                  // A series that names its own icon wins over the chart wide
+                  // setting, which is the order the reference implementation
+                  // uses.
+                  series.legendIconType ??
+                      (settings.iconType == VarietyLegendIconType.seriesType
+                          ? _fromSeries(series)
+                          : settings.iconType),
                   color,
                   swatchSize,
                   swatchRadius,
@@ -310,6 +331,38 @@ class _LegendIconPainter extends CustomPainter {
             ..moveTo(center.dx, center.dy - half)
             ..lineTo(center.dx, center.dy + half),
           stroke,
+        );
+      case VarietyLegendIconType.verticalLine:
+        canvas.drawLine(
+          Offset(center.dx, canvasSize.height * 0.05),
+          Offset(center.dx, canvasSize.height * 0.95),
+          stroke,
+        );
+      case VarietyLegendIconType.horizontalLine:
+        canvas.drawLine(
+          Offset(canvasSize.width * 0.05, center.dy),
+          Offset(canvasSize.width * 0.95, center.dy),
+          stroke,
+        );
+      case VarietyLegendIconType.pentagon:
+        canvas.drawPath(
+          () {
+            final Path path = Path();
+            for (int i = 0; i < 5; i++) {
+              final double angle = -math.pi / 2 + i * 2 * math.pi / 5;
+              final Offset corner = Offset(
+                center.dx + half * math.cos(angle),
+                center.dy + half * math.sin(angle),
+              );
+              if (i == 0) {
+                path.moveTo(corner.dx, corner.dy);
+              } else {
+                path.lineTo(corner.dx, corner.dy);
+              }
+            }
+            return path..close();
+          }(),
+          fill,
         );
       case VarietyLegendIconType.rectangle:
       case VarietyLegendIconType.seriesType:
