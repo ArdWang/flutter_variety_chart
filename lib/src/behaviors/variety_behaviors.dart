@@ -87,8 +87,7 @@ class VarietyTooltipBehavior {
 ///
 /// While a guide is active the reader has to look down at the axis to learn
 /// which x the guide sits on, and across to it for the y. These boxes carry
-/// that reading next to the axis, the way Syncfusion's axis interactive
-/// tooltip does.
+/// that reading next to the axis, the way an axis value box does.
 @immutable
 class VarietyAxisTooltipSettings {
   /// Creates axis tooltip settings.

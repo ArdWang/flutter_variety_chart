@@ -328,7 +328,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   (double, double)? _lastPrimaryRange;
   (double, double)? _lastSecondaryRange;
 
-  // Zoom state, held the same way Syncfusion holds it: every axis keeps a
+  // Zoom state, held as a per-axis window: every axis keeps a
   // normalised window made of a `factor` (the visible fraction of the full
   // range, 1 meaning fully zoomed out) and a `position` (where that window
   // starts, as a fraction of the full range). Gestures only ever touch those
@@ -358,7 +358,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   VarietyCartesianGeometry? _display;
 
   // Magnification captured for each axis when the current pinch began, the
-  // counterpart of Syncfusion's `_previousScale`.
+  // counterpart of the magnification captured when the pinch began.
   double? _startScaleX;
   double? _startScaleY;
   int _scalePointerCount = 0;
@@ -404,7 +404,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       widget.zoomPanBehavior!.enabled &&
       widget.zoomPanBehavior!.mode != VarietyZoomMode.none;
 
-  /// Whether a long press may drag out a zoom region. Syncfusion drives
+  /// Whether a long press may drag out a zoom region. The gesture model uses
   /// selection zooming from a long press and pans from a plain drag, which is
   /// what lets pinch, pan and selection all stay live at the same time.
   bool get _selectionZoomEnabled =>
@@ -1557,7 +1557,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     if (geometry == null) {
       return;
     }
-    // Mirror Syncfusion: one wheel notch is a quarter of a magnification step
+    // One wheel notch is a quarter of a magnification step
     // applied at the pointer, so the value under the cursor stays put and the
     // chart can be zoomed back out again.
     _zoomInAndOut(
@@ -1613,16 +1613,16 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   // ---------------------------------------------------------------------------
   // Zoom maths
   //
-  // Ported from Syncfusion's `ZoomPanBehavior` (behaviors/zooming.dart). The
-  // helpers keep the same names and semantics as the original so the two
-  // implementations can be compared side by side.
+  // The zoom and pan maths, in one place. The helpers keep the names the
+  // gestures use elsewhere, so a number can be followed from the gesture that
+  // produced it down to the window it ends up as.
   // ---------------------------------------------------------------------------
 
   double _minMax(double value, double min, double max) =>
       value > max ? max : (value < min ? min : value);
 
   /// The smallest window a gesture may leave behind, as a fraction of the full
-  /// range. Syncfusion spells this `maximumZoomLevel`.
+  /// range. This is the ceiling on magnification.
   double get _maxZoomInFactor =>
       _minMax(widget.zoomPanBehavior!.minimumZoomLevel, 1e-4, 1);
 
@@ -1632,7 +1632,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   /// Converts a zoom window into the magnification the maths works with: a
   /// factor of 0.5 shows half the range, which is a scale of 2. This is
-  /// Syncfusion's `_toScaleValue`.
+  /// the scale conversion.
   double _toScaleValue(double zoomFactor) =>
       math.max(1 / _minMax(zoomFactor, 1e-6, 1), 1);
 
@@ -1652,7 +1652,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
 
   /// Applies a cumulative magnification to a window, keeping [origin] fixed.
-  /// This is Syncfusion's `_zoom`; [origin] is the fraction of the plot under
+  /// The window maths; [origin] is the fraction of the plot under
   /// the gesture, measured from the minimum end of the axis.
   (double, double) _zoomWindow({
     required double factor,
@@ -1694,7 +1694,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
 
   /// Zooms both axes by a fixed magnification step around [origin], the
-  /// counterpart of Syncfusion's `_zoomInAndOut`.
+  /// workhorse of the double tap zoom.
   void _zoomInAndOut(
     double zoomLevel,
     Offset origin,
@@ -1827,8 +1827,8 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     behavior.onZoomEnd?.call(details);
   }
 
-  /// Pans a zoomed axis by a pixel delta, the counterpart of Syncfusion's
-  /// `_toPanValue` and `_pan`. [delta] is `previous - current`, so the content
+  /// Pans a zoomed axis by a pixel delta. [delta] is `previous - current`, so
+  /// the content
   /// follows the finger on both axes.
   void _pan(Offset position, VarietyCartesianGeometry geometry) {
     if (!_panStarted) {
@@ -1933,7 +1933,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       final double maxScale = _toScaleValue(_maxZoomInFactor);
       final double originX = _originForX(details.localFocalPoint, geometry);
       final double originY = _originForY(details.localFocalPoint, geometry);
-      // Syncfusion multiplies the magnification captured when the pinch began
+      // The magnification captured when the pinch began is multiplied
       // by the gesture's scale, which keeps the window stable across frames.
       final double rawScaleX = (_startScaleX ?? 1) *
           (both ? details.scale : details.horizontalScale);
@@ -2005,8 +2005,8 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     }
   }
 
-  /// Converts the rubber band into a new window, the same way Syncfusion's
-  /// `_drawSelectionZoomRect` does. Returns whether anything was zoomed, so a
+  /// Converts the rubber band into a new window. Returns whether anything was
+  /// zoomed, so a
   /// stray long press with no drag does not report a zoom.
   bool _applySelectionZoom(Rect rect, VarietyCartesianGeometry geometry) {
     final VarietyZoomPanBehavior behavior = widget.zoomPanBehavior!;

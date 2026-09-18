@@ -5,8 +5,8 @@
 An option that is declared, documented and then never read is worse than no
 option at all: the chart silently ignores what the caller asked for. The sweep
 that has been clearing that list now comes back empty — every field it found is
-read by the renderer — and the options this package was missing next to the
-reference implementation are added with them.
+read by the renderer — and the options the API was missing are added with
+them.
 
 Added
 
@@ -14,8 +14,8 @@ Added
   `color`, on both axes and on every extra axis. Minor ticks follow
   `minorTicksPerInterval` exactly as before; only their styling was missing.
 * `VarietyAxis.maximumLabels` caps the captions at that many per 100 logical
-  pixels, which is the reference implementation's rule and its default of three.
-  Captions are dropped on a regular stride, and the two ends are always kept.
+  pixels, which is where the default of three comes from. Captions are dropped
+  on a regular stride, and the two ends are always kept.
 * `VarietyAxis.labelAlignment` places a caption by its leading edge, its centre
   or its trailing edge.
 * `VarietyMultiLevelLabels.merge` folds neighbouring groups that share a caption
@@ -84,12 +84,12 @@ Added
 Changed
 
 * **Breaking.** `VarietyAxis.labelAlignment` is now a `VarietyLabelAlignment`
-  (`start`, `center`, `end`), the axis counterpart of the reference
-  implementation's `LabelAlignment`. It used to be a `VarietyLabelPosition`,
+  (`start`, `center`, `end`), the axis counterpart of the caption alignment
+  the data labels use. It used to be a `VarietyLabelPosition`,
   which described a different idea. The default is `center`, so nothing moves
   for a chart that does not set it.
 * **Breaking.** `VarietyTrackballVisibilityMode.always` is now `visible`, the
-  spelling the reference implementation uses.
+  spelling used everywhere else in the API.
 * **Breaking.** `VarietyMultiLevelBorderType.curlyBracket` and `brace` are now
   `curlyBrace` and `squareBrace`, and `withoutTopAndBottom` was added.
 
@@ -442,9 +442,9 @@ not line up with the times on the axis.
 
 Fixed
 
-* Categories key on the instant a point carries, not on its caption, which is
-  what upstream's `DateTimeCategoryAxis` does when it keys on
-  `millisecondsSinceEpoch`.
+* Categories key on the instant a point carries, not on its caption, so two
+  readings a second apart stay in buckets of their own even when their captions
+  happen to match.
 * Captions are derived separately, and a pattern is chosen fine enough to give
   every category a caption of its own, so a minute of readings is labelled
   `11:30:01`, `11:30:11`, `11:30:31` rather than one repeated `15 Sep`.
@@ -465,7 +465,7 @@ sat beside it rather than on it.
 Fixed
 
 * The guide is anchored on the point closest to the touch across all series,
-  which is what upstream's `leastX` does.
+  so the crosshair lands on the point the reader actually aimed at.
 * `VarietyTrackballBehavior.displayMode` is now honoured. It was declared but
   never read, so every mode behaved like `groupAllPoints`:
   * `groupAllPoints` pulls every series onto the guide, so the markers line up
@@ -500,11 +500,11 @@ Fixed
 
 ## 0.5.1
 
-### Gesture zoom and pan aligned with Syncfusion
+### Gesture zoom and pan reworked around a normalised window
 
-Pinch, wheel, double-tap, pan and selection zooming now use the normalised
-`(zoomFactor, zoomPosition)` window model that `Syncfusion_flutter_charts`'
-`ZoomPanBehavior` uses, instead of raw data-space minimum/maximum pairs. Each
+Pinch, wheel, double-tap, pan and selection zooming now use a normalised
+`(zoomFactor, zoomPosition)` window model instead of raw data-space
+minimum/maximum pairs. Each
 axis keeps the visible fraction of the full range plus where that window
 starts, so a gesture only ever touches two numbers and the focal point stays
 pinned while it is applied.
@@ -520,8 +520,8 @@ Fixed
 
 Changed
 
-* Selection zooming is driven by a long press, matching upstream's
-  "long-press and drag to select a region". `VarietyZoomMode.both` now really
+* Selection zooming is driven by a long press: press, drag out a region,
+  release. `VarietyZoomMode.both` now really
   does enable pinch, pan and selection at the same time, and
   `VarietyZoomMode.selection` keeps drag-to-pan.
 * `VarietyZoomMode.none` now disables every zoom and pan gesture. It was
@@ -535,8 +535,8 @@ Removed a redundant null assertion in the trackball hit path that tripped
 ## 0.5.0
 
 ### CartLineSeries full parity (the last 4)
-Closed every remaining gap with the upstream library. `LineSeries` now
-exposes the full 37-parameter surface that `SfCartesianChart` ships.
+Closed every remaining gap in the series parameter surface.
+`VarietyLineSeries` now exposes all 37 parameters the chart API offers.
 
 * `onCreateRenderer` lets you supply a custom element renderer per series.
   The painter keeps `Map<int, VarietyElementRenderer>` so each series is
@@ -544,7 +544,7 @@ exposes the full 37-parameter surface that `SfCartesianChart` ships.
 * `onCreateShader` is consulted for every path the series emits (fill and
   stroke); a non-null shader overrides `gradient` and `borderGradient`.
 * `onRendererCreated` fires once per series right after the renderer is
-  built, mirroring the upstream `ChartSeriesController` handshake.
+  built, which is the hook a renderer-scoped controller attaches to.
 * `selectionBehavior` is now per-series. When set on a series it overrides
   the chart-wide one.
 
@@ -569,8 +569,8 @@ Behaviour parity
 ## 0.4.0
 
 ### Line series parameter parity
-* Added series-scoped parameters that bring `LineSeries` (and every other
-  cartesian series) to functional parity with the upstream library:
+* Added series-scoped parameters, shared by `VarietyLineSeries` and every
+  other cartesian series:
   `markerSettings`, `gradient`, `borderGradient`, `enableTrackball`,
   `initialIsVisible`, `initialSelectedDataIndexes`, `isVisibleInLegend`,
   `legendItemText`, `legendIconType`, `pointColorMapper`, `dataLabelMapper`,
@@ -620,7 +620,7 @@ Behaviour parity
 
 The four widgets, `VarietySparkMarker`, `VarietySparkPlotBand`,
 `VarietySparkTrackball` and all four enumerations were verified parameter by
-parameter against the reference implementation and have full coverage.
+parameter and have full coverage.
 
 #### Behaviour parity
 

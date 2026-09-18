@@ -429,7 +429,7 @@ VarietyCartesianChart(
 
 ## Upgrading from 0.5.14
 
-Three names changed to match the reference implementation:
+Three names changed in this release, all in the name of consistency:
 
 | Was | Now |
 | --- | --- |

@@ -257,13 +257,12 @@ enum VarietyShapeType {
 
 /// The activation mode understood by the zoom and pan behaviour.
 ///
-/// This mirrors the independent flags Syncfusion's `ZoomPanBehavior` exposes
-/// (`enablePinching`, `enablePanning`, `enableMouseWheelZooming`,
-/// `enableDoubleTapZooming`, `enableSelectionZooming`), bundled into the
-/// combinations that are actually useful.
+/// This bundles the independent zooming flags — `enablePinching`,
+/// `enablePanning`, `enableMouseWheelZooming`, `enableDoubleTapZooming` and
+/// `enableSelectionZooming` — into the combinations that are actually useful.
 ///
-/// Selection zooming is always driven by a **long press**, exactly as in
-/// Syncfusion ("long-press and drag to select a region"). That is what lets it
+/// Selection zooming is always driven by a **long press**: press, drag out a
+/// region, release. That is what lets it
 /// run alongside panning, which keeps the plain drag gesture.
 enum VarietyZoomMode {
   /// Pinch and mouse wheel zoom, double tap to zoom in or reset, and drag to
