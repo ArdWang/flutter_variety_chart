@@ -172,6 +172,7 @@ class VarietyCartesianGeometry {
     this.secondaryYAxes = const <VarietyAxis>[],
     this.secondaryXAxes = const <VarietyAxis>[],
     this.palette,
+    this.buildElements = true,
   })  : _rawPlotRect = plotRect,
         transposed = _shouldTranspose(series),
         xAxis = _shouldTranspose(series) ? yAxis : xAxis,
@@ -188,7 +189,9 @@ class VarietyCartesianGeometry {
     _collectCategories();
     _resolveRanges();
     _buildPositions();
-    _buildElements();
+    if (buildElements) {
+      _buildElements();
+    }
   }
 
   void _resolveSeriesAxes() {
@@ -291,7 +294,16 @@ class VarietyCartesianGeometry {
   /// The animation progress, from `0` (collapsed) to `1` (fully drawn).
   final double progress;
 
-  /// A per series override for [progress], one entry per series.
+  /// Whether the series are turned into drawable elements.
+  ///
+  /// A caller that only needs the resolved ranges, ticks and captions — the
+  /// chart's inset probe, which is built on every frame purely to measure how
+  /// much room the axis furniture wants — can pass `false` and skip the
+  /// element pass entirely. [elements] is then empty, so nothing that draws
+  /// may be handed a geometry built this way.
+  final bool buildElements;
+
+  /// A per-series override for [progress], one entry per series.
   ///
   /// The chart widget fills this in so that a series carrying
   /// `animationDelay` starts later than the ones before it. Indexes past the
@@ -387,6 +399,15 @@ class VarietyCartesianGeometry {
   /// categories, and looking a point up by its caption would then drop it on
   /// the wrong slot.
   final List<List<String>> _axisCategoryKeys = <List<String>>[];
+
+  /// The same keys as [_axisCategoryKeys], indexed by themselves.
+  ///
+  /// A category chart looks a point's slot up once per point and again for
+  /// every element it builds, so scanning the key list each time made the
+  /// layout quadratic in the number of categories: a few thousand points were
+  /// enough to take tens of milliseconds a frame. The map keeps the lookup
+  /// constant time and holds nothing the list does not already hold.
+  final List<Map<String, int>> _categoryKeyIndexes = <Map<String, int>>[];
 
   /// The ordered category captions of the primary horizontal axis.
   List<String> get categories => axisCategories[0];
@@ -589,6 +610,7 @@ class VarietyCartesianGeometry {
       axisCategories.add(<String>[]);
       axisCategoryValues.add(<dynamic>[]);
       _axisCategoryKeys.add(<String>[]);
+      _categoryKeyIndexes.add(<String, int>{});
       axisSlotCenters.add(<double>[]);
       axisSlotWidths.add(0);
       axisDateTimeTicks.add(<DateTime>[]);
@@ -650,6 +672,9 @@ class VarietyCartesianGeometry {
         }
       }
     }
+    for (int i = 0; i < order.length; i++) {
+      _categoryKeyIndexes[0][order[i]] = i;
+    }
     _axisCategoryKeys[0].addAll(order);
     axisCategories[0].addAll(
       axisCategoryValues[0].map(
@@ -663,7 +688,7 @@ class VarietyCartesianGeometry {
         (int p) {
           final VarietyChartData point = sourceData[s][p];
           final String key = point.label ?? _categoryKey(point.x);
-          final int index = _axisCategoryKeys[0].indexOf(key);
+          final int index = _categoryKeyIndexes[0][key] ?? -1;
           return VarietyChartData(
             point.y ?? 0,
             index < 0 ? p.toDouble() : index.toDouble(),
@@ -893,6 +918,7 @@ class VarietyCartesianGeometry {
         for (final VarietyChartData point in resolvedData[s]) {
           final String key = point.label ?? _categoryKey(point.x);
           if (seen.add(key)) {
+            _categoryKeyIndexes[i][key] = _axisCategoryKeys[i].length;
             _axisCategoryKeys[i].add(key);
             axisCategoryValues[i].add(point.x);
           }
@@ -914,8 +940,9 @@ class VarietyCartesianGeometry {
     if (axisIndex < 0 || axisIndex >= _axisCategoryKeys.length) {
       return -1;
     }
-    return _axisCategoryKeys[axisIndex]
-        .indexOf(point.label ?? _categoryKey(point.x));
+    return _categoryKeyIndexes[axisIndex]
+            [point.label ?? _categoryKey(point.x)] ??
+        -1;
   }
 
   /// The identity of a category.

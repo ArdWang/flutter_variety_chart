@@ -1,3 +1,51 @@
+## 0.5.16
+
+### A cheaper frame, and one list that stopped growing
+
+Nothing here changes what a chart looks like. It changes how much work each
+frame costs, and it fixes a list that never stopped growing.
+
+Fixed
+
+* The axis label rectangles the painter hands back were appended to on every
+  frame rather than describing the current one. A chart that repainted for a
+  second collected hundreds of stale rectangles: memory that grew without
+  bound, and a hit test that could match positions no longer on screen. Both
+  hit lists are emptied at the start of a paint now. The regression test in
+  `test/render/variety_render_hot_paths_test.dart` reports twelve entries
+  where four are expected on the previous revision.
+
+Performance
+
+* A category chart looked a point's slot up by scanning the whole category
+  list, once per point and again for every element built, which made the layout
+  quadratic in the number of categories. Three series of two thousand points
+  took 19.6 ms to lay out and now take 3.6 ms. The lookup goes through an index
+  built alongside the keys, so what it resolves is unchanged.
+* The inset probe that is built on every frame purely to measure the axis
+  furniture no longer builds the series elements, which nothing on that path
+  reads: 0.9 ms against 3.6 ms for a full build of the same data.
+* Markers no longer build a path and two paints apiece. The glyph is built once
+  per shape and size, the circle and the square go straight to the canvas, and
+  the paints are reused with their colour reassigned. A five thousand point
+  scatter went from 14.4 ms a frame to 4.6 ms, and a two thousand point line
+  with markers from 7.6 ms to 2.1 ms.
+* The dashes of a dashed path are collected into a single path and drawn once,
+  instead of a path being cut out and drawn for each dash: a two thousand point
+  dashed line went from 5.9 ms a frame to 3.7 ms.
+
+Added
+
+* `VarietyCartesianGeometry.buildElements`. Passing `false` skips the element
+  pass for callers that only need the ranges, ticks and captions; `elements` is
+  then empty, so nothing that draws should be handed a geometry built that way.
+
+Notes
+
+* A series dense enough to draw several points per pixel still costs
+  proportionally more to dash, because there are proportionally more dashes.
+  That is what `VarietyFastLineSeries` and its `decimationFactor` are for.
+
 ## 0.5.15
 
 ### The rest of the dead configuration, and the first export hook

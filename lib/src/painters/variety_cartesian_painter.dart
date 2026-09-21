@@ -176,6 +176,12 @@ class VarietyCartesianPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Both lists describe what is on screen *now*, so they are emptied at the
+    // start of every frame. Appending to them instead let them grow without
+    // bound across repaints, which both leaked and left stale rectangles
+    // behind for the hit test to match against.
+    labelHits?.clear();
+    axisLabelHits?.clear();
     if (_seriesVisible.isEmpty) {
       for (int s = 0; s < geometry.series.length; s++) {
         _seriesVisible[s] = geometry.series[s].initialIsVisible;

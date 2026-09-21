@@ -902,6 +902,9 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   (VarietyCartesianGeometry, VarietyCartesianGeometry) _geometries(Size size) {
     final Size safe = Size(math.max(size.width, 1), math.max(size.height, 1));
+    // The probe exists only to measure how much room the axis furniture wants,
+    // so it skips the element pass: nothing here reads `elements`, and building
+    // them would duplicate a third of the frame's work for nothing.
     final VarietyCartesianGeometry probe = VarietyCartesianGeometry(
       series: _items,
       xAxis: widget.primaryXAxis,
@@ -911,6 +914,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       secondaryYAxes: widget.secondaryYAxes,
       secondaryXAxes: widget.secondaryXAxes,
       palette: widget.palette ?? VarietyChartTheme.of(context).palette,
+      buildElements: false,
     );
     final EdgeInsets insets = _insetsFor(probe);
     Rect plotRect = Rect.fromLTRB(

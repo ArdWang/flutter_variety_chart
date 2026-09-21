@@ -192,68 +192,110 @@ class VarietyElementRenderer {
     }
   }
 
+  /// Marker glyphs, built once per shape and size.
+  ///
+  /// A scatter series can carry thousands of markers and each one used to have
+  /// its path built from scratch on every frame. The glyph only depends on the
+  /// shape and the size, so it is built once and drawn where it is needed. The
+  /// map is bounded because the pair usually takes only a handful of values,
+  /// and is dropped whole if a chart ever animates a size freely.
+  static final Map<(VarietyMarkerShape, double), Path> _glyphs =
+      <(VarietyMarkerShape, double), Path>{};
+
+  /// The glyph of [shape] at [size], centred on the origin.
+  Path glyphFor(VarietyMarkerShape shape, double size) {
+    if (_glyphs.length > 64) {
+      _glyphs.clear();
+    }
+    return _glyphs.putIfAbsent(
+      (shape, size),
+      () => markerPath(shape, Offset.zero, size),
+    );
+  }
+
   /// Paints a set of markers.
+  ///
+  /// The two paints are built once and their colour is reassigned per marker
+  /// rather than a fresh [Paint] being allocated for each of thousands of
+  /// glyphs, and the shapes the canvas can draw directly skip the path
+  /// entirely.
   void drawMarkers(Canvas canvas, VarietyMarkersElement element) {
+    final Paint fill = Paint()
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    final Paint stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = element.borderWidth
+      ..isAntiAlias = true;
+    final bool strokeOnly = isStrokeMarker(element.shape);
     for (final VarietyMarker marker in element.markers) {
       final double size = marker.size ?? element.size;
-      final Path path = markerPath(element.shape, marker.center, size);
       final Color color = marker.color ?? element.color;
-      if (isStrokeMarker(element.shape)) {
-        canvas.drawPath(
-          path,
-          Paint()
-            ..color = color
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = math.max(size * 0.22, 1.4)
-            ..strokeCap = StrokeCap.round
-            ..isAntiAlias = true,
-        );
+      if (strokeOnly) {
+        stroke
+          ..color = color
+          ..strokeWidth = math.max(size * 0.22, 1.4)
+          ..strokeCap = StrokeCap.round;
+        _drawGlyph(canvas, element.shape, marker.center, size, stroke);
         continue;
       }
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.fill
-          ..isAntiAlias = true,
-      );
+      fill.color = color;
+      _drawGlyph(canvas, element.shape, marker.center, size, fill);
       if (element.border != null) {
-        canvas.drawPath(
-          path,
-          Paint()
-            ..color = element.border!
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = element.borderWidth
-            ..isAntiAlias = true,
-        );
+        stroke
+          ..color = element.border!
+          ..strokeWidth = element.borderWidth;
+        _drawGlyph(canvas, element.shape, marker.center, size, stroke);
       }
+    }
+  }
+
+  /// Draws one glyph at [center], using the cheapest shape the canvas offers.
+  void _drawGlyph(
+    Canvas canvas,
+    VarietyMarkerShape shape,
+    Offset center,
+    double size,
+    Paint paint,
+  ) {
+    switch (shape) {
+      case VarietyMarkerShape.none:
+        return;
+      case VarietyMarkerShape.circle:
+        canvas.drawCircle(center, size / 2, paint);
+      case VarietyMarkerShape.square:
+        canvas.drawRect(
+          Rect.fromCenter(center: center, width: size, height: size),
+          paint,
+        );
+      default:
+        final Path glyph = glyphFor(shape, size);
+        // The template sits on the origin, so the canvas carries the offset
+        // rather than a copy of the path being made for every marker.
+        canvas.save();
+        canvas.translate(center.dx, center.dy);
+        canvas.drawPath(glyph, paint);
+        canvas.restore();
     }
   }
 
   /// Paints a set of bubbles.
   void drawBubbles(Canvas canvas, VarietyBubblesElement element) {
+    final Paint fill = Paint()..isAntiAlias = true;
+    final Paint stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = element.borderWidth
+      ..isAntiAlias = true;
     for (final VarietyBubble bubble in element.bubbles) {
       if (bubble.radius <= 0) {
         continue;
       }
       final Color color = bubble.color ?? element.color;
-      canvas.drawCircle(
-        bubble.center,
-        bubble.radius,
-        Paint()
-          ..color = color.withValues(alpha: color.a * element.fillOpacity)
-          ..isAntiAlias = true,
-      );
+      fill.color = color.withValues(alpha: color.a * element.fillOpacity);
+      canvas.drawCircle(bubble.center, bubble.radius, fill);
       if (element.border != null && element.borderWidth > 0) {
-        canvas.drawCircle(
-          bubble.center,
-          bubble.radius,
-          Paint()
-            ..color = element.border!
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = element.borderWidth
-            ..isAntiAlias = true,
-        );
+        stroke.color = element.border!;
+        canvas.drawCircle(bubble.center, bubble.radius, stroke);
       }
     }
   }
@@ -454,11 +496,19 @@ class VarietyElementRenderer {
   }
 
   /// Draws a path using a dash pattern.
+  ///
+  /// Every dash is appended to one path which is then drawn once. Cutting each
+  /// dash out with `extractPath` and drawing it on its own cost a path
+  /// allocation and a canvas call per dash, which turned a long dashed series
+  /// into thousands of both: a five thousand point dashed line spent about a
+  /// hundred milliseconds a frame that way, against a fraction of a
+  /// millisecond once the subpaths are batched.
   void dashPath(Canvas canvas, Path path, Paint paint, List<double> pattern) {
     if (pattern.isEmpty) {
       canvas.drawPath(path, paint);
       return;
     }
+    final Path dashes = Path();
     for (final ui.PathMetric metric in path.computeMetrics()) {
       double distance = 0;
       int index = 0;
@@ -466,12 +516,16 @@ class VarietyElementRenderer {
         final double length = pattern[index % pattern.length];
         final double next = math.min(distance + length, metric.length);
         if (index.isEven) {
-          canvas.drawPath(metric.extractPath(distance, next), paint);
+          // `extractPath` follows the path, corners and all, so a dash that
+          // spans a vertex still bends round it. Chaining its tangents instead
+          // would cut that corner, which is visible on a jagged line.
+          dashes.addPath(metric.extractPath(distance, next), Offset.zero);
         }
         distance = next;
         index++;
       }
     }
+    canvas.drawPath(dashes, paint);
   }
 
   /// Whether a marker shape is drawn with strokes rather than a fill.
