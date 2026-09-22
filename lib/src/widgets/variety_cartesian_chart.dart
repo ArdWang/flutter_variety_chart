@@ -18,6 +18,7 @@ import '../models/variety_legend_settings.dart';
 import '../models/variety_options.dart';
 import '../models/variety_series.dart';
 import '../painters/variety_cartesian_painter.dart';
+import '../painters/variety_element_renderer.dart';
 import '../render/variety_chart_theme.dart';
 import '../render/variety_geometry.dart';
 import '../utils/variety_label_utils.dart';
@@ -927,6 +928,11 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       plotRect = Rect.fromLTWH(
           0, 0, math.max(safe.width, 1), math.max(safe.height, 1));
     }
+    // Of the three or four geometries a frame builds, only `display` is ever
+    // painted. The base is read for its two x limits and its two y limits, and
+    // the range probe for its y limits, so none of them has any use for the
+    // element pass: skipping it there takes about three quarters of the frame's
+    // layout work away on a large data set.
     final VarietyCartesianGeometry base = VarietyCartesianGeometry(
       series: _items,
       xAxis: widget.primaryXAxis,
@@ -937,6 +943,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       secondaryYAxes: widget.secondaryYAxes,
       secondaryXAxes: widget.secondaryXAxes,
       palette: widget.palette ?? VarietyChartTheme.of(context).palette,
+      buildElements: false,
     );
     _baseXMin = base.xMinimum;
     _baseXMax = base.xMaximum;
@@ -1035,7 +1042,8 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       dataLabelResolver: _resolveDataLabel,
       secondaryYAxes: widget.secondaryYAxes,
       secondaryXAxes: widget.secondaryXAxes,
-      palette: VarietyChartTheme.of(context).palette,
+      palette: widget.palette ?? VarietyChartTheme.of(context).palette,
+      buildElements: false,
     );
   }
 
@@ -1052,7 +1060,13 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     final TextStyle xStyle = _tickLabelStyle(probe.xAxis);
     double bottom = 10;
     final double rotation = probe.xAxis.labelRotation * math.pi / 180;
-    if (probe.xAxisType == VarietyAxisType.category ||
+    if (rotation == 0) {
+      // An upright single line is as tall as its style, whatever it says, so
+      // one sample is the whole answer. Measuring every caption of a chart
+      // with two thousand categories cost about seventy milliseconds a frame,
+      // against the twenty-odd captions that are actually painted.
+      bottom = math.max(bottom, _textSize('0', xStyle).height + 8);
+    } else if (probe.xAxisType == VarietyAxisType.category ||
         probe.xAxisType == VarietyAxisType.dateTimeCategory) {
       for (final String caption in probe.categories) {
         bottom =
@@ -1066,8 +1080,8 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
         );
       }
     } else {
-      // Measure the captions that will actually be drawn: the tick values come
-      // from the geometry so this agrees with the painted grid lines and labels.
+      // A rotated run is only as tall as its style when it is upright, so the
+      // captions the axis will draw are measured through the shared cache.
       for (final double value in probe.xNumericTicks) {
         final String caption = probe.xAxis.labelFormatter?.call(value) ??
             varietyFormatNumber(value);
@@ -1216,14 +1230,10 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
         (size.width * math.sin(rotation)).abs();
   }
 
-  Size _textSize(String text, TextStyle style) {
-    final TextPainter painter = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-    )..layout();
-    return painter.size;
-  }
+  /// The size a caption takes, measured through the painter's own cache so
+  /// that reserving room for a caption and drawing it cost one layout.
+  Size _textSize(String text, TextStyle style) =>
+      VarietyElementRenderer.measure(text, style);
 
   // ---------------------------------------------------------------------------
   // Pointer handling

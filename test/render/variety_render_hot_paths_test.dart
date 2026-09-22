@@ -176,6 +176,116 @@ void main() {
     });
   });
 
+  group('percentage stacks are summed once per point', () {
+    VarietyCartesianGeometry stacked() => VarietyCartesianGeometry(
+          series: <VarietySeries>[
+            VarietyColumnSeries(
+              name: 'A',
+              stackMode: VarietyStackingMode.percent100,
+              data: const <VarietyChartData>[
+                VarietyChartData('x', 30),
+                VarietyChartData('y', 50),
+              ],
+            ),
+            VarietyColumnSeries(
+              name: 'B',
+              stackMode: VarietyStackingMode.percent100,
+              data: const <VarietyChartData>[
+                VarietyChartData('x', 70),
+                VarietyChartData('y', 50),
+              ],
+            ),
+            VarietyColumnSeries(
+              name: 'C',
+              yAxisName: 'second',
+              stackMode: VarietyStackingMode.percent100,
+              data: const <VarietyChartData>[
+                VarietyChartData('x', 10),
+                VarietyChartData('y', 20),
+              ],
+            ),
+            VarietyColumnSeries(
+              name: 'D',
+              yAxisName: 'second',
+              stackMode: VarietyStackingMode.percent100,
+              data: const <VarietyChartData>[
+                VarietyChartData('x', 10),
+                VarietyChartData('y', 80),
+              ],
+            ),
+          ],
+          xAxis: const VarietyAxis(type: VarietyAxisType.category),
+          yAxis: const VarietyAxis(type: VarietyAxisType.numeric),
+          secondaryYAxes: const <VarietyAxis>[
+            VarietyAxis(type: VarietyAxisType.numeric, name: 'second'),
+          ],
+          plotRect: defaultPlotRect,
+          progress: 1,
+        );
+
+    test('each point is normalised against its own total', () {
+      final VarietyCartesianGeometry geometry = stacked();
+      expect(geometry.topValue(0, 0), closeTo(30, 0.001));
+      expect(geometry.baseValue(1, 0), closeTo(30, 0.001));
+      expect(geometry.topValue(1, 0), closeTo(100, 0.001));
+      // The second point has a different total, so a total that was worked out
+      // once for the axis and reused for every point would show up here.
+      expect(geometry.topValue(0, 1), closeTo(50, 0.001));
+      expect(geometry.topValue(1, 1), closeTo(100, 0.001));
+      expect(geometry.baseValue(1, 1), closeTo(50, 0.001));
+    });
+
+    test('a second value axis keeps its own totals', () {
+      final VarietyCartesianGeometry geometry = stacked();
+      // Ten and ten on the second axis is fifty percent each, not the hundred
+      // the first axis adds up to.
+      expect(geometry.topValue(2, 0), closeTo(50, 0.001));
+      expect(geometry.baseValue(3, 0), closeTo(50, 0.001));
+      expect(geometry.topValue(3, 0), closeTo(100, 0.001));
+      expect(geometry.topValue(2, 1), closeTo(20, 0.001));
+      expect(geometry.topValue(3, 1), closeTo(100, 0.001));
+    });
+  });
+
+  group('text runs are laid out once', () {
+    test('the same text and style comes back as the same run', () {
+      const TextStyle style = TextStyle(fontSize: 11, color: Color(0xFF333333));
+      final TextPainter first = VarietyElementRenderer.runFor('Jan', style);
+      expect(identical(VarietyElementRenderer.runFor('Jan', style), first),
+          isTrue);
+      expect(
+        identical(VarietyElementRenderer.runFor('Feb', style), first),
+        isFalse,
+      );
+      expect(
+        identical(
+          VarietyElementRenderer.runFor('Jan', const TextStyle(fontSize: 12)),
+          first,
+        ),
+        isFalse,
+      );
+      // A trimmed run is laid out to a width, so it is a different entry.
+      final TextPainter trimmed =
+          VarietyElementRenderer.runFor('January sales', style, maxWidth: 24);
+      expect(trimmed.width, lessThanOrEqualTo(24));
+      expect(
+        identical(
+          VarietyElementRenderer.runFor('January sales', style, maxWidth: 24),
+          trimmed,
+        ),
+        isTrue,
+      );
+    });
+
+    test('measuring and drawing agree on the same run', () {
+      const TextStyle style = TextStyle(fontSize: 11, color: Color(0xFF333333));
+      expect(
+        VarietyElementRenderer.measure('Revenue', style),
+        VarietyElementRenderer.runFor('Revenue', style).size,
+      );
+    });
+  });
+
   group('dashes are batched into one path', () {
     test('a dashed rule still draws as a run of dashes', () async {
       Future<int> dashCount(List<double> pattern) async {

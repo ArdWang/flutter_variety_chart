@@ -1128,13 +1128,6 @@ class VarietyCartesianPainter extends CustomPainter {
         break;
     }
 
-    final List<TextPainter> painters = ticks
-        .map((_AxisTick tick) => _renderer.layoutText(tick.text, style))
-        .toList(growable: false);
-    final List<double> extents = painters
-        .map((TextPainter painter) => _projectedWidth(painter, rotation))
-        .toList(growable: false);
-
     final List<bool> visible = List<bool>.filled(ticks.length, true);
     // A caption is only ever allowed to appear once. Two ticks can end up with
     // the same text when the label format is coarser than the tick interval,
@@ -1145,7 +1138,23 @@ class VarietyCartesianPainter extends CustomPainter {
         visible[i] = false;
       }
     }
+    // Both of the passes above decide from the index and the text alone, so
+    // they run before anything is measured.
     _capLabelCount(ticks.length, axis, geometry.plotRect.width, visible);
+    // Only the captions that survive are laid out. A chart with two thousand
+    // categories used to lay out two thousand of them on every frame in order
+    // to draw about twenty, which was most of the cost of a frame.
+    final List<TextPainter?> painters =
+        List<TextPainter?>.filled(ticks.length, null);
+    final List<double> extents = List<double>.filled(ticks.length, 0);
+    for (int i = 0; i < ticks.length; i++) {
+      if (!visible[i]) {
+        continue;
+      }
+      final TextPainter painter = _renderer.layoutText(ticks[i].text, style);
+      painters[i] = painter;
+      extents[i] = _projectedWidth(painter, rotation);
+    }
     final bool thinning =
         axis.labelIntersectAction == VarietyLabelIntersectAction.hide ||
             axis.labelIntersectAction == VarietyLabelIntersectAction.rotate45 ||
@@ -1171,7 +1180,7 @@ class VarietyCartesianPainter extends CustomPainter {
       if (!visible[i]) {
         continue;
       }
-      final TextPainter painter = painters[i];
+      final TextPainter painter = painters[i]!;
       double x = ticks[i].position + _labelAlignmentShift(axis, extents[i]);
       if (axis.edgeLabelPlacement != VarietyEdgeLabelPlacement.none) {
         final double half = extents[i] / 2;

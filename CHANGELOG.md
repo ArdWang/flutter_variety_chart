@@ -1,3 +1,51 @@
+## 0.5.17
+
+### Four more places where a frame did the same work twice
+
+Nothing here changes what a chart looks like either.
+
+Performance
+
+* A percentage stack worked out its total once per series per point, and working
+  one out walks every series, so the layout was quadratic in the series count:
+  four series of a thousand points took 2.8 ms, eight took 13.3 ms and sixteen
+  took 68.5 ms. The totals are summed once per value axis now and read from
+  there: 1.5 ms, 3.3 ms and 10.2 ms for the same three charts, which scales with
+  the data again instead of with its square.
+* The horizontal captions were laid out before the label cap and the overlap
+  thinning threw most of them away, so a chart of two thousand categories laid
+  out two thousand of them on every frame in order to draw about twenty. The cap
+  and the duplicate-caption pass decide from the index and the text alone, so
+  they run first now and only the survivors are measured: the frame of a three
+  series, two thousand category column chart went from 86 ms to 16 ms, and the
+  single series case from 78 ms to 7.3 ms. Painting a two thousand point column
+  series went from 75 ms to 5.5 ms for the same reason.
+* Text runs are laid out once and handed out from a bounded cache, so drawing a
+  caption on the next frame is a lookup rather than a fresh layout. Measuring a
+  caption for the axis inset and then drawing it also cost two layouts for the
+  same run; the widget now measures through the painter's cache, and reserving
+  room for an upright label row measures one sample instead of every caption,
+  because a single line is as tall as its style whatever it says.
+* Of the three or four geometries a frame builds, only the painted one builds
+  elements. The base geometry is read for its four limits and the range probe
+  for its two, so the other two skip the element pass, which is about three
+  quarters of a frame's layout work on a large data set.
+
+Added
+
+* `VarietyElementRenderer.runFor` and `VarietyElementRenderer.measure`, the
+  cached layout the painter draws from and the widget measures with.
+
+Notes
+
+* Runs are keyed by the text and by the style's own values, so a theme change
+  produces a different style and a different run. An application that swaps its
+  default font while leaving the same `TextStyle` in place would be handed the
+  runs measured before the swap, until the map is dropped at
+  `VarietyElementRenderer.runCacheLimit`.
+
+394 tests before, 398 after.
+
 ## 0.5.16
 
 ### A cheaper frame, and one list that stopped growing

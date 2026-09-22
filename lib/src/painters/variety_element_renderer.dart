@@ -459,23 +459,66 @@ class VarietyElementRenderer {
   ///
   /// This is what the `trim` label intersect action needs: a caption that
   /// cannot fit keeps its head and loses its tail rather than vanishing.
-  TextPainter trimText(String text, TextStyle style, double maxWidth) {
-    return TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-      ellipsis: '\u2026',
-    )..layout(maxWidth: math.max(maxWidth, 1));
+  TextPainter trimText(String text, TextStyle style, double maxWidth) =>
+      runFor(text, style, maxWidth: math.max(maxWidth, 1));
+
+  /// Laid out runs, keyed by what they were laid out from.
+  ///
+  /// Laying a run out costs tens of microseconds and a chart lays the same
+  /// handful out on every frame: the axis captions, the titles, the data
+  /// labels. Handing out the same painter for the same text and style makes
+  /// all of those after the first frame a map lookup. The map is bounded and
+  /// simply dropped when it grows past the bound, which refills in a frame.
+  ///
+  /// The painters are shared, so a caller must paint them and read their size
+  /// and nothing else; laying one out again would corrupt every other reader.
+  ///
+  /// A run is keyed by the text and by the style's own values, so a theme
+  /// change produces a different style and therefore a different run. The one
+  /// case that is not covered is an application that swaps its default font
+  /// while leaving the same [TextStyle] in place: the runs measured before the
+  /// swap would be handed out until the map is dropped at
+  /// [runCacheLimit].
+  static final Map<(String, TextStyle, double), TextPainter> _runs =
+      <(String, TextStyle, double), TextPainter>{};
+
+  /// How many runs are kept before the map is dropped and refilled.
+  ///
+  /// A chart of a few hundred categories with its labels turned upright keeps
+  /// every caption it will ever draw well inside this, so the cache holds
+  /// across frames instead of being emptied in the middle of one.
+  static const int runCacheLimit = 2048;
+
+  /// The cached run for [text], laid out to [maxWidth] when one is given.
+  static TextPainter runFor(
+    String text,
+    TextStyle style, {
+    double? maxWidth,
+  }) {
+    if (_runs.length > runCacheLimit) {
+      _runs.clear();
+    }
+    final double width = maxWidth ?? double.infinity;
+    return _runs.putIfAbsent(
+      (text, style, width),
+      () => TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: maxWidth == null ? null : '\u2026',
+      )..layout(maxWidth: width),
+    );
   }
 
+  /// The size [text] takes at [style].
+  ///
+  /// This is the measurement the chart widget reserves room with, so it goes
+  /// through the same cache the painter draws from: measuring a caption here
+  /// and drawing it there costs one layout rather than two.
+  static Size measure(String text, TextStyle style) => runFor(text, style).size;
+
   /// Lays out a single-line text run.
-  TextPainter layoutText(String text, TextStyle style) {
-    return TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-    )..layout();
-  }
+  TextPainter layoutText(String text, TextStyle style) => runFor(text, style);
 
   /// Draws a line, honouring an optional dash pattern.
   void drawLine(
