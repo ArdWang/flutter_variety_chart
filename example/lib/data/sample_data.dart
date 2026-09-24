@@ -24,6 +24,34 @@ const List<VarietyChartData> monthlyTarget = <VarietyChartData>[
   VarietyChartData('Aug', 57, label: 'August'),
 ];
 
+/// Indoor temperature, in degrees Celsius, for the two-axis demo. It shares its
+/// categories with [indoorHumidity] so both series land on the same slots.
+const List<VarietyChartData> indoorTemperature = <VarietyChartData>[
+  VarietyChartData('Jan', 21.4),
+  VarietyChartData('Feb', 22.1),
+  VarietyChartData('Mar', 23.6),
+  VarietyChartData('Apr', 25.2),
+  VarietyChartData('May', 26.8),
+  VarietyChartData('Jun', 28.1),
+  VarietyChartData('Jul', 28.9),
+  VarietyChartData('Aug', 28.2),
+];
+
+/// Relative humidity, in percent, for the two-axis demo.
+///
+/// The values sit in a band that has nothing to do with the temperature scale,
+/// which is exactly why the pair needs its own axis instead of sharing one.
+const List<VarietyChartData> indoorHumidity = <VarietyChartData>[
+  VarietyChartData('Jan', 62),
+  VarietyChartData('Feb', 58),
+  VarietyChartData('Mar', 52),
+  VarietyChartData('Apr', 46),
+  VarietyChartData('May', 41),
+  VarietyChartData('Jun', 38),
+  VarietyChartData('Jul', 36),
+  VarietyChartData('Aug', 39),
+];
+
 /// A typical conversion funnel.
 const List<VarietyChartData> funnelStages = <VarietyChartData>[
   VarietyChartData('Visited', 1200, label: 'Visited'),

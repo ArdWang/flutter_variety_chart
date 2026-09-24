@@ -95,6 +95,141 @@ void main() {
       expect(details!.isVisible, isFalse);
     });
 
+    testWidgets('tapping an item actually drops the series from the plot',
+        (WidgetTester tester) async {
+      bool? reported;
+      await tester.pumpWidget(
+        host(
+          VarietyCartesianChart(
+            legendSettings: const VarietyLegendSettings(
+              toggleSeriesVisibility: true,
+            ),
+            onLegendTapped: (VarietyLegendTapDetails value) =>
+                reported = value.isVisible,
+            series: <VarietySeries>[
+              VarietyColumnSeries(name: 'Alpha', data: monthly()),
+              VarietyLineSeries(name: 'Beta', data: monthly()),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // Both legends start undecorated.
+      expect(
+        tester.widget<Text>(find.text('Alpha')).style?.decoration,
+        isNot(TextDecoration.lineThrough),
+      );
+
+      await tester.tap(find.text('Alpha'));
+      await tester.pumpAndSettle();
+
+      // The tap has to change the chart's own hidden set, not just report it:
+      // the legend strikes the caption through exactly when the series is in
+      // that set, so this is the state the plot is filtered by.
+      expect(reported, isFalse);
+      expect(
+        tester.widget<Text>(find.text('Alpha')).style?.decoration,
+        TextDecoration.lineThrough,
+      );
+      expect(
+        tester.widget<Text>(find.text('Beta')).style?.decoration,
+        isNot(TextDecoration.lineThrough),
+      );
+
+      // Tapping again brings the series back.
+      await tester.tap(find.text('Alpha'));
+      await tester.pumpAndSettle();
+      expect(reported, isTrue);
+      expect(
+        tester.widget<Text>(find.text('Alpha')).style?.decoration,
+        isNot(TextDecoration.lineThrough),
+      );
+    });
+
+    testWidgets('a tap reports the series but keeps it when toggling is off',
+        (WidgetTester tester) async {
+      VarietyLegendTapDetails? details;
+      await tester.pumpWidget(
+        host(
+          VarietyCartesianChart(
+            onLegendTapped: (VarietyLegendTapDetails value) => details = value,
+            series: <VarietySeries>[
+              VarietyColumnSeries(name: 'Alpha', data: monthly()),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alpha'));
+      await tester.pumpAndSettle();
+      expect(details, isNotNull);
+      expect(
+        tester.widget<Text>(find.text('Alpha')).style?.decoration,
+        isNot(TextDecoration.lineThrough),
+      );
+    });
+
+    testWidgets('hiding the last visible series leaves the legend in place',
+        (WidgetTester tester) async {
+      // Tapping an entry is the only way to bring a hidden series back, so the
+      // legend has to outlive hiding everything it describes. It used to be
+      // asked for by the series still on the plot, which meant hiding the last
+      // one took the legend away with it and stranded the reader.
+      await tester.pumpWidget(
+        host(
+          VarietyCartesianChart(
+            legendSettings: const VarietyLegendSettings(
+              toggleSeriesVisibility: true,
+            ),
+            series: <VarietySeries>[
+              VarietyColumnSeries(name: 'Alpha', data: monthly()),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alpha'));
+      await tester.pumpAndSettle();
+      expect(find.text('Alpha'), findsOneWidget);
+
+      // And a second tap brings the series back.
+      await tester.tap(find.text('Alpha'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.text('Alpha')).style?.decoration,
+        isNot(TextDecoration.lineThrough),
+      );
+    });
+
+    testWidgets('a hidden custom item is dimmed rather than restyled',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        host(
+          VarietyCartesianChart(
+            legendSettings: const VarietyLegendSettings(
+              toggleSeriesVisibility: true,
+            ),
+            series: <VarietySeries>[
+              VarietyColumnSeries(name: 'Alpha', data: monthly()),
+            ],
+            legendBuilder:
+                (BuildContext context, VarietySeries series, int i) =>
+                    Text('custom-${series.name}'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('custom-Alpha'));
+      await tester.pumpAndSettle();
+      final Opacity dimmed = tester.widget<Opacity>(
+        find.ancestor(
+          of: find.text('custom-Alpha'),
+          matching: find.byType(Opacity),
+        ),
+      );
+      expect(dimmed.opacity, lessThan(1.0));
+    });
+
     testWidgets('a legend title is rendered', (WidgetTester tester) async {
       await tester.pumpWidget(
         host(

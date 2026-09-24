@@ -396,4 +396,121 @@ void main() {
       expect(geometry.secondaryTickLabel(1234.5), '1,234.50');
     });
   });
+
+  group('spacing', () {
+    double columnWidth(VarietySeries series) {
+      final VarietyCartesianGeometry geometry =
+          build(series: <VarietySeries>[series]);
+      return geometry.bandRects[0].first!.width;
+    }
+
+    /// A chart of bars alone transposes, so the slot the group is carved out of
+    /// runs vertically and the band a bar occupies is its height. Reading
+    /// `width` there would return the bar's length instead.
+    double barBand(VarietySeries series) {
+      final VarietyCartesianGeometry geometry =
+          build(series: <VarietySeries>[series]);
+      return geometry.bandRects[0].first!.height;
+    }
+
+    test('a column leaves the declared share of its width empty', () {
+      final double packed = columnWidth(VarietyColumnSeries(data: monthly()));
+      final double spaced = columnWidth(
+        VarietyColumnSeries(data: monthly(), spacing: 0.5),
+      );
+      expect(packed, greaterThan(0));
+      // The gap is taken off the width, not added beside it, so the group
+      // still fits in the slot it was given.
+      expect(spaced, closeTo(packed / 2, 0.001));
+    });
+
+    test('bars read the same setting', () {
+      final double packed = barBand(VarietyBarSeries(data: monthly()));
+      final double spaced = barBand(
+        VarietyBarSeries(data: monthly(), spacing: 0.25),
+      );
+      expect(packed, greaterThan(0));
+      expect(spaced, closeTo(packed * 0.75, 0.001));
+    });
+
+    test('the default leaves every rectangle at its old width', () {
+      // Bands are shared between the column-like series, so a series that
+      // never mentions spacing has to keep widthFactor as its only input.
+      final double declared = columnWidth(
+        VarietyColumnSeries(data: monthly(), spacing: 0),
+      );
+      final double omitted = columnWidth(VarietyColumnSeries(data: monthly()));
+      expect(omitted, closeTo(declared, 0.0001));
+    });
+
+    test('a spacing above one collapses rather than mirrors', () {
+      final double width = columnWidth(
+        VarietyColumnSeries(data: monthly(), spacing: 4),
+      );
+      expect(width, 0);
+    });
+  });
+
+  group('candles', () {
+    List<VarietyChartData> risingThenFalling() => const <VarietyChartData>[
+          // Close above open: rising.
+          VarietyChartData(1, 0, open: 100, high: 112, low: 98, close: 110),
+          // Close below open: falling.
+          VarietyChartData(2, 0, open: 110, high: 114, low: 96, close: 99),
+        ];
+
+    List<VarietyRectsElement> bodies(VarietyCandleSeries series) => build(
+          series: <VarietySeries>[series],
+        ).elements.whereType<VarietyRectsElement>().toList();
+
+    test('a rising candle is filled unless the series says otherwise', () {
+      final List<VarietyRectsElement> solid = bodies(
+        VarietyCandleSeries(data: risingThenFalling()),
+      );
+      final List<VarietyRectsElement> hollow = bodies(
+        VarietyCandleSeries(
+          data: risingThenFalling(),
+          enableSolidCandles: false,
+        ),
+      );
+      expect(solid, hasLength(2));
+      expect(hollow, hasLength(2));
+      expect(solid[0].color, isNot(const Color(0x00000000)));
+      expect(hollow[0].color, const Color(0x00000000));
+      // The outline still carries the colour, so a hollow candle is visible.
+      expect(hollow[0].border, isNotNull);
+      expect(hollow[0].borderWidth, greaterThan(0));
+      // Falling candles stay filled both ways, which is what keeps a dense
+      // chart readable.
+      expect(hollow[1].color, isNot(const Color(0x00000000)));
+      expect(hollow[1].color, solid[1].color);
+    });
+
+    test('a flat session is drawn when the indication is on', () {
+      const List<VarietyChartData> flat = <VarietyChartData>[
+        // All four prices equal: no body to draw.
+        VarietyChartData(1, 0, open: 100, high: 100, low: 100, close: 100),
+      ];
+      List<VarietyElement> elements({required bool indication}) => build(
+            series: <VarietySeries>[
+              VarietyCandleSeries(
+                data: flat,
+                showIndicationForSameValues: indication,
+              ),
+            ],
+          ).elements;
+
+      final List<VarietyElement> without = elements(indication: false);
+      final List<VarietyElement> with_ = elements(indication: true);
+      expect(
+          without.whereType<VarietyRectsElement>().first.rects.single, isEmpty);
+      expect(
+        with_.whereType<VarietySegmentsElement>(),
+        isNotEmpty,
+        reason: 'a flat candle needs a mark or it disappears from the chart',
+      );
+      // The mark stands for the candle, so no zero-height rectangle joins it.
+      expect(with_.whereType<VarietyRectsElement>(), isEmpty);
+    });
+  });
 }

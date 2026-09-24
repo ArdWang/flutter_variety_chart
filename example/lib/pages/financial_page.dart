@@ -50,6 +50,21 @@ class FinancialPage extends StatelessWidget {
           ),
         ),
         ChartCard(
+          title: 'Hollow rising candles',
+          height: 300,
+          child: VarietyCartesianChart(
+            series: <VarietySeries>[
+              VarietyCandleSeries(
+                name: 'ACME',
+                // Only the falling candles keep a solid body here, which makes
+                // a dense series easier to scan.
+                enableSolidCandles: false,
+                data: _datedPrices(),
+              ),
+            ],
+          ),
+        ),
+        ChartCard(
           title: 'Hi-lo and hi-lo-open-close',
           height: 300,
           child: VarietyCartesianChart(

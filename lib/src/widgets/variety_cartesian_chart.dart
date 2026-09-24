@@ -572,14 +572,16 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   }
 
   void _handleLegendTap(VarietySeries series, int index) {
-    // Tapping toggles, so a currently hidden series becomes visible.
-    final bool willBeVisible = _hiddenSeries.contains(index);
+    // Tapping flips the series, so a hidden one comes back and a visible one
+    // goes away. The value reported to `onLegendTapped` is the visibility the
+    // series has *after* the tap, which is the opposite of what it had.
+    final bool wasHidden = _hiddenSeries.contains(index);
     if (widget.legendSettings.toggleSeriesVisibility) {
       setState(() {
-        if (willBeVisible) {
-          _hiddenSeries.add(index);
-        } else {
+        if (wasHidden) {
           _hiddenSeries.remove(index);
+        } else {
+          _hiddenSeries.add(index);
         }
       });
     }
@@ -587,7 +589,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       VarietyLegendTapDetails(
         series: series,
         seriesIndex: index,
-        isVisible: willBeVisible,
+        isVisible: wasHidden,
       ),
     );
   }
@@ -631,7 +633,6 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   Widget _buildContent(BuildContext context) {
     final VarietyChartTheme theme = VarietyChartTheme.of(context);
-    final List<VarietySeries> items = _items;
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final bool bounded =
@@ -641,8 +642,14 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
           column.add(VarietyChartTitle(
               text: widget.title!, textStyle: widget.titleStyle));
         }
-        final bool wantsLegend =
-            widget.showLegend && items.any((VarietySeries s) => s.name != null);
+        // Asked for by the chart's own series rather than by the ones still on
+        // the plot. Hiding the last visible series must leave the legend in
+        // place, because tapping its entry is the only way back — a legend
+        // that disappears with the series it describes strands the reader.
+        final bool wantsLegend = widget.showLegend &&
+            widget.series.any(
+              (VarietySeries s) => !s.isCircular && s.name != null,
+            );
         // `auto` is resolved against the box the chart was given, so a wide
         // chart puts the legend beside the plot and a tall one underneath.
         final VarietyLegendPosition legendPosition =

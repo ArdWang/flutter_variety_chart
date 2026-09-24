@@ -38,6 +38,54 @@ class LineAreaPage extends StatelessWidget {
           ),
         ),
         ChartCard(
+          title: 'Two value axes, one plot area',
+          height: 300,
+          child: VarietyCartesianChart(
+            primaryYAxis: const VarietyAxis(
+              type: VarietyAxisType.numeric,
+              name: 'temperature',
+              title: 'Temperature (°C)',
+              minimum: 18,
+              maximum: 30,
+              interval: 3,
+            ),
+            // An extra axis is drawn to the right of the plot area. Naming it
+            // and pointing a line at that name is all it takes to put a series
+            // on its own scale; the humidity band would otherwise be flattened
+            // against the bottom of the temperature axis.
+            secondaryYAxes: const <VarietyAxis>[
+              VarietyAxis(
+                type: VarietyAxisType.numeric,
+                name: 'humidity',
+                title: 'Humidity (%)',
+                minimum: 30,
+                maximum: 70,
+                interval: 10,
+              ),
+            ],
+            legendSettings: const VarietyLegendSettings(
+              toggleSeriesVisibility: true,
+            ),
+            series: <VarietySeries>[
+              VarietyLineSeries(
+                name: 'Temperature',
+                yAxisName: 'temperature',
+                showMarkers: true,
+                markerShape: VarietyMarkerShape.circle,
+                data: indoorTemperature,
+              ),
+              VarietyLineSeries(
+                name: 'Humidity',
+                yAxisName: 'humidity',
+                lineStyle: VarietyLineStyle.curved,
+                showMarkers: true,
+                markerShape: VarietyMarkerShape.diamond,
+                data: indoorHumidity,
+              ),
+            ],
+          ),
+        ),
+        ChartCard(
           title: 'Curved spline',
           height: 260,
           child: VarietyCartesianChart(

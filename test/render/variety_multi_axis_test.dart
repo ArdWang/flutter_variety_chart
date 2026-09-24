@@ -1,7 +1,22 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
 import 'package:flutter_variety_chart/flutter_variety_chart.dart';
+// The painter is not part of the public surface, but these tests drive it
+// directly to check what actually reaches the canvas.
+import 'package:flutter_variety_chart/src/painters/variety_cartesian_painter.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 import '../test_helpers.dart';
+
+const VarietyChartTheme _theme = VarietyChartTheme(
+  gridLineColor: Color(0x1F000000),
+  axisLineColor: Color(0x59000000),
+  labelColor: Color(0xBF000000),
+  tooltipBackgroundColor: Color(0xFF32323A),
+  tooltipTextColor: Colors.white,
+  markerBorderColor: Colors.white,
+);
 
 const VarietyAxis rateAxis = VarietyAxis(
   type: VarietyAxisType.numeric,
@@ -219,4 +234,115 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  // Two series measured in different units is the reason a second value axis
+  // exists, and it is only working if both scales really reach the canvas. A
+  // chart that merely renders without throwing has not shown that.
+  group('two value axes on screen', () {
+    const VarietyAxis temperature = VarietyAxis(
+      type: VarietyAxisType.numeric,
+      name: 'temperature',
+      title: 'Temperature (C)',
+      minimum: 18,
+      maximum: 30,
+      interval: 3,
+    );
+    const VarietyAxis humidity = VarietyAxis(
+      type: VarietyAxisType.numeric,
+      name: 'humidity',
+      title: 'Humidity (%)',
+      minimum: 30,
+      maximum: 70,
+      interval: 10,
+    );
+
+    /// Paints the chart and collects both what the horizontal axis reported and
+    /// where every paragraph went, since `labelHits` covers the horizontal axis
+    /// alone and the value axes can only be seen through the canvas calls.
+    (VarietyCartesianGeometry, List<Offset>) paint() {
+      final VarietyCartesianGeometry geometry = VarietyCartesianGeometry(
+        series: <VarietySeries>[
+          VarietyLineSeries(data: monthly(), yAxisName: 'temperature'),
+          VarietyLineSeries(data: monthly(), yAxisName: 'humidity'),
+        ],
+        xAxis: const VarietyAxis(type: VarietyAxisType.category),
+        yAxis: temperature,
+        plotRect: defaultPlotRect,
+        progress: 1,
+        secondaryYAxes: const <VarietyAxis>[humidity],
+      );
+      expect(geometry.axisIndexOf(0), 0);
+      expect(geometry.axisIndexOf(1), 1);
+      final _RecordingCanvas canvas = _RecordingCanvas();
+      VarietyCartesianPainter(
+        geometry: geometry,
+        theme: _theme,
+      ).paint(canvas, const Size(400, 300));
+      return (geometry, canvas.paragraphs);
+    }
+
+    test('each value axis carries the scale it was configured with', () {
+      final (VarietyCartesianGeometry geometry, List<Offset> _) = paint();
+      // The two ranges share no tick value, so a tick can only have come from
+      // the axis it was configured on.
+      expect(geometry.yTicksOn(0).first, 18);
+      expect(geometry.yTicksOn(0).last, 30);
+      expect(geometry.yTicksOn(1).first, 30);
+      expect(geometry.yTicksOn(1).last, 70);
+      // The same number therefore means two different heights, which is the
+      // whole point of a second value axis.
+      expect(
+        geometry.pixelYOn(0, 30),
+        isNot(closeTo(geometry.pixelYOn(1, 30), 0.5)),
+      );
+    });
+
+    test('both scales reach the canvas, one on each side of the plot', () {
+      final (VarietyCartesianGeometry _, List<Offset> paragraphs) = paint();
+      expect(paragraphs, isNotEmpty);
+      // The primary scale hugs the left edge of the plot...
+      expect(
+        paragraphs.any((Offset at) => at.dx < defaultPlotRect.left),
+        isTrue,
+        reason: 'the primary value axis prints nothing left of the plot',
+      );
+      // ...and the extra one sits past its right edge, which is what makes the
+      // two scales readable at once.
+      expect(
+        paragraphs.any((Offset at) => at.dx >= defaultPlotRect.right),
+        isTrue,
+        reason: 'the secondary value axis prints nothing right of the plot',
+      );
+    });
+  });
+}
+
+/// A canvas that records where paragraphs were painted instead of rasterising
+/// them.
+///
+/// The painter never reads a value back out of the canvas it is handed, so
+/// answering every other call with `null` is enough to let a paint run through
+/// and still say where the text landed.
+class _RecordingCanvas implements ui.Canvas {
+  /// The top-left corner of every paragraph the painter drew.
+  final List<Offset> paragraphs = <Offset>[];
+
+  @override
+  void drawParagraph(ui.Paragraph paragraph, Offset offset) {
+    paragraphs.add(offset);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    // Everything the painter calls returns void, but answering the few calls
+    // that want a value keeps a future one from tripping over a null.
+    if (invocation.memberName == #getSaveCount) {
+      return 1;
+    }
+    if (invocation.memberName == #getDestinationClipBounds ||
+        invocation.memberName == #getLocalClipBounds) {
+      return Rect.zero;
+    }
+    return null;
+  }
 }

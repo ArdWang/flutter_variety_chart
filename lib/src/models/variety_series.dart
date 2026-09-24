@@ -531,6 +531,7 @@ class VarietyColumnSeries extends VarietySeries {
     this.borderWidth = 0.0,
     this.showTrack = false,
     this.trackColor,
+    this.spacing = 0.0,
   });
 
   /// The share of the available band occupied by the rectangle.
@@ -550,6 +551,14 @@ class VarietyColumnSeries extends VarietySeries {
 
   /// The colour of the track.
   final Color? trackColor;
+
+  /// The fraction of its own width a column leaves empty beside itself.
+  ///
+  /// `0` packs the columns of a group edge to edge, which is the default, and
+  /// `1` would shrink them to nothing. It is applied after [widthFactor], so
+  /// the two compose: the factor decides how much of the slot the group takes
+  /// and this opens a gap inside that.
+  final double spacing;
 
   @override
   bool get isBanded => true;
@@ -659,10 +668,17 @@ class VarietyBarSeries extends VarietySeries {
     this.cornerRadius = 0.0,
     this.borderColor,
     this.borderWidth = 0.0,
+    this.spacing = 0.0,
   });
 
   /// The share of the available band occupied by the rectangle.
   final double widthFactor;
+
+  /// The fraction of its own width a bar leaves empty beside itself.
+  ///
+  /// The horizontal counterpart of the gap [VarietyColumnSeries.spacing]
+  /// opens, read the same way.
+  final double spacing;
 
   /// The corner radius applied to the rectangle.
   final double cornerRadius;
@@ -836,6 +852,8 @@ class VarietyCandleSeries extends VarietySeries {
     this.borderColor,
     this.showWicks = true,
     this.widthFactor = 0.7,
+    this.enableSolidCandles = true,
+    this.showIndicationForSameValues = false,
   });
 
   /// The fill colour of rising candles.
@@ -852,6 +870,22 @@ class VarietyCandleSeries extends VarietySeries {
 
   /// The share of the available band occupied by one candle.
   final double widthFactor;
+
+  /// Whether a rising candle is filled or left hollow.
+  ///
+  /// Filled is the default and matches the way a candle chart is usually
+  /// drawn. Setting it to `false` outlines the rising candles instead, which
+  /// is the convention on some markets and also makes a dense series easier to
+  /// read, since only the falling ones carry a solid block of colour. Falling
+  /// candles are filled either way.
+  final bool enableSolidCandles;
+
+  /// Whether a candle whose four prices are equal is still given a visible mark.
+  ///
+  /// Such a candle has no body and draws nothing on its own, so a flat session
+  /// would simply be missing from the chart. With this on, it is drawn as a
+  /// short horizontal line where it belongs.
+  final bool showIndicationForSameValues;
 }
 
 /// A series that draws a vertical line between the high and the low value.

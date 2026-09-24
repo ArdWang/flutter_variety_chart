@@ -1,3 +1,46 @@
+## 0.5.18
+
+### Tapping a legend entry now takes the series off the plot
+
+Fixed
+
+* `VarietyLegendSettings.toggleSeriesVisibility` promised that tapping a
+  legend entry hides the series and tapping it again brings it back. The
+  callback reported the new state correctly the whole time, but the set the
+  plot is actually filtered by was never changed: a tap on a visible series
+  tried to remove it from a set it was not in, and a tap on a hidden one tried
+  to add it back to the same set. Both directions were inverted, so tapping
+  never hid anything. The set is toggled the way the callback already
+  described, and what `onLegendTapped` reports is unchanged.
+
+Added
+
+* A hidden legend entry is struck through and greyed out when the legend draws
+  the entry itself, so the state is readable from the legend alone. An entry
+  built by `legendBuilder` or `itemBuilder` is dimmed instead, because nothing
+  in the legend can restyle a widget it did not build. The cue is applied
+  whether or not a tap handler is attached, so a legend driven from outside the
+  chart still shows which series are off.
+* `VarietyColumnSeries.spacing` and `VarietyBarSeries.spacing` open a gap
+  between the rectangles of a group. The gap is taken out of each rectangle's
+  own width — `spacing: 0.3` leaves a little under a third of it empty — so a
+  group still fits the slot it was given, and the default of `0` draws exactly
+  what it always did.
+* `VarietyCandleSeries.enableSolidCandles` leaves rising candles hollow while
+  falling ones stay solid. It is the convention on some markets and it keeps a
+  dense series readable, since only half the candles carry a block of colour.
+  It defaults to `true`, which is what every version before this one drew.
+* `VarietyCandleSeries.showIndicationForSameValues` draws a short horizontal
+  mark for a session whose open, high, low and close are all equal. Such a
+  candle has no body and so drew nothing at all, which left a flat session
+  missing from the chart.
+
+Changed
+
+* The line and area demo pages gain a two value axes chart and a grouped column
+  chart with a gap, and the financial page shows hollow rising candles, so each
+  of the options above can be seen rather than only described.
+
 ## 0.5.17
 
 ### Four more places where a frame did the same work twice

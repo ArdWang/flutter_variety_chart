@@ -37,6 +37,29 @@ class ColumnBarPage extends StatelessWidget {
           ),
         ),
         ChartCard(
+          title: 'The same group with a gap between the columns',
+          height: 280,
+          child: VarietyCartesianChart(
+            series: <VarietySeries>[
+              VarietyColumnSeries(
+                name: 'Revenue',
+                cornerRadius: 4,
+                // `spacing` takes the gap out of each column's own width, so
+                // the pair still fits the slot it was given.
+                spacing: 0.3,
+                data: monthlyRevenue,
+              ),
+              VarietyColumnSeries(
+                name: 'Target',
+                widthFactor: 0.45,
+                cornerRadius: 4,
+                spacing: 0.3,
+                data: monthlyTarget,
+              ),
+            ],
+          ),
+        ),
+        ChartCard(
           title: 'Bars with data labels',
           height: 300,
           child: VarietyCartesianChart(

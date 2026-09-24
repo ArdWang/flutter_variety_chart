@@ -120,26 +120,36 @@ class VarietyLegend extends StatelessWidget {
       if (item.name == null && item.legendItemText == null) {
         continue;
       }
-      final Widget child = itemBuilder?.call(context, item, i) ??
-          settings.itemBuilder?.call(context, item, i) ??
+      final bool isHidden = hiddenIndexes.contains(i);
+      final Widget? custom = itemBuilder?.call(context, item, i) ??
+          settings.itemBuilder?.call(context, item, i);
+      final Widget child = custom ??
           _defaultItem(
             context,
             item,
             i,
             settings.textStyle ?? textStyle ?? fallback,
+            isHidden: isHidden,
           );
-      items.add(
-        onItemTap == null
-            ? child
-            : GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onItemTap!(item, i),
-                child: Opacity(
-                  opacity: hiddenIndexes.contains(i) ? 0.4 : 1,
-                  child: child,
-                ),
-              ),
-      );
+      // A hidden entry is dimmed whether or not the legend is tappable, so a
+      // legend wired to a controller outside the chart still shows its state.
+      // A custom item is dimmed as a whole because nothing here can reach
+      // inside it to restyle the text; the default item strikes its caption
+      // through instead, which is the stronger cue.
+      Widget entry = isHidden && custom != null
+          ? Opacity(opacity: 0.4, child: child)
+          : child;
+      if (onItemTap != null) {
+        entry = MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onItemTap!(item, i),
+            child: entry,
+          ),
+        );
+      }
+      items.add(entry);
     }
     if (items.isEmpty) {
       return const SizedBox.shrink();
@@ -199,10 +209,21 @@ class VarietyLegend extends StatelessWidget {
     BuildContext context,
     VarietySeries series,
     int index,
-    TextStyle style,
-  ) {
-    final Color color = series.color ??
+    TextStyle style, {
+    bool isHidden = false,
+  }) {
+    final Color paletteColor = series.color ??
         varietyDefaultPalette[index % varietyDefaultPalette.length];
+    // A hidden series greys out and strikes its caption through, so the state
+    // reads from the legend alone rather than from the plot behind it.
+    final Color color =
+        isHidden ? Theme.of(context).disabledColor : paletteColor;
+    final TextStyle effectiveStyle = isHidden
+        ? style.copyWith(
+            decoration: TextDecoration.lineThrough,
+            color: Theme.of(context).disabledColor,
+          )
+        : style;
     return Padding(
       padding: settings.itemPadding,
       child: Row(
@@ -230,7 +251,7 @@ class VarietyLegend extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          Text(series.legendItemText ?? series.name!, style: style),
+          Text(series.legendItemText ?? series.name!, style: effectiveStyle),
         ],
       ),
     );

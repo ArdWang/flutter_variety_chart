@@ -2523,6 +2523,22 @@ class VarietyCartesianGeometry {
     return 0.7;
   }
 
+  /// The fraction of its own width a rectangle leaves empty beside itself.
+  ///
+  /// Only the two series that expose the setting read anything but zero, so
+  /// every other banded series keeps the width it always had.
+  static double _spacingOf(VarietySeries item) {
+    final double? declared = switch (item) {
+      VarietyColumnSeries() => item.spacing,
+      VarietyBarSeries() => item.spacing,
+      _ => null,
+    };
+    if (declared == null) {
+      return 0;
+    }
+    return math.max(0, math.min(declared, 1));
+  }
+
   static bool _isColumnLike(VarietySeries item) =>
       item is VarietyColumnSeries ||
       item is VarietyBarSeries ||
@@ -2540,7 +2556,10 @@ class VarietyCartesianGeometry {
         if (_isColumnLike(series[s]) && _slotAxisIndexOf(s) == slotAxis) s,
     ];
     final double slot = axisSlotWidths[xAxisIndexOf(seriesIndex)];
-    final double width = slot * _bandFactor(item) / math.max(band.length, 1);
+    final double width = slot *
+        _bandFactor(item) *
+        (1 - _spacingOf(item)) /
+        math.max(band.length, 1);
     final int slotInBand = math.max(band.indexOf(seriesIndex), 0);
     final double shift =
         band.length > 1 ? (slotInBand - (band.length - 1) / 2) * width : 0;
@@ -2780,12 +2799,39 @@ class VarietyCartesianGeometry {
       math.max(open, close),
     );
     bandRects[seriesIndex][p] = body;
+    final Color stroke = item.borderColor ?? color;
+    // A session whose four prices are equal has no body, so a rectangle for it
+    // would draw nothing and the point would simply be absent. The indication
+    // gives it a readable mark instead.
+    final bool flat = item.showIndicationForSameValues &&
+        point.openValue == point.highValue &&
+        point.highValue == point.lowValue &&
+        point.lowValue == point.closeValue;
+    if (flat) {
+      elements.add(
+        VarietySegmentsElement(
+          seriesIndex: seriesIndex,
+          segments: <VarietySegment>[
+            VarietySegment(
+              Offset(center - width / 2, body.top),
+              Offset(center + width / 2, body.top),
+            ),
+          ],
+          color: stroke,
+          width: 1.4,
+        ),
+      );
+      return;
+    }
+    // A hollow rising candle only carries its outline. Falling candles stay
+    // filled either way, so the chart still reads at a glance.
+    final bool hollow = rising && !item.enableSolidCandles;
     elements.add(
       VarietyRectsElement(
         seriesIndex: seriesIndex,
         rects: <Rect>[body],
-        color: color,
-        border: item.borderColor ?? color,
+        color: hollow ? const Color(0x00000000) : color,
+        border: stroke,
         borderWidth: 1,
       ),
     );
