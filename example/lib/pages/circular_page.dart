@@ -41,7 +41,11 @@ class CircularPage extends StatelessWidget {
               VarietyDoughnutSeries(
                 name: 'Traffic',
                 innerRadiusFactor: 0.62,
-                cornerRadius: 6,
+                // Deliberately left without a corner radius. A rounded join has
+                // to give up the arc it turns in, which opens a gap to its
+                // neighbour — fine on its own, but the point of this chart is
+                // the widget in the middle, and the ring reads better whole.
+                // The radial bars further down show what the corners look like.
                 data: trafficSources,
               ),
             ],

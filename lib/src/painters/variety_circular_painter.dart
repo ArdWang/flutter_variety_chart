@@ -177,56 +177,96 @@ class VarietyCircularPainter extends CustomPainter {
     return path;
   }
 
+  /// The angle a corner takes off the two arcs beside it.
+  ///
+  /// A corner is as wide as the band it sits in, so it is measured against the
+  /// radius halfway across that band: an arc gives up the slice of angle that a
+  /// length of `corner` covers at that radius. Measuring each arc at its own
+  /// radius instead gives the inner and outer gaps different angles, and the
+  /// join reads as a wedge rather than an even gap.
+  static double _cornerAngle(
+    double innerRadius,
+    double outerRadius,
+    double corner,
+  ) {
+    final double mid = (innerRadius + outerRadius) / 2;
+    if (mid <= 0) {
+      return 0;
+    }
+    return corner / mid;
+  }
+
+  /// The outline of one slice, with its corners rounded when asked for.
+  ///
+  /// A slice is a band between two radii, so its outline turns four times: the
+  /// outer arc, the right edge, the inner arc, and the left edge. `cornerRadius`
+  /// runs a small arc through each turn, which means the two arcs stop short of
+  /// the edges and the corner bridges the gap.
+  ///
+  /// A pie has no inner arc and nothing for a corner to turn against, and a
+  /// radius wider than half the band would turn the slice inside out, so both
+  /// fall back to the plain outline.
   Path _slicePath(VarietySlice slice) {
-    if (slice.cornerRadius <= 0) {
+    final double outer = slice.outerRadius;
+    final double inner = slice.innerRadius;
+    if (slice.cornerRadius <= 0 || inner <= 0) {
+      return _ringPath(slice);
+    }
+    final double corner = math.min(slice.cornerRadius, (outer - inner) / 2);
+    final double sweep = slice.sweepAngle;
+    if (corner <= 0.5 || sweep.abs() <= 1e-6) {
       return _ringPath(slice);
     }
     final Offset center = slice.center;
-    final double outer = slice.outerRadius;
-    final double inner = slice.innerRadius;
     final double start = slice.startAngle;
-    final double sweep = slice.sweepAngle;
-    final double radius =
-        math.min(slice.cornerRadius, (outer - inner).abs() / 2);
-    if (radius <= 0.5) {
-      return _ringPath(slice);
-    }
-    final double insetOuter = outer - radius;
-    final double insetInner = inner + radius;
-    final Path path = Path()
-      ..moveTo(
-        center.dx + insetOuter * math.cos(start),
-        center.dy + insetOuter * math.sin(start),
-      )
-      ..arcTo(
-          Rect.fromCircle(center: center, radius: outer), start, sweep, false)
-      ..lineTo(
-        center.dx + outer * math.cos(start + sweep),
-        center.dy + outer * math.sin(start + sweep),
-      )
-      ..arcTo(
-        Rect.fromCircle(center: center, radius: insetOuter),
-        start + sweep,
-        -sweep,
-        false,
-      );
-    if (inner > 0) {
-      path
-        ..lineTo(
-          center.dx + insetInner * math.cos(start + sweep),
-          center.dy + insetInner * math.sin(start + sweep),
-        )
-        ..arcTo(
-          Rect.fromCircle(center: center, radius: inner),
-          start + sweep,
-          -(-sweep),
-          false,
+    final double end = start + sweep;
+    // Angles run one way or the other depending on the slice's direction, and
+    // every corner turns with them.
+    final bool clockwise = sweep > 0;
+    final double sign = clockwise ? 1 : -1;
+    // Both arcs give up the same angle: the slice of angle a length of `corner`
+    // covers at the radius halfway across the band. Capping it at a quarter of
+    // the sweep keeps the two ends of one arc from meeting in the middle.
+    final double trim = math.min(
+      _cornerAngle(inner, outer, corner),
+      sweep.abs() / 4,
+    );
+    Offset at(double radius, double angle) => Offset(
+          center.dx + radius * math.cos(angle),
+          center.dy + radius * math.sin(angle),
         );
-    } else {
-      path.lineTo(center.dx, center.dy);
-    }
-    path.close();
-    return path;
+
+    final Offset outerStart = at(outer, start + sign * trim);
+    final Offset outerRight = at(outer - corner, end);
+    final Offset innerRight = at(inner + corner, end);
+    final Offset innerArcEnd = at(inner, end - sign * trim);
+    final Offset innerLeft = at(inner + corner, start);
+    final Offset outerLeft = at(outer - corner, start);
+    final Radius cornerRadius = Radius.circular(corner);
+
+    return Path()
+      ..moveTo(outerStart.dx, outerStart.dy)
+      ..arcTo(
+        Rect.fromCircle(center: center, radius: outer),
+        start + sign * trim,
+        sweep - 2 * sign * trim,
+        false,
+      )
+      // Right edge, top to bottom.
+      ..arcToPoint(outerRight, radius: cornerRadius, clockwise: clockwise)
+      ..lineTo(innerRight.dx, innerRight.dy)
+      ..arcToPoint(innerArcEnd, radius: cornerRadius, clockwise: !clockwise)
+      ..arcTo(
+        Rect.fromCircle(center: center, radius: inner),
+        end - sign * trim,
+        -(sweep - 2 * sign * trim),
+        false,
+      )
+      // Left edge, bottom to top.
+      ..arcToPoint(innerLeft, radius: cornerRadius, clockwise: clockwise)
+      ..lineTo(outerLeft.dx, outerLeft.dy)
+      ..arcToPoint(outerStart, radius: cornerRadius, clockwise: !clockwise)
+      ..close();
   }
 
   @override

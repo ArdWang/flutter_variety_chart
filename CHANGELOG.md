@@ -1,3 +1,38 @@
+## 0.5.19
+
+### A rounded doughnut slice draws as a ring again
+
+Fixed
+
+* A doughnut slice that asked for a `cornerRadius` was outlined by dropping from
+  the outer arc straight across the band onto the inner one, so the slice filled
+  the middle of the chart and read as a spike instead of a ring. The inner arc's
+  sweep was also negated twice, which turned it back the way it came. The outline
+  is built from the four turns a band really has — outer arc, right edge, inner
+  arc, left edge — with the corner radius turning each join. A pie, which has no
+  inner arc, and a radius wider than half the band keep the plain outline.
+* Both arcs of a slice now give up the same angle to their corners, taken from
+  the radius halfway across the band. Measuring each arc at its own radius gave
+  the inner and outer gaps different angles, so a join read as a wedge, and the
+  narrow slices tore open outright. The angle is still capped at a quarter of the
+  sweep, so the two ends of one narrow arc can never meet and swallow it. A four
+  percent slice now draws as cleanly as a fifty percent one.
+* The slot handed to a `center` widget was a fixed `radius * 1.1`, which ignores
+  both `radiusFactor` and `innerRadiusFactor`. On the demo's doughnut that made
+  the slot 4% wider than the hole it was meant to sit in, so a centre widget
+  carrying its own background would have overlapped the ring — the demo's two
+  short lines were small enough to hide it. The slot is measured from the hole
+  now, taking the smallest hole when several doughnuts share the plot, and falls
+  back to the old behaviour when no series leaves a hole at all.
+
+Changed
+
+* A corner radius leaves a gap at every join, because a corner can only turn in
+  the arc it gives up. That is what the option is for, but it is not what the
+  doughnut with a centre widget is there to show, so that chart no longer asks
+  for one and its ring reads whole. The radial bar chart still asks for a radius
+  and shows the corners.
+
 ## 0.5.18
 
 ### Tapping a legend entry now takes the series off the plot
@@ -40,6 +75,7 @@ Changed
 * The line and area demo pages gain a two value axes chart and a grouped column
   chart with a gap, and the financial page shows hollow rising candles, so each
   of the options above can be seen rather than only described.
+
 
 ## 0.5.17
 

@@ -188,4 +188,38 @@ void main() {
       expect(find.text('52.00'), findsOneWidget);
     });
   });
+
+  testWidgets('the centre slot follows the doughnut hole',
+      (WidgetTester tester) async {
+    // A doughnut's hole is `innerRadiusFactor` of its outer edge, so turning the
+    // factor down has to shrink the room the centre widget is given. Sizing the
+    // slot off the outer radius instead hands back the same number either way,
+    // which is how a centre widget ends up sitting on the ring.
+    Future<double> slotFor(double innerRadiusFactor) async {
+      const Key probe = Key('centre-probe');
+      await tester.pumpWidget(
+        host(
+          VarietyCircularChart(
+            series: <VarietySeries>[
+              VarietyDoughnutSeries(
+                name: 'Traffic',
+                innerRadiusFactor: innerRadiusFactor,
+                data: slices,
+              ),
+            ],
+            center: const SizedBox(key: probe, width: 1000, height: 1000),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return tester.getSize(find.byKey(probe)).width;
+    }
+
+    final double wide = await slotFor(0.62);
+    final double narrow = await slotFor(0.30);
+    expect(wide, greaterThan(0));
+    expect(narrow, lessThan(wide));
+    // The slot is the hole less a sliver, so halving the hole halves it too.
+    expect(narrow, lessThanOrEqualTo(wide * 0.5));
+  });
 }

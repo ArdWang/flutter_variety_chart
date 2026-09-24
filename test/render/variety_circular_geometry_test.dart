@@ -1,5 +1,21 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+// The painter is not part of the public surface, but this test has to drive it
+// directly to check the outline it actually draws.
+import 'package:flutter_variety_chart/src/painters/variety_circular_painter.dart';
 import 'package:flutter_variety_chart/flutter_variety_chart.dart';
+
+const VarietyChartTheme _theme = VarietyChartTheme(
+  gridLineColor: Color(0x1F000000),
+  axisLineColor: Color(0x59000000),
+  labelColor: Color(0xBF000000),
+  tooltipBackgroundColor: Color(0xFF32323A),
+  tooltipTextColor: Colors.white,
+  markerBorderColor: Colors.white,
+);
 
 VarietyCircularGeometry buildCircular({
   required List<VarietySeries> series,
@@ -192,4 +208,87 @@ void main() {
           geometry.rings.single.sweepAngle, closeTo(3.141592653589793, 0.001));
     });
   });
+
+  group('rounded slices', () {
+    // The last entry is deliberately tiny: a corner that eats more of the arc
+    // than it should is invisible on the 52% slice and tears the 4% one open.
+    List<VarietyChartData> traffic() => const <VarietyChartData>[
+          VarietyChartData('Search', 52),
+          VarietyChartData('Direct', 24),
+          VarietyChartData('Social', 15),
+          VarietyChartData('Referral', 5),
+          VarietyChartData('Other', 4),
+        ];
+
+    test('every rounded slice keeps its hole open and its band whole', () {
+      final VarietyCircularGeometry geometry = buildCircular(
+        series: <VarietySeries>[
+          VarietyDoughnutSeries(
+            name: 'Traffic',
+            innerRadiusFactor: 0.62,
+            cornerRadius: 6,
+            data: traffic(),
+          ),
+        ],
+      );
+      final _PathRecorder recorder = _PathRecorder();
+      VarietyCircularPainter(geometry: geometry, theme: _theme)
+          .paint(recorder, const Size(200, 200));
+
+      expect(recorder.paths, hasLength(geometry.slices.length));
+      for (int i = 0; i < geometry.slices.length; i++) {
+        final VarietySlice slice = geometry.slices[i];
+        final Path path = recorder.paths[i];
+        final String which = 'the ${slice.point.x} slice';
+
+        // The hole has to stay a hole. The corner path used to run a line
+        // straight across the slice, which filled the middle of the chart and
+        // left the band looking like a spike instead of a ring.
+        expect(
+          path.contains(slice.center),
+          isFalse,
+          reason: 'the centre must not be painted ($which)',
+        );
+
+        final double mid = slice.startAngle + slice.sweepAngle / 2;
+        final Offset outward = Offset(math.cos(mid), math.sin(mid));
+        final double band = (slice.outerRadius + slice.innerRadius) / 2;
+        // The middle of the band, and both ends of it just inside the two arcs.
+        // A corner that overruns its arc leaves one of these unpainted.
+        for (final double radius in <double>[
+          band,
+          slice.innerRadius + 1,
+          slice.outerRadius - 1,
+        ]) {
+          expect(
+            path.contains(slice.center + outward * radius),
+            isTrue,
+            reason: 'radius $radius must be painted ($which)',
+          );
+        }
+
+        // And nothing reaches past the outer edge.
+        expect(
+          path.contains(slice.center + outward * (slice.outerRadius + 4)),
+          isFalse,
+          reason: 'nothing may paint outside the outer radius ($which)',
+        );
+      }
+    });
+  });
+}
+
+/// A canvas that keeps the outlines a painter asked for.
+///
+/// Nothing in the painter reads a value back out of the canvas, so answering
+/// every other call with `null` still lets a paint run through and leaves the
+/// paths behind to be checked.
+class _PathRecorder implements ui.Canvas {
+  final List<Path> paths = <Path>[];
+
+  @override
+  void drawPath(Path path, Paint paint) => paths.add(path);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
 }

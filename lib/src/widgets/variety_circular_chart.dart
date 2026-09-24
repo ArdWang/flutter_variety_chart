@@ -231,6 +231,30 @@ class VarietyCircularChartState extends State<VarietyCircularChart>
     );
   }
 
+  /// The radius of the hole a centre widget has to fit inside.
+  ///
+  /// A doughnut's outer edge sits `radiusFactor` of the way out into the room
+  /// the chart was given, and its hole is `innerRadiusFactor` of that, so the
+  /// room left in the middle is both fractions deep. Sizing the centre slot off
+  /// the outer radius instead — which is what this used to do — ignores both
+  /// numbers, and the slot overlaps the ring as soon as either is turned down.
+  ///
+  /// The smallest hole wins, so a centre widget still fits when more than one
+  /// doughnut shares the plot. Returns `null` when nothing leaves a hole, which
+  /// is the case for a pie.
+  double? _holeRadius(double maxRadius) {
+    double? hole;
+    for (final VarietySeries item in _circular) {
+      if (item is! VarietyDoughnutSeries) {
+        continue;
+      }
+      final double radius =
+          maxRadius * item.radiusFactor * item.innerRadiusFactor;
+      hole = hole == null ? radius : math.min(hole, radius);
+    }
+    return hole == null || hole <= 0 ? null : hole;
+  }
+
   Widget _buildPlot(VarietyChartTheme theme) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
@@ -250,6 +274,11 @@ class VarietyCircularChartState extends State<VarietyCircularChart>
           size: size,
           painter: VarietyCircularPainter(geometry: geometry, theme: theme),
         );
+        // The slot the centre widget is given: the hole itself, less a sliver
+        // so a widget carrying its own background does not touch the ring. A
+        // chart that leaves no hole keeps the slot it always had.
+        final double? hole = _holeRadius(radius);
+        final double slot = hole == null ? radius * 1.1 : hole * 1.9;
         return Stack(
           children: <Widget>[
             Positioned.fill(
@@ -272,8 +301,8 @@ class VarietyCircularChartState extends State<VarietyCircularChart>
                 child: IgnorePointer(
                   child: Center(
                     child: SizedBox(
-                      width: radius * 1.1,
-                      height: radius * 1.1,
+                      width: slot,
+                      height: slot,
                       child: Center(child: widget.center),
                     ),
                   ),
