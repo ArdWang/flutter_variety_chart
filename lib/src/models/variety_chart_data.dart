@@ -138,7 +138,7 @@ class VarietyDataLabelSettings {
     this.position = VarietyLabelPosition.auto,
     this.textStyle,
     this.color,
-    this.margin = const EdgeInsets.all(4),
+    this.margin = const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
     this.labelOffset = 6,
     this.builder,
     this.showCumulativeTotal = false,
@@ -166,7 +166,10 @@ class VarietyDataLabelSettings {
   /// The text colour applied to the label.
   final Color? color;
 
-  /// Padding reserved around the label text.
+  /// Padding reserved around the label text, inside the label's own card.
+  ///
+  /// Only a label that draws a background or an outline has a card to pad,
+  /// so this grows the card rather than moving the text.
   final EdgeInsets margin;
 
   /// Distance in logical pixels between the marker and the label.

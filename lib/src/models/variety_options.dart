@@ -387,12 +387,15 @@ enum VarietyMultiLevelBorderType {
   curlyBrace,
 }
 
-/// The area an annotation is positioned against.
+/// The area a spanning annotation covers.
+///
+/// Only the rule annotations read this, because only they have an extent to
+/// choose: every other annotation is anchored to a data point.
 enum VarietyAnnotationRegion {
-  /// Coordinates are read against the whole chart.
+  /// The whole chart, axis gutters and their captions included.
   chart,
 
-  /// Coordinates are read against the plot area.
+  /// The plot area, which is the rectangle the data itself is drawn in.
   plotArea,
 }
 

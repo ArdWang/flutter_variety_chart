@@ -35,7 +35,10 @@ class VarietyCircularPainter extends CustomPainter {
 
   void _paintRings(Canvas canvas) {
     for (final VarietySlice slice in geometry.rings) {
-      _paintRing(canvas, slice, slice.point.y == null);
+      // The track of a radial bar reuses the data point it belongs to, so a
+      // null reading is not what marks it out. The flag the geometry sets is,
+      // and it is the flag hit testing already reads.
+      _paintRing(canvas, slice, slice.isTrack);
     }
   }
 

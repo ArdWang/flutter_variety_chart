@@ -1066,7 +1066,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     }
     final TextStyle xStyle = _tickLabelStyle(probe.xAxis);
     double bottom = 10;
-    final double rotation = probe.xAxis.labelRotation * math.pi / 180;
+    final double rotation = _labelRotation(probe.xAxis);
     if (rotation == 0) {
       // An upright single line is as tall as its style, whatever it says, so
       // one sample is the whole answer. Measuring every caption of a chart
@@ -1096,8 +1096,16 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
             math.max(bottom, _rotatedHeight(caption, xStyle, rotation) + 8);
       }
     }
-    if ((probe.xAxis.title ?? '').isNotEmpty) {
-      bottom += 22;
+    if (probe.xAxis.labelIntersectAction ==
+        VarietyLabelIntersectAction.multipleRows) {
+      // A second row of captions is printed under the first, one line deeper.
+      bottom += _extraRowHeight;
+    }
+    final String? xTitle = probe.xAxis.title;
+    if (xTitle != null && xTitle.isNotEmpty) {
+      // Measured rather than assumed to be one line tall, because the painter
+      // measures it too: a title set in a larger face used to be cropped.
+      bottom += 6 + _textSize(xTitle, _xAxisTitleStyle()).height;
     }
     final VarietyMultiLevelLabels? groups = probe.xAxis.multiLevelLabels;
     if (groups != null && groups.groups.isNotEmpty) {
@@ -1157,12 +1165,16 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
         continue;
       }
       final TextStyle style = _tickLabelStyle(axis);
-      final double rotation = axis.labelRotation * math.pi / 180;
+      final double rotation = _labelRotation(axis);
       double height = 0;
       for (final String caption in _xCaptions(probe, i)) {
         height = math.max(height, _rotatedHeight(caption, style, rotation));
       }
       double row = math.max(height, _textSize('0', style).height) + 8;
+      if (axis.labelIntersectAction ==
+          VarietyLabelIntersectAction.multipleRows) {
+        row += _extraRowHeight;
+      }
       final String? title = axis.title;
       if (title != null && title.isNotEmpty) {
         row += 6 + _textSize(title, _xAxisTitleStyle()).height;
@@ -1199,6 +1211,34 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
         );
   }
 
+  /// The extra depth a second row of captions takes under the first.
+  ///
+  /// Mirrors `VarietyCartesianPainter._extraRowHeight`, which the painter adds
+  /// to the row it reports for `multipleRows`. The two have to agree, or the
+  /// second row is painted below the room reserved for it.
+  static const double _extraRowHeight = 20;
+
+  /// The rotation the captions of [axis] are painted at, in radians.
+  ///
+  /// A label intersect action can override the rotation the axis carries. The
+  /// painter answers the same question through its own `_labelRotationDegrees`
+  /// and the two chains are kept identical on purpose: reading the axis field
+  /// alone reserved an upright row for captions drawn at an angle.
+  double _labelRotation(VarietyAxis axis) {
+    switch (axis.labelIntersectAction) {
+      case VarietyLabelIntersectAction.rotate45:
+        return -45 * math.pi / 180;
+      case VarietyLabelIntersectAction.rotate90:
+        return -90 * math.pi / 180;
+      case VarietyLabelIntersectAction.none:
+      case VarietyLabelIntersectAction.hide:
+      case VarietyLabelIntersectAction.wrap:
+      case VarietyLabelIntersectAction.trim:
+      case VarietyLabelIntersectAction.multipleRows:
+        return axis.labelRotation * math.pi / 180;
+    }
+  }
+
   /// The horizontal room the secondary axes need on the right.
   double _secondaryAxisInset(VarietyCartesianGeometry probe) {
     if (probe.yAxes.length < 2) {
@@ -1210,9 +1250,9 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       if (!axis.visible) {
         continue;
       }
-      final TextStyle style = axis.labelStyle ??
-          TextStyle(
-              fontSize: 11, color: Theme.of(context).colorScheme.onSurface);
+      // The same style the painter draws the secondary captions with, so a
+      // theme that grows the axis label text grows the room kept for it too.
+      final TextStyle style = _tickLabelStyle(axis);
       double width = 0;
       for (final double tick in probe.yTicksOn(i)) {
         width = math.max(
@@ -1387,6 +1427,51 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     final VarietyHitResult? hit = geometry.hitTest(position);
     setState(() => _hit = hit);
     widget.onPointTap?.call(hit);
+    _notifySeries(
+        hit,
+        geometry,
+        (VarietySeries series, VarietyChartData point, int index) =>
+            series.onPointTap?.call(point, index));
+  }
+
+  /// Hands [hit] to the per-series callback the caller describes.
+  ///
+  /// A series declares a tap, a double tap and a long press handler, and they
+  /// are one concept: the point under the finger. They all go through here so
+  /// that wiring one of them and forgetting another cannot happen again —
+  /// `onPointTap` was declared and documented but reachable from nowhere,
+  /// because only the other two had been connected.
+  void _notifySeries(
+    VarietyHitResult? hit,
+    VarietyCartesianGeometry geometry,
+    void Function(VarietySeries series, VarietyChartData point, int index)
+        notify,
+  ) {
+    if (hit == null) {
+      return;
+    }
+    final int s = hit.seriesIndex;
+    if (s < 0 || s >= geometry.series.length) {
+      return;
+    }
+    final int p = hit.pointIndex;
+    final List<List<VarietyChartData>> rows = geometry.resolvedData;
+    // The resolved row is what the plot actually drew, so it is the point the
+    // handler is told about. A hit that falls outside it is described by the
+    // series' own data instead, clamped into range.
+    if (s < rows.length && p >= 0 && p < rows[s].length) {
+      notify(geometry.series[s], rows[s][p], p);
+      return;
+    }
+    final List<VarietyChartData> data = geometry.series[s].data;
+    if (data.isEmpty) {
+      return;
+    }
+    notify(
+      geometry.series[s],
+      data[p.clamp(0, data.length - 1)],
+      p,
+    );
   }
 
   void _onLongPressStart(Offset position, VarietyCartesianGeometry geometry) {
@@ -1409,19 +1494,11 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     }
     final VarietyHitResult? hit = geometry.hitTest(position);
     _updateSingleHit(hit, hover: true);
-    if (hit != null) {
-      final int s = hit.seriesIndex;
-      final int p = hit.pointIndex;
-      final List<List<VarietyChartData>> rows = geometry.resolvedData;
-      if (s < rows.length && p < rows[s].length) {
-        geometry.series[s].onPointLongPress?.call(rows[s][p], p);
-      } else {
-        geometry.series[s].onPointLongPress?.call(
-            geometry
-                .series[s].data[p.clamp(0, geometry.series[s].data.length - 1)],
-            p);
-      }
-    }
+    _notifySeries(
+        hit,
+        geometry,
+        (VarietySeries series, VarietyChartData point, int index) =>
+            series.onPointLongPress?.call(point, index));
   }
 
   void _onLongPressMove(Offset position, VarietyCartesianGeometry geometry) {
@@ -1595,14 +1672,12 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     // The user might just want to know a point was double-clicked; honour
     // per-series `onPointDoubleTap` before the zoom logic kicks in.
     final VarietyHitResult? hit = display.hitTest(position);
-    if (hit != null) {
-      final int s = hit.seriesIndex;
-      final int p = hit.pointIndex;
-      final List<List<VarietyChartData>> rows = display.resolvedData;
-      if (s < rows.length && p < rows[s].length) {
-        display.series[s].onPointDoubleTap?.call(rows[s][p], p);
-      }
-    }
+    _notifySeries(
+      hit,
+      display,
+      (VarietySeries series, VarietyChartData point, int index) =>
+          series.onPointDoubleTap?.call(point, index),
+    );
     final VarietyZoomPanBehavior? behavior = widget.zoomPanBehavior;
     if (behavior != null &&
         behavior.enabled &&

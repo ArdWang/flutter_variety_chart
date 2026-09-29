@@ -17,8 +17,8 @@ class VarietyLegend extends StatelessWidget {
     this.position = VarietyLegendPosition.bottom,
     this.textStyle,
     this.padding,
-    this.spacing = 16,
-    this.runSpacing = 8,
+    this.spacing,
+    this.runSpacing,
     this.swatchSize = 10,
     this.swatchRadius = 2,
     this.itemBuilder,
@@ -40,10 +40,14 @@ class VarietyLegend extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
 
   /// Horizontal space between two items.
-  final double spacing;
+  ///
+  /// When omitted, [VarietyLegendSettings.spacing] is used.
+  final double? spacing;
 
   /// Vertical space between two rows.
-  final double runSpacing;
+  ///
+  /// When omitted, [VarietyLegendSettings.runSpacing] is used.
+  final double? runSpacing;
 
   /// The width and height of the colour swatch.
   final double swatchSize;
@@ -155,13 +159,19 @@ class VarietyLegend extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final Widget content;
+    // The settings carry the spacing a chart asks for; the widget arguments
+    // stay as a direct override for someone building a legend by hand. Only
+    // the settings were ever read by the chart, so a value set there used to
+    // do nothing at all.
+    final double gap = spacing ?? settings.spacing;
+    final double rowGap = runSpacing ?? settings.runSpacing;
     if (_isVertical) {
       content = Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           for (int i = 0; i < items.length; i++) ...<Widget>[
-            if (i > 0) SizedBox(height: runSpacing),
+            if (i > 0) SizedBox(height: rowGap),
             items[i],
           ],
         ],
@@ -169,8 +179,8 @@ class VarietyLegend extends StatelessWidget {
     } else {
       final Wrap wrap = Wrap(
         alignment: _wrapAlignment,
-        spacing: spacing,
-        runSpacing: runSpacing,
+        spacing: gap,
+        runSpacing: rowGap,
         children: items,
       );
       content = settings.overflowMode == VarietyLegendOverflowMode.scroll
@@ -236,13 +246,7 @@ class VarietyLegend extends StatelessWidget {
               child: CustomPaint(
                 size: Size(settings.iconWidth, settings.iconHeight),
                 painter: _LegendIconPainter(
-                  // A series that names its own icon wins over the chart wide
-                  // setting, which is the order the reference implementation
-                  // uses.
-                  series.legendIconType ??
-                      (settings.iconType == VarietyLegendIconType.seriesType
-                          ? _fromSeries(series)
-                          : settings.iconType),
+                  iconFor(series, settings),
                   color,
                   swatchSize,
                   swatchRadius,
@@ -274,18 +278,74 @@ class VarietyLegend extends StatelessWidget {
     }
     return VarietyLegendIconType.rectangle;
   }
+
+  /// The glyph the legend draws for [series], or `null` for no glyph at all.
+  ///
+  /// A series can name its own glyph in two ways and the marker shape wins,
+  /// because describing the glyph as a marker shape is the more specific of
+  /// the two. A series that names neither follows the legend's own
+  /// [VarietyLegendSettings.iconType], which in turn falls back to the series
+  /// kind. Exposed so a legend built by hand through `itemBuilder` can draw the
+  /// same glyph the default entry would.
+  static VarietyLegendIconType? iconFor(
+    VarietySeries series,
+    VarietyLegendSettings settings,
+  ) {
+    final VarietyMarkerShape? shape = series.legendIconShape;
+    if (shape != null) {
+      return _fromMarkerShape(shape);
+    }
+    return series.legendIconType ??
+        (settings.iconType == VarietyLegendIconType.seriesType
+            ? _fromSeries(series)
+            : settings.iconType);
+  }
+
+  /// The legend glyph that stands for [shape].
+  static VarietyLegendIconType? _fromMarkerShape(VarietyMarkerShape shape) {
+    switch (shape) {
+      case VarietyMarkerShape.none:
+        return null;
+      case VarietyMarkerShape.circle:
+        return VarietyLegendIconType.circle;
+      case VarietyMarkerShape.square:
+        return VarietyLegendIconType.rectangle;
+      case VarietyMarkerShape.diamond:
+        return VarietyLegendIconType.diamond;
+      case VarietyMarkerShape.triangle:
+        return VarietyLegendIconType.triangle;
+      case VarietyMarkerShape.invertedTriangle:
+        return VarietyLegendIconType.invertedTriangle;
+      case VarietyMarkerShape.plus:
+        return VarietyLegendIconType.plus;
+      case VarietyMarkerShape.cross:
+        return VarietyLegendIconType.cross;
+      case VarietyMarkerShape.pentagon:
+        return VarietyLegendIconType.pentagon;
+      case VarietyMarkerShape.verticalLine:
+        return VarietyLegendIconType.verticalLine;
+      case VarietyMarkerShape.horizontalLine:
+        return VarietyLegendIconType.horizontalLine;
+    }
+  }
 }
 
 class _LegendIconPainter extends CustomPainter {
   const _LegendIconPainter(this.type, this.color, this.size, this.radius);
 
-  final VarietyLegendIconType type;
+  /// The glyph to draw. `null` draws nothing, which is how a series asks for
+  /// a caption with no icon beside it.
+  final VarietyLegendIconType? type;
   final Color color;
   final double size;
   final double radius;
 
   @override
   void paint(Canvas canvas, Size canvasSize) {
+    final VarietyLegendIconType? kind = type;
+    if (kind == null) {
+      return;
+    }
     final Paint fill = Paint()
       ..color = color
       ..style = PaintingStyle.fill
@@ -298,7 +358,7 @@ class _LegendIconPainter extends CustomPainter {
       ..isAntiAlias = true;
     final Offset center = canvasSize.center(Offset.zero);
     final double half = size / 2;
-    switch (type) {
+    switch (kind) {
       case VarietyLegendIconType.circle:
         canvas.drawCircle(center, half, fill);
       case VarietyLegendIconType.diamond:

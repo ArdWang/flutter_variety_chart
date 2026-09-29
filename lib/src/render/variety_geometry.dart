@@ -2476,10 +2476,17 @@ class VarietyCartesianGeometry {
   /// Resolves the effective colour of a point, honouring overrides and opacity.
   Color colorFor(VarietySeries item, int seriesIndex, int pointIndex) {
     final List<VarietyChartData> points = resolvedData[seriesIndex];
-    final Color base =
-        (pointIndex < points.length ? points[pointIndex].color : null) ??
-            item.color ??
-            seriesColors[seriesIndex % seriesColors.length];
+    final VarietyChartData? point =
+        pointIndex < points.length ? points[pointIndex] : null;
+    // A per-point callback outranks the point's own colour field, which in
+    // turn outranks the series colour. Returning `null` from the callback
+    // keeps whatever the point would have been drawn in otherwise.
+    final Color base = (point == null
+            ? null
+            : item.pointColorMapper?.call(point, pointIndex)) ??
+        point?.color ??
+        item.color ??
+        seriesColors[seriesIndex % seriesColors.length];
     return item.opacity >= 1
         ? base
         : base.withValues(alpha: base.a * item.opacity);
@@ -3455,8 +3462,13 @@ class VarietyCartesianGeometry {
     final double captionValue = settings.showCumulativeTotal && item.isStacked
         ? topValue(seriesIndex, pointIndex)
         : (point.y ?? 0);
-    String caption =
-        settings.builder?.call(point) ?? varietyFormatNumber(captionValue);
+    // The series callback is asked first because it is the most specific
+    // answer available for this point. The chart-wide resolver comes last: it
+    // is handed a caption that has already been through both, so it can still
+    // rewrite whatever they produced.
+    String caption = item.dataLabelMapper?.call(point, pointIndex) ??
+        settings.builder?.call(point) ??
+        varietyFormatNumber(captionValue);
     final String? overridden =
         dataLabelResolver?.call(item, seriesIndex, point, pointIndex, caption);
     if (overridden != null) {
@@ -3474,6 +3486,7 @@ class VarietyCartesianGeometry {
             text: caption,
             position: settings.position,
             offset: settings.labelOffset,
+            margin: settings.margin,
             color: settings.useSeriesColor
                 ? colorFor(item, seriesIndex, pointIndex)
                 : settings.color,
@@ -4794,6 +4807,7 @@ class VarietyFunnelGeometry {
                     (points[i].label ?? varietyFormatNumber(points[i].y ?? 0)),
                 position: series.dataLabelSettings.position,
                 offset: series.dataLabelSettings.labelOffset,
+                margin: series.dataLabelSettings.margin,
                 color: series.dataLabelSettings.color,
               ),
             ],

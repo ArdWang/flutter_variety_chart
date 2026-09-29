@@ -228,6 +228,7 @@ class VarietyLabelItem {
     required this.text,
     this.position = VarietyLabelPosition.auto,
     this.offset = 6,
+    this.margin = const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
     this.color,
     this.backgroundColor,
     this.borderColor,
@@ -253,6 +254,9 @@ class VarietyLabelItem {
 
   /// The distance between [anchor] and the caption.
   final double offset;
+
+  /// The room left around the caption inside its card.
+  final EdgeInsets margin;
 
   /// An optional colour override.
   final Color? color;

@@ -1,3 +1,70 @@
+## 0.5.20
+
+### The readings an indicator feeds itself, and the options nothing read
+
+Fixed
+
+* An indicator reads a closing price when the point carries one and its own
+  value otherwise, but the list it produces is a set of derived readings rather
+  than bars, and it used to keep the closing price of the point it was computed
+  from. A second pass therefore averaged the original prices again: the
+  triangular average collapsed back into a simple average, the MACD signal line
+  was an average of closes instead of the MACD line, and the stochastic `%D`
+  came out at price level while `%K` sat between 0 and 100. A derived point no
+  longer carries the bar it came from.
+* A window holding a point with no reading now yields a point with no reading,
+  rather than counting the gap as a zero and tilting the start of the line
+  towards the origin.
+* The track behind a radial bar was told apart from the reading in front of it
+  by asking the point whether it carried a value, but the track reuses the
+  reading's own point, so the answer was always no and every track was outlined
+  as though it were a reading. The flag the geometry sets for a track decides
+  now, which is what hit testing already used.
+* `VarietySeries.onPointTap` is called. The per-series double tap and long press
+  handlers were connected and this one, declared and documented beside them, was
+  not, so a chart listening for a tap on a series never heard anything. All
+  three go through one path now.
+* `VarietySeries.dataLabelMapper` decides the caption for a point. It is asked
+  before `VarietyDataLabelSettings.builder`, and the chart-wide label resolver
+  still sees the result. Setting it used to change nothing.
+* `VarietySeries.pointColorMapper` colours the point it is asked about, ahead of
+  the point's own colour and the series colour. Returning `null` keeps whatever
+  the point would have been drawn in.
+* `VarietySeries.legendIconShape` names the glyph the legend draws, ahead of
+  `legendIconType`, because a marker shape is the more specific way to describe
+  one. `VarietyMarkerShape.none` asks for a caption with no glyph. The answer is
+  available as `VarietyLegend.iconFor`, so an entry built by hand draws the same
+  glyph the default one would.
+* `VarietyLegendSettings.spacing` and `runSpacing` are read. The legend widget
+  kept private copies of both with 16 and 8 written into them, so a chart that
+  set them saw no change.
+* `VarietyChartTheme.majorTickLineColor` is read when neither the axis'
+  `majorTickLines.color` nor its `axisLineColor` is set. Its getter falls back
+  to the axis line colour, so a theme that never names it draws as it did.
+* `VarietyDataLabelSettings.margin` is read. It is the room left around a
+  caption inside its card, which used to be a fixed 4 by 2; the default is that
+  same 4 by 2, so an untouched chart draws identically.
+* `VarietyMultiLevelLabels.overlap` is read. Neighbouring brackets meet exactly
+  by default, and asking for an overlap bleeds each side by half of it.
+* `VarietyAnnotationRegion`, declared with no reader at all, now decides how far
+  a rule annotation reaches: the plot area by default, or the whole chart with
+  `VarietyAnnotationRegion.chart`, which lets a line run through the axis
+  gutters.
+
+Changed
+
+* The room kept below a horizontal axis is now worked out from the same style
+  the caption block is drawn with. The axis title is measured instead of being
+  assumed to be 22 pixels tall, a row turned by `rotate45` or `rotate90` is
+  reserved at the angle it is painted at, the second row of `multipleRows` is
+  allowed for, a secondary value axis measures its captions through the themed
+  label style, and the title of an extra value axis is painted in the themed
+  title style. A larger themed style used to be honoured where the text was
+  painted and ignored where the room for it was decided.
+* `VarietySeries.legendIconShape` is optional now rather than defaulting to a
+  circle. That is what lets a series say nothing about its glyph and follow the
+  legend, the way its documentation already described.
+
 ## 0.5.19
 
 ### A rounded doughnut slice draws as a ring again

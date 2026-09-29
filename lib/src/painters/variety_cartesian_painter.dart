@@ -237,7 +237,7 @@ class VarietyCartesianPainter extends CustomPainter {
     _paintAxisLines(canvas);
     _paintPlotAreaBorder(canvas);
     _paintAxisTooltips(canvas);
-    _paintAnnotations(canvas);
+    _paintAnnotations(canvas, size);
     _paintHighlights(canvas);
     _paintSelectionRect(canvas);
   }
@@ -460,13 +460,15 @@ class VarietyCartesianPainter extends CustomPainter {
   /// The length, thickness and colour a tick mark should be drawn with.
   ///
   /// `majorTickLines` wins over the plain `tickLength` fields, which is the
-  /// same relationship `minorGridLines` and the grid line fields have.
+  /// same relationship `minorGridLines` and the grid line fields have. The
+  /// theme's `majorTickLineColor` is the last fallback and defaults to the
+  /// axis line colour, so a theme that never names it draws as it always did.
   (double, double, Color) _tickStyle(VarietyAxis axis) {
     final VarietyMajorTickLines? lines = axis.majorTickLines;
     return (
       lines?.size ?? axis.tickLength,
       lines?.width ?? 1,
-      lines?.color ?? axis.axisLineColor ?? theme.axisLineColor,
+      lines?.color ?? axis.axisLineColor ?? theme.majorTickLineColor,
     );
   }
 
@@ -907,13 +909,8 @@ class VarietyCartesianPainter extends CustomPainter {
       }
       final String? title = axis.title;
       if (title != null && title.isNotEmpty) {
-        final TextPainter painter = _renderer.layoutText(
-          title,
-          TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: theme.labelColor),
-        );
+        final TextPainter painter =
+            _renderer.layoutText(title, _axisTitleStyle());
         canvas.save();
         canvas.translate(axisX + labelWidth + 24, geometry.plotRect.center.dy);
         canvas.rotate(math.pi / 2);
@@ -1114,19 +1111,7 @@ class VarietyCartesianPainter extends CustomPainter {
     if (!axis.showLabels) {
       return 0;
     }
-    double rotation = axis.labelRotation;
-    switch (axis.labelIntersectAction) {
-      case VarietyLabelIntersectAction.rotate45:
-        rotation = -45;
-      case VarietyLabelIntersectAction.rotate90:
-        rotation = -90;
-      case VarietyLabelIntersectAction.none:
-      case VarietyLabelIntersectAction.hide:
-      case VarietyLabelIntersectAction.wrap:
-      case VarietyLabelIntersectAction.trim:
-      case VarietyLabelIntersectAction.multipleRows:
-        break;
-    }
+    final double rotation = _labelRotationDegrees(axis);
 
     final List<bool> visible = List<bool>.filled(ticks.length, true);
     // A caption is only ever allowed to appear once. Two ticks can end up with
@@ -1246,7 +1231,7 @@ class VarietyCartesianPainter extends CustomPainter {
 
     double consumed = _labelRowHeight(axisIndex, style) +
         (axis.labelIntersectAction == VarietyLabelIntersectAction.multipleRows
-            ? 20
+            ? _extraRowHeight
             : 0);
     final String? title = axis.title;
     if (title != null && title.isNotEmpty) {
@@ -1350,14 +1335,44 @@ class VarietyCartesianPainter extends CustomPainter {
     }
   }
 
+  /// The extra depth a second row of captions takes under the first.
+  ///
+  /// `multipleRows` splits a caption over two lines, so the row is one line
+  /// deeper than a single caption by this much. The widget that sizes the plot
+  /// area leaves the same amount and names this constant in its comment.
+  static const double _extraRowHeight = 20;
+
+  /// The angle the captions of [axis] are painted at, in degrees.
+  ///
+  /// A label intersect action can override the rotation the axis carries, so
+  /// this is the one answer every caller has to agree on: the painting itself,
+  /// the row height reserved for the captions, and the space the widget leaves
+  /// for them. Reading `labelRotation` directly in only some of those places
+  /// reserved an upright row for captions that were drawn at an angle.
+  static double _labelRotationDegrees(VarietyAxis axis) {
+    switch (axis.labelIntersectAction) {
+      case VarietyLabelIntersectAction.rotate45:
+        return -45;
+      case VarietyLabelIntersectAction.rotate90:
+        return -90;
+      case VarietyLabelIntersectAction.none:
+      case VarietyLabelIntersectAction.hide:
+      case VarietyLabelIntersectAction.wrap:
+      case VarietyLabelIntersectAction.trim:
+      case VarietyLabelIntersectAction.multipleRows:
+        return axis.labelRotation;
+    }
+  }
+
   /// The height one caption row of horizontal axis [axisIndex] needs.
   ///
-  /// Mirrors [_primaryLabelHeight], but reads the rotation off the axis in
-  /// question, so a rotated second axis still reserves a row deep enough for
-  /// its captions.
+  /// Reads the rotation off the axis in question through
+  /// [_labelRotationDegrees], so a rotated second axis reserves a row deep
+  /// enough for its captions and a rotation the intersect action overrode is
+  /// seen here as well.
   double _labelRowHeight(int axisIndex, TextStyle style) {
     final double rotation =
-        geometry.xAxes[axisIndex].labelRotation * math.pi / 180;
+        _labelRotationDegrees(geometry.xAxes[axisIndex]) * math.pi / 180;
     if (rotation == 0) {
       return _renderer.layoutText('0', style).height;
     }
@@ -1392,9 +1407,26 @@ class VarietyCartesianPainter extends CustomPainter {
             fontSize: 11,
             fontWeight: FontWeight.w600,
             color: theme.axisTitleColor);
-    final double baseY = geometry.plotRect.bottom +
+    // The brackets hang under everything the primary axis printed, its title
+    // included. Starting them at the caption row alone put the first bracket
+    // on top of the title whenever the axis carried one.
+    final TextStyle primaryStyle = _tickLabelStyle(geometry.xAxis);
+    double consumed = _labelRowHeight(0, primaryStyle) +
+        (geometry.xAxis.labelIntersectAction ==
+                VarietyLabelIntersectAction.multipleRows
+            ? _extraRowHeight
+            : 0);
+    final String? primaryTitle = geometry.xAxis.title;
+    if (primaryTitle != null && primaryTitle.isNotEmpty) {
+      consumed +=
+          6 + _renderer.layoutText(primaryTitle, _axisTitleStyle()).height;
+    }
+    final double baseY = math.max(
+          geometry.plotRect.bottom,
+          _xAxisLineY(),
+        ) +
         geometry.xAxis.labelOffset +
-        _primaryLabelHeight(_tickLabelStyle(geometry.xAxis)) +
+        consumed +
         6;
     final double rowHeight = math.max(groups.rowHeight, 8);
     for (final VarietyLabelGroup group in _resolvedLabelGroups(groups)) {
@@ -1404,10 +1436,14 @@ class VarietyCartesianPainter extends CustomPainter {
           .slotCenters[group.start.clamp(0, geometry.slotCenters.length - 1)];
       final double right = geometry
           .slotCenters[group.end.clamp(0, geometry.slotCenters.length - 1)];
+      // A bracket normally stops exactly where its neighbour starts. Asking
+      // for an overlap bleeds each side by half of it, so two brackets that
+      // asked for the same amount really do share that many pixels.
+      final double bleed = groups.overlap / 2;
       final Rect rect = Rect.fromLTRB(
-        left - geometry.slotWidth / 2,
+        left - geometry.slotWidth / 2 - bleed,
         top,
-        right + geometry.slotWidth / 2,
+        right + geometry.slotWidth / 2 + bleed,
         bottom,
       );
       final Paint border = Paint()
@@ -1501,16 +1537,6 @@ class VarietyCartesianPainter extends CustomPainter {
     return merged;
   }
 
-  double _primaryLabelHeight(TextStyle style) {
-    final double rotation = geometry.xAxis.labelRotation * math.pi / 180;
-    if (rotation == 0) {
-      return _renderer.layoutText('0', style).height;
-    }
-    final Size sample = _renderer.layoutText('00 MMM', style).size;
-    return sample.height * math.cos(rotation).abs() +
-        sample.width * math.sin(rotation).abs();
-  }
-
   void _paintRotated(
     Canvas canvas,
     String text,
@@ -1534,11 +1560,18 @@ class VarietyCartesianPainter extends CustomPainter {
   // Annotations and highlights
   // ---------------------------------------------------------------------------
 
-  void _paintAnnotations(Canvas canvas) {
+  void _paintAnnotations(Canvas canvas, Size size) {
+    final Rect chartRect = Offset.zero & size;
     for (final VarietyAnnotation annotation in annotations) {
       if (!annotation.isVisible) {
         continue;
       }
+      // A rule spans the area the annotation says it is positioned against:
+      // the plot area by default, or the whole chart when the annotation asks
+      // for that, which lets a line run through the axis gutters as well.
+      final Rect span = annotation.region == VarietyAnnotationRegion.plotArea
+          ? geometry.plotRect
+          : chartRect;
       final Color border = annotation.borderColor ?? theme.axisLineColor;
       final Color fill = annotation.fillColor ?? border.withValues(alpha: 0.15);
       switch (annotation.shapeType) {
@@ -1549,8 +1582,8 @@ class VarietyCartesianPainter extends CustomPainter {
           final double y = geometry.pixelY((annotation.y! as num).toDouble());
           _renderer.drawLine(
             canvas,
-            Offset(geometry.plotRect.left, y),
-            Offset(geometry.plotRect.right, y),
+            Offset(span.left, y),
+            Offset(span.right, y),
             Paint()
               ..color = border
               ..strokeWidth = annotation.borderWidth,
@@ -1559,21 +1592,20 @@ class VarietyCartesianPainter extends CustomPainter {
           _paintAnnotationText(
             canvas,
             annotation,
-            Offset(geometry.plotRect.left + 6, y - 18),
+            Offset(span.left + 6, y - 18),
           );
         case VarietyShapeType.verticalLine:
           final double x = _annotationX(annotation.x);
           _renderer.drawLine(
             canvas,
-            Offset(x, geometry.plotRect.top),
-            Offset(x, geometry.plotRect.bottom),
+            Offset(x, span.top),
+            Offset(x, span.bottom),
             Paint()
               ..color = border
               ..strokeWidth = annotation.borderWidth,
             annotation.dashArray,
           );
-          _paintAnnotationText(
-              canvas, annotation, Offset(x + 6, geometry.plotRect.top + 6));
+          _paintAnnotationText(canvas, annotation, Offset(x + 6, span.top + 6));
         case VarietyShapeType.rectangle:
         case VarietyShapeType.ellipse:
           final Offset anchor = _annotationOffset(annotation);

@@ -402,8 +402,7 @@ class VarietyElementRenderer {
       return;
     }
     final RRect card = RRect.fromRectAndRadius(
-      const EdgeInsets.symmetric(horizontal: 4, vertical: 2)
-          .inflateRect(bounds),
+      item.margin.inflateRect(bounds),
       Radius.circular(item.borderRadius),
     );
     final Color? fill = item.backgroundColor;

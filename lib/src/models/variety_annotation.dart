@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
 import 'variety_enums.dart';
+import 'variety_options.dart';
 
 /// A decoration anchored to a data coordinate or to the plot area itself.
 @immutable
@@ -22,6 +23,7 @@ class VarietyAnnotation {
     this.dashArray = const <double>[],
     this.image,
     this.padding = const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    this.region = VarietyAnnotationRegion.plotArea,
     this.isVisible = true,
   });
 
@@ -36,6 +38,7 @@ class VarietyAnnotation {
     this.dashArray = const <double>[6, 4],
     this.isVisible = true,
     this.padding = const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    this.region = VarietyAnnotationRegion.plotArea,
   })  : shapeType = VarietyShapeType.horizontalLine,
         x = null,
         width = 0,
@@ -54,6 +57,7 @@ class VarietyAnnotation {
     this.dashArray = const <double>[6, 4],
     this.isVisible = true,
     this.padding = const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    this.region = VarietyAnnotationRegion.plotArea,
   })  : shapeType = VarietyShapeType.verticalLine,
         y = null,
         width = 0,
@@ -102,6 +106,13 @@ class VarietyAnnotation {
 
   /// Padding reserved around the caption.
   final EdgeInsets padding;
+
+  /// The area a rule annotation spans.
+  ///
+  /// The default keeps a rule inside the plot area, next to the data it marks.
+  /// Asking for [VarietyAnnotationRegion.chart] lets it run the full width or
+  /// height of the widget, through the axis gutters and their captions.
+  final VarietyAnnotationRegion region;
 
   /// Whether the annotation is painted.
   final bool isVisible;

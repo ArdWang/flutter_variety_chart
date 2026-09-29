@@ -4,8 +4,34 @@ import 'variety_chart_data.dart';
 import 'variety_enums.dart';
 import 'variety_series.dart';
 
-/// The value used by each point when an indicator needs a single reading.
-double _reading(VarietyChartData point) => point.closeValue;
+/// The value an indicator reads from a point, or `null` when the point carries
+/// a value of neither kind.
+///
+/// A point that names a closing price is a bar, and the close is what an
+/// indicator is defined over; `y` is often left at zero on such a point. A
+/// point without one carries its reading in `y`. Decorating the reading with a
+/// zero would hide the third case — a point an earlier stage produced — which
+/// is what let a warm-up window average a value nothing had ever held.
+double? _readingOrNull(VarietyChartData point) => point.close ?? point.y;
+
+/// A point holding [value] as its reading.
+///
+/// The bar fields of [source] are dropped on purpose: the output of an
+/// indicator is a derived reading, not a bar. Leaving the source's `close`
+/// behind is what let a later pass mistake it for the original series, so the
+/// triangular average, the MACD signal line and the stochastic `%D` were built
+/// from prices instead of from the values they had been handed.
+VarietyChartData _derived(VarietyChartData source, double? value) =>
+    VarietyChartData(
+      source.x,
+      value,
+      label: source.label,
+      color: source.color,
+      isEmpty: source.isEmpty,
+    );
+
+/// A point whose reading is not defined yet, used for a rolling warm-up.
+VarietyChartData _undefined(VarietyChartData source) => _derived(source, null);
 
 /// Produces a point list whose values equal the simple moving average.
 List<VarietyChartData> simpleMovingAverage(
@@ -16,6 +42,11 @@ List<VarietyChartData> simpleMovingAverage(
 }
 
 /// Produces a point list whose values equal the exponential moving average.
+///
+/// A point with no reading of its own leaves the average undefined, and the
+/// seed is only taken from a window in which every point has one. Treating a
+/// missing reading as zero would drag the first values toward the origin and
+/// then, once the window filled up, jump.
 List<VarietyChartData> exponentialMovingAverage(
     List<VarietyChartData> source, int period) {
   if (source.isEmpty || period <= 0) {
@@ -25,21 +56,36 @@ List<VarietyChartData> exponentialMovingAverage(
   final List<VarietyChartData> result = <VarietyChartData>[];
   double? previous;
   for (int i = 0; i < source.length; i++) {
-    final double value = _reading(source[i]);
-    if (i < period - 1) {
-      result.add(source[i].withValue(null));
-      continue;
-    }
     if (previous == null) {
+      if (i < period - 1) {
+        result.add(_undefined(source[i]));
+        continue;
+      }
       double seed = 0;
+      bool complete = true;
       for (int j = i - period + 1; j <= i; j++) {
-        seed += _reading(source[j]);
+        final double? entry = _readingOrNull(source[j]);
+        if (entry == null) {
+          complete = false;
+          break;
+        }
+        seed += entry;
+      }
+      if (!complete) {
+        result.add(_undefined(source[i]));
+        continue;
       }
       previous = seed / period;
-    } else {
-      previous = (value - previous) * multiplier + previous;
+      result.add(_derived(source[i], previous));
+      continue;
     }
-    result.add(source[i].copyWith(y: previous));
+    final double? value = _readingOrNull(source[i]);
+    if (value == null) {
+      result.add(_undefined(source[i]));
+      continue;
+    }
+    previous = (value - previous) * multiplier + previous;
+    result.add(_derived(source[i], previous));
   }
   return result;
 }
@@ -75,7 +121,19 @@ List<VarietyChartData> relativeStrengthIndex(
   double gain = 0;
   double loss = 0;
   for (int i = 1; i <= period; i++) {
-    final double delta = _reading(source[i]) - _reading(source[i - 1]);
+    final double? current = _readingOrNull(source[i]);
+    final double? previous = _readingOrNull(source[i - 1]);
+    if (current == null || previous == null) {
+      // A window that is not fully defined cannot seed the averages. Returning
+      // a reading built from a zero would put the oscillator on a level it was
+      // never measured at, so the whole line stays undefined.
+      return List<VarietyChartData>.generate(
+        source.length,
+        (int i) => _undefined(source[i]),
+        growable: false,
+      );
+    }
+    final double delta = current - previous;
     if (delta >= 0) {
       gain += delta;
     } else {
@@ -86,11 +144,21 @@ List<VarietyChartData> relativeStrengthIndex(
   double averageLoss = loss / period;
   for (int i = 0; i < source.length; i++) {
     if (i < period) {
-      result.add(source[i].withValue(null));
+      result.add(_undefined(source[i]));
+      continue;
+    }
+    final double? current = _readingOrNull(source[i]);
+    if (current == null) {
+      result.add(_undefined(source[i]));
       continue;
     }
     if (i > period) {
-      final double delta = _reading(source[i]) - _reading(source[i - 1]);
+      final double? previous = _readingOrNull(source[i - 1]);
+      if (previous == null) {
+        result.add(_undefined(source[i]));
+        continue;
+      }
+      final double delta = current - previous;
       final double up = delta > 0 ? delta : 0;
       final double down = delta < 0 ? -delta : 0;
       averageGain = (averageGain * (period - 1) + up) / period;
@@ -98,7 +166,7 @@ List<VarietyChartData> relativeStrengthIndex(
     }
     final double rs = averageLoss == 0 ? 100 : averageGain / averageLoss;
     result.add(
-        source[i].copyWith(y: averageLoss == 0 ? 100 : 100 - 100 / (1 + rs)));
+        _derived(source[i], averageLoss == 0 ? 100 : 100 - 100 / (1 + rs)));
   }
   return result;
 }
@@ -133,11 +201,15 @@ List<VarietyChartData> momentum(List<VarietyChartData> source, int period) {
   final List<VarietyChartData> result = <VarietyChartData>[];
   for (int i = 0; i < source.length; i++) {
     if (i < period) {
-      result.add(source[i].withValue(null));
+      result.add(_undefined(source[i]));
       continue;
     }
-    result.add(source[i]
-        .copyWith(y: _reading(source[i]) - _reading(source[i - period])));
+    final double? current = _readingOrNull(source[i]);
+    final double? previous = _readingOrNull(source[i - period]);
+    result.add(_derived(
+      source[i],
+      (current == null || previous == null) ? null : current - previous,
+    ));
   }
   return result;
 }
@@ -147,13 +219,17 @@ List<VarietyChartData> rateOfChange(List<VarietyChartData> source, int period) {
   final List<VarietyChartData> result = <VarietyChartData>[];
   for (int i = 0; i < source.length; i++) {
     if (i < period) {
-      result.add(source[i].withValue(null));
+      result.add(_undefined(source[i]));
       continue;
     }
-    final double previous = _reading(source[i - period]);
-    final double current = _reading(source[i]);
-    result.add(source[i].copyWith(
-        y: previous == 0 ? 0 : (current - previous) / previous * 100));
+    final double? previous = _readingOrNull(source[i - period]);
+    final double? current = _readingOrNull(source[i]);
+    result.add(_derived(
+      source[i],
+      (current == null || previous == null)
+          ? null
+          : (previous == 0 ? 0 : (current - previous) / previous * 100),
+    ));
   }
   return result;
 }
@@ -175,7 +251,7 @@ List<VarietyChartData> accumulationDistribution(List<VarietyChartData> source) {
       final double multiplier = ((close - low) - (high - close)) / span;
       running += multiplier * (point.size ?? 0);
     }
-    result.add(point.withValue(running));
+    result.add(_derived(point, running));
   }
   return result;
 }
@@ -220,13 +296,20 @@ List<VarietyChartData> _rolling(
   int period,
   double Function(List<double> window) reduce,
 ) {
-  final List<double> values = source.map(_reading).toList(growable: false);
+  final List<double?> values =
+      source.map(_readingOrNull).toList(growable: false);
   return _rollingValues(source, values, period, reduce);
 }
 
+/// Applies [reduce] to every full window of [values].
+///
+/// A window holding a point with no reading produces a point with no reading
+/// either. Counting a gap as a zero would tilt the window towards the origin,
+/// which is how the warm-up of a composite indicator used to pick up values
+/// its input had never carried.
 List<VarietyChartData> _rollingValues(
   List<VarietyChartData> source,
-  List<double> values,
+  List<double?> values,
   int period, [
   double Function(List<double> window)? reduce,
 ]) {
@@ -239,11 +322,15 @@ List<VarietyChartData> _rollingValues(
   final List<VarietyChartData> result = <VarietyChartData>[];
   for (int i = 0; i < source.length; i++) {
     if (i < period - 1) {
-      result.add(source[i].withValue(null));
+      result.add(_undefined(source[i]));
       continue;
     }
-    result.add(
-        source[i].copyWith(y: reducer(values.sublist(i - period + 1, i + 1))));
+    final List<double?> window = values.sublist(i - period + 1, i + 1);
+    if (window.any((double? value) => value == null)) {
+      result.add(_undefined(source[i]));
+      continue;
+    }
+    result.add(_derived(source[i], reducer(window.cast<double>())));
   }
   return result;
 }
@@ -482,12 +569,12 @@ class VarietyBollingerBandsIndicator {
       final double? mean = middle[i].y;
       final double? sd = deviation[i].y;
       if (mean == null || sd == null) {
-        upper.add(middle[i].withValue(null));
-        lower.add(middle[i].withValue(null));
+        upper.add(_undefined(middle[i]));
+        lower.add(_undefined(middle[i]));
         continue;
       }
-      upper.add(middle[i].copyWith(y: mean + sd * standardDeviation));
-      lower.add(middle[i].copyWith(y: mean - sd * standardDeviation));
+      upper.add(_derived(middle[i], mean + sd * standardDeviation));
+      lower.add(_derived(middle[i], mean - sd * standardDeviation));
     }
     return <VarietyLineSeries>[
       VarietyLineSeries(
@@ -538,7 +625,7 @@ class VarietyMacdIndicator {
       final double? a = i < fast.length ? fast[i].y : null;
       final double? b = i < slow.length ? slow[i].y : null;
       macd.add(
-          source.data[i].copyWith(y: (a == null || b == null) ? null : a - b));
+          _derived(source.data[i], (a == null || b == null) ? null : a - b));
     }
     final List<VarietyChartData> signal =
         exponentialMovingAverage(macd, signalPeriod);
@@ -546,8 +633,7 @@ class VarietyMacdIndicator {
     for (int i = 0; i < macd.length; i++) {
       final double? a = macd[i].y;
       final double? b = i < signal.length ? signal[i].y : null;
-      histogram
-          .add(macd[i].copyWith(y: (a == null || b == null) ? null : a - b));
+      histogram.add(_derived(macd[i], (a == null || b == null) ? null : a - b));
     }
     return <VarietySeries>[
       VarietyColumnSeries(name: 'MACD', data: histogram, widthFactor: 0.5),
@@ -580,7 +666,7 @@ class VarietyStochasticIndicator {
     final List<VarietyChartData> kValues = <VarietyChartData>[];
     for (int i = 0; i < source.data.length; i++) {
       if (i < period - 1) {
-        kValues.add(source.data[i].withValue(null));
+        kValues.add(_undefined(source.data[i]));
         continue;
       }
       double highest = double.negativeInfinity;
@@ -589,10 +675,14 @@ class VarietyStochasticIndicator {
         highest = math.max(highest, source.data[j].highValue);
         lowest = math.min(lowest, source.data[j].lowValue);
       }
-      final double close = source.data[i].closeValue;
+      final double? close = _readingOrNull(source.data[i]);
+      if (close == null) {
+        kValues.add(_undefined(source.data[i]));
+        continue;
+      }
       final double span = highest - lowest;
-      kValues.add(source.data[i]
-          .copyWith(y: span == 0 ? 50 : (close - lowest) / span * 100));
+      kValues.add(_derived(
+          source.data[i], span == 0 ? 50 : (close - lowest) / span * 100));
     }
     return <VarietyLineSeries>[
       VarietyLineSeries(name: '%K', data: kValues, strokeWidth: 1.6),

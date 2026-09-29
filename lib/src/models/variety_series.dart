@@ -47,7 +47,7 @@ abstract class VarietySeries {
     this.trendlines = const <VarietyTrendline>[],
     this.selectionColor,
     this.unselectedOpacity = 1.0,
-    this.legendIconShape = VarietyMarkerShape.circle,
+    this.legendIconShape,
     this.animationDelay = Duration.zero,
     this.emptyPointSettings = const VarietyEmptyPointSettings(),
     this.sortingOrder = VarietySortingOrder.none,
@@ -90,14 +90,18 @@ abstract class VarietySeries {
 
   /// Returns the label text for a point, overriding [VarietyDataLabelSettings].
   ///
-  /// When `null`, the renderer falls back to the point's `y` value formatted
-  /// by [VarietyDataLabelSettings.builder].
+  /// Consulted before [VarietyDataLabelSettings.builder], and the result is
+  /// still handed to the chart-wide label resolver, so an override here can
+  /// itself be rewritten. When `null`, the renderer falls back to the point's
+  /// `y` value formatted by [VarietyDataLabelSettings.builder].
   final String Function(VarietyChartData point, int index)? dataLabelMapper;
 
   /// Returns a per-point colour override.
   ///
-  /// Returning `null` keeps the series colour for that point. The painter
-  /// walks this callback once per rendered marker and label.
+  /// Returning `null` keeps the colour the point would otherwise have been
+  /// drawn in. The painter walks this callback once per rendered marker and
+  /// label, and the resolved colour is also what a bar, a bubble or a slice
+  /// of this series is filled with.
   final Color? Function(VarietyChartData point, int index)? pointColorMapper;
 
   /// The icon used by the chart's legend when [legendIconShape] is omitted.
@@ -148,7 +152,12 @@ abstract class VarietySeries {
   final double unselectedOpacity;
 
   /// The glyph used to represent this series in the legend.
-  final VarietyMarkerShape legendIconShape;
+  ///
+  /// Given as a marker shape, which is the more specific way of naming a
+  /// glyph, so it wins over [legendIconType]. When omitted, [legendIconType]
+  /// decides, and when that is omitted too the legend's own `iconType` is
+  /// used. [VarietyMarkerShape.none] asks for a caption with no glyph.
+  final VarietyMarkerShape? legendIconShape;
 
   /// A delay inserted before the entrance animation of this series starts.
   final Duration animationDelay;

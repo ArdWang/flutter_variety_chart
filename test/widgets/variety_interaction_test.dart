@@ -452,4 +452,36 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('per-series point callbacks', () {
+    testWidgets('a series hears about the point under the finger',
+        (WidgetTester tester) async {
+      final List<int> indexes = <int>[];
+      final List<double?> values = <double?>[];
+      await tester.pumpWidget(
+        host(
+          VarietyCartesianChart(
+            series: <VarietySeries>[
+              VarietyColumnSeries(
+                name: 'A',
+                data: singleSlot(),
+                onPointTap: (VarietyChartData point, int index) {
+                  indexes.add(index);
+                  values.add(point.y);
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tapAt(tester.getCenter(chartCanvas()));
+      await tester.pumpAndSettle();
+
+      // The callback was declared and documented but nothing ever called it,
+      // while the double tap and long press handlers beside it were wired.
+      expect(indexes, <int>[0]);
+      expect(values, <double?>[50]);
+    });
+  });
 }
