@@ -359,4 +359,45 @@ void main() {
       );
     });
   });
+
+  group('a series that starts hidden', () {
+    /// How many paths reach the canvas with the second series visible or not.
+    int pathsDrawn({required bool visible}) {
+      const List<VarietyChartData> first = <VarietyChartData>[
+        VarietyChartData(0, 4),
+        VarietyChartData(1, 9),
+        VarietyChartData(2, 6),
+      ];
+      const List<VarietyChartData> second = <VarietyChartData>[
+        VarietyChartData(0, 8),
+        VarietyChartData(1, 5),
+        VarietyChartData(2, 9),
+      ];
+      final VarietyCartesianGeometry geometry = VarietyCartesianGeometry(
+        series: <VarietySeries>[
+          VarietyLineSeries(data: first),
+          VarietyLineSeries(data: second, initialIsVisible: visible),
+        ],
+        xAxis: quietX,
+        yAxis: const VarietyAxis(
+          type: VarietyAxisType.numeric,
+          showGridLines: false,
+          showLabels: false,
+          showTicks: false,
+        ),
+        plotRect: defaultPlotRect,
+        progress: 1,
+      );
+      final _Recorder recorder = _Recorder();
+      VarietyCartesianPainter(geometry: geometry, theme: base)
+          .paint(recorder, surface);
+      return recorder.pathPaints.length;
+    }
+
+    test('leaves it off the canvas', () {
+      // The flag is read by the painter rather than by the geometry, so it only
+      // shows in what reaches the canvas.
+      expect(pathsDrawn(visible: false), lessThan(pathsDrawn(visible: true)));
+    });
+  });
 }

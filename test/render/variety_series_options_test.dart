@@ -513,4 +513,74 @@ void main() {
       expect(with_.whereType<VarietyRectsElement>(), isEmpty);
     });
   });
+
+  group('marker families', () {
+    /// The single marker element the chart produced, or a failure that says so.
+    VarietyMarkersElement markersOf(VarietyCartesianGeometry geometry) =>
+        geometry.elements.whereType<VarietyMarkersElement>().single;
+
+    test('a marker settings override turns a step area markers on', () {
+      // The step area asked `showMarkers` and wrote the glyph and the diameter
+      // into the element itself, so the settings beside it were ignored twice
+      // over: they neither switched the markers on nor named what to draw.
+      final VarietyCartesianGeometry geometry = build(
+        series: <VarietySeries>[
+          VarietyStepAreaSeries(
+            data: const <VarietyChartData>[
+              VarietyChartData('A', 10),
+              VarietyChartData('B', 20),
+              VarietyChartData('C', 15),
+            ],
+            markerSettings: const VarietyMarkerSettings(
+              isVisible: true,
+              shape: VarietyMarkerShape.diamond,
+              width: 9,
+            ),
+          ),
+        ],
+      );
+      final VarietyMarkersElement element = markersOf(geometry);
+      expect(element.shape, VarietyMarkerShape.diamond);
+      expect(element.size, 9);
+      expect(element.markers, hasLength(3));
+    });
+
+    test('a spline area draws the diameter it declares', () {
+      // The area family documents five, which the plain area drew; the other
+      // three fell through to the generic six.
+      final VarietyCartesianGeometry geometry = build(
+        series: <VarietySeries>[
+          VarietySplineAreaSeries(
+            data: const <VarietyChartData>[
+              VarietyChartData('A', 10),
+              VarietyChartData('B', 20),
+            ],
+            showMarkers: true,
+          ),
+        ],
+      );
+      expect(markersOf(geometry).size, 5);
+    });
+
+    test('a hi lo series takes its marker glyph from the settings', () {
+      final VarietyCartesianGeometry geometry = build(
+        series: <VarietySeries>[
+          VarietyHiLoSeries(
+            data: const <VarietyChartData>[
+              VarietyChartData('A', 10, high: 20, low: 5),
+              VarietyChartData('B', 12, high: 22, low: 6),
+            ],
+            markerSettings: const VarietyMarkerSettings(
+              isVisible: true,
+              shape: VarietyMarkerShape.triangle,
+            ),
+          ),
+        ],
+      );
+      final VarietyMarkersElement element = markersOf(geometry);
+      expect(element.shape, VarietyMarkerShape.triangle);
+      // One glyph at the high of every point and one at the low.
+      expect(element.markers, hasLength(4));
+    });
+  });
 }

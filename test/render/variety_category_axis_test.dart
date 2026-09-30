@@ -116,4 +116,72 @@ void main() {
       expect(hits.first.position.dx, closeTo(aimed, 0.01));
     });
   });
+
+  group('category captions over a long run', () {
+    /// Two thousand instants a second apart, which is the shape of a recording
+    /// session rather than a test fixture.
+    List<VarietyChartData> recording() => <VarietyChartData>[
+          for (int i = 0; i < 2000; i++)
+            VarietyChartData(
+              DateTime(2026, 9, 15, 8).add(Duration(seconds: i)),
+              10 + (i % 7),
+            ),
+        ];
+
+    test('every instant still gets a caption of its own', () {
+      // Working out the caption pattern reads every value on the axis, so
+      // asking for it once per caption made building them quadratic: this run
+      // cost millions of date formats instead of thousands.
+      final VarietyCartesianGeometry geometry = build(recording());
+      expect(geometry.categories.length, 2000);
+      expect(
+        geometry.categories.toSet().length,
+        2000,
+        reason: 'two instants share a caption',
+      );
+      expect(geometry.categories.first, isNotEmpty);
+    });
+
+    test('each axis is captioned with a pattern of its own', () {
+      // One axis of strings and one of instants, which is what makes a pattern
+      // hoisted for the wrong axis visible.
+      final VarietyCartesianGeometry geometry = VarietyCartesianGeometry(
+        series: <VarietySeries>[
+          VarietyLineSeries(
+            name: 'Revenue',
+            xAxisName: 'month',
+            data: const <VarietyChartData>[
+              VarietyChartData('Jan', 10),
+              VarietyChartData('Feb', 20),
+            ],
+          ),
+          VarietyLineSeries(
+            name: 'Load',
+            xAxisName: 'stamp',
+            data: <VarietyChartData>[
+              VarietyChartData(DateTime(2026, 9, 15, 11, 30, 1), 30),
+              VarietyChartData(DateTime(2026, 9, 15, 11, 30, 31), 45),
+            ],
+          ),
+        ],
+        xAxis: const VarietyAxis(
+          type: VarietyAxisType.category,
+          name: 'month',
+        ),
+        secondaryXAxes: const <VarietyAxis>[
+          VarietyAxis(type: VarietyAxisType.dateTimeCategory, name: 'stamp'),
+        ],
+        yAxis: const VarietyAxis(type: VarietyAxisType.numeric),
+        plotRect: plotRect,
+        progress: 1,
+      );
+      expect(geometry.axisCategories[0], <String>['Jan', 'Feb']);
+      expect(geometry.axisCategories[1].length, 2);
+      expect(geometry.axisCategories[1].toSet().length, 2);
+      // A pattern taken from the other axis would have printed the strings it
+      // found there instead of a time.
+      expect(geometry.axisCategories[1].first, isNot('Jan'));
+      expect(geometry.axisCategories[1].first, isNot('Feb'));
+    });
+  });
 }

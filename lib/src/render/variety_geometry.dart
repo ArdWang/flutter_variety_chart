@@ -676,9 +676,13 @@ class VarietyCartesianGeometry {
       _categoryKeyIndexes[0][order[i]] = i;
     }
     _axisCategoryKeys[0].addAll(order);
+    // The pattern is resolved once for the axis rather than once per value:
+    // working one out formats every value the axis carries, so asking again for
+    // each caption turned building them into quadratic work.
+    final String? datePattern = _dateCaptionPattern(_categoryAxis);
     axisCategories[0].addAll(
       axisCategoryValues[0].map(
-        (dynamic x) => _categoryCaption(_categoryAxis, x),
+        (dynamic x) => _categoryCaption(_categoryAxis, x, datePattern),
       ),
     );
     resolvedData = List<List<VarietyChartData>>.generate(
@@ -925,10 +929,12 @@ class VarietyCartesianGeometry {
         }
       }
       // Captions are resolved once every value is known, because the pattern
-      // has to be fine enough to tell them all apart.
+      // has to be fine enough to tell them all apart. The pattern itself is
+      // resolved once for the axis, not once per caption.
+      final String? datePattern = _dateCaptionPattern(xAxes[i]);
       axisCategories[i].addAll(
         axisCategoryValues[i].map(
-          (dynamic x) => _categoryCaption(xAxes[i], x),
+          (dynamic x) => _categoryCaption(xAxes[i], x, datePattern),
         ),
       );
     }
@@ -959,14 +965,38 @@ class VarietyCartesianGeometry {
   }
 
   /// The caption an axis prints for a category value.
-  String _categoryCaption(VarietyAxis axis, dynamic x) {
+  ///
+  /// [datePattern] is the pattern [_dateCaptionPattern] resolved for the axis.
+  /// It is handed in rather than worked out here because resolving it reads
+  /// every value the axis carries, which is far too much work to repeat for
+  /// each caption.
+  String _categoryCaption(VarietyAxis axis, dynamic x, String? datePattern) {
     if (x is DateTime) {
       return varietyFormatDateTime(
         x,
-        axis.dateFormat ?? _autoCategoryDateFormat(axis),
+        datePattern ?? axis.dateFormat ?? 'dd MMM',
       );
     }
     return x?.toString() ?? '';
+  }
+
+  /// The date pattern the captions of [axis] are printed with, or `null` when
+  /// the values the axis carries are not dates.
+  ///
+  /// An axis that names its own `dateFormat` gets that back untouched. One that
+  /// does not has to be given a pattern fine enough to tell every category
+  /// apart, which is what [_autoCategoryDateFormat] works out.
+  String? _dateCaptionPattern(VarietyAxis axis) {
+    if (axis.dateFormat != null) {
+      return axis.dateFormat;
+    }
+    final int index = xAxes.indexOf(axis);
+    final List<dynamic> values =
+        index < 0 ? categoryValues : axisCategoryValues[index];
+    if (!values.any((dynamic value) => value is DateTime)) {
+      return null;
+    }
+    return _autoCategoryDateFormat(axis);
   }
 
   /// A caption pattern fine enough to tell every category apart.
@@ -1733,7 +1763,6 @@ class VarietyCartesianGeometry {
         strokeWidth: item.strokeWidth,
         fillOpacity: item.fillOpacity,
         showMarkers: item.showMarkers,
-        markerSize: item.markerSize,
       );
       _buildAttachedErrorBar(s, item);
       return;
@@ -1751,7 +1780,6 @@ class VarietyCartesianGeometry {
         strokeWidth: item.strokeWidth,
         fillOpacity: item.fillOpacity,
         showMarkers: item.showMarkers,
-        markerSize: item.markerSize,
       );
       _buildAttachedErrorBar(s, item);
       return;
@@ -1862,7 +1890,9 @@ class VarietyCartesianGeometry {
         ),
       );
     }
-    if (!item.showMarkers) {
+    // Asked the same way every other family asks it, so a marker settings
+    // override turns the markers on here too.
+    if (!_showsMarkers(item)) {
       return;
     }
     final List<VarietyMarker> markers = <VarietyMarker>[];
@@ -1873,8 +1903,10 @@ class VarietyCartesianGeometry {
         continue;
       }
       markers.add(
-        VarietyMarker(Offset(
-            pointPositions[seriesIndex][p].dx, topPixel(seriesIndex, p))),
+        VarietyMarker(
+          Offset(pointPositions[seriesIndex][p].dx, topPixel(seriesIndex, p)),
+          color: _markerColorOf(item),
+        ),
       );
     }
     if (markers.isEmpty) {
@@ -1884,9 +1916,14 @@ class VarietyCartesianGeometry {
       VarietyMarkersElement(
         seriesIndex: seriesIndex,
         markers: markers,
-        size: item.markerSize,
-        shape: VarietyMarkerShape.circle,
+        // The same four choices every other marker family makes, taken the same
+        // way: this builder used to write a circle and the series diameter in
+        // itself and ignore what the settings asked for.
+        size: _markerSizeOf(item),
+        shape: _markerShapeOf(item),
         color: color,
+        border: _markerBorderOf(item),
+        borderWidth: item.markerSettings?.borderWidth ?? 1.4,
       ),
     );
   }
@@ -2429,6 +2466,21 @@ class VarietyCartesianGeometry {
     if (item is VarietyAreaSeries) {
       return item.markerSize;
     }
+    // The rest of the area family declares a diameter of its own too. Without
+    // these the markers drew the generic fallback instead of the size the
+    // series documented, which is five rather than six.
+    if (item is VarietySplineAreaSeries) {
+      return item.markerSize;
+    }
+    if (item is VarietyStepAreaSeries) {
+      return item.markerSize;
+    }
+    if (item is VarietyRangeAreaSeries) {
+      return item.markerSize;
+    }
+    if (item is VarietySplineRangeAreaSeries) {
+      return item.markerSize;
+    }
     return 6;
   }
 
@@ -2957,10 +3009,11 @@ class VarietyCartesianGeometry {
           Offset(x + item.tickWidth / 2, close),
         ));
       } else if (item is VarietyHiLoSeries &&
-          item.showMarkers &&
+          _showsMarkers(item) &&
           _markerWanted(seriesIndex, p)) {
-        markers.add(VarietyMarker(Offset(x, high)));
-        markers.add(VarietyMarker(Offset(x, low)));
+        markers
+            .add(VarietyMarker(Offset(x, high), color: _markerColorOf(item)));
+        markers.add(VarietyMarker(Offset(x, low), color: _markerColorOf(item)));
       }
       _addDataLabel(item, seriesIndex, p, Offset(x, high), null);
     }
@@ -2983,9 +3036,11 @@ class VarietyCartesianGeometry {
         VarietyMarkersElement(
           seriesIndex: seriesIndex,
           markers: markers,
-          size: (item as VarietyHiLoSeries).markerSize,
-          shape: VarietyMarkerShape.circle,
+          size: _markerSizeOf(item),
+          shape: _markerShapeOf(item),
           color: color,
+          border: _markerBorderOf(item),
+          borderWidth: item.markerSettings?.borderWidth ?? 1.4,
         ),
       );
     }
@@ -2999,7 +3054,6 @@ class VarietyCartesianGeometry {
       strokeWidth: item.strokeWidth,
       fillOpacity: item.fillOpacity,
       showMarkers: item.showMarkers,
-      markerSize: item.markerSize,
     );
   }
 
@@ -3011,7 +3065,6 @@ class VarietyCartesianGeometry {
     required double strokeWidth,
     required double fillOpacity,
     required bool showMarkers,
-    required double markerSize,
   }) {
     final List<VarietyChartData> points = resolvedData[seriesIndex];
     final int axisIndex = axisIndexOf(seriesIndex);
@@ -3077,7 +3130,6 @@ class VarietyCartesianGeometry {
       strokeWidth: item.strokeWidth,
       fillOpacity: item.fillOpacity,
       showMarkers: item.showMarkers,
-      markerSize: item.markerSize,
     );
   }
 
@@ -3090,7 +3142,6 @@ class VarietyCartesianGeometry {
     required double strokeWidth,
     required double fillOpacity,
     required bool showMarkers,
-    required double markerSize,
   }) {
     final List<VarietyChartData> points = resolvedData[seriesIndex];
     final Color color = colorFor(item, seriesIndex, 0);

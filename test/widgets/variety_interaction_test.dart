@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_variety_chart/flutter_variety_chart.dart';
+// The painter is not part of the public surface, but a tap has to be aimed at a
+// point, and only the geometry knows where the points landed.
+import 'package:flutter_variety_chart/src/painters/variety_cartesian_painter.dart';
 
 import '../test_helpers.dart';
 
@@ -15,6 +18,12 @@ Finder chartCanvas() => find
       matching: find.byType(CustomPaint),
     )
     .first;
+
+/// The geometry the chart is drawing.
+VarietyCartesianGeometry chartGeometry(WidgetTester tester) {
+  final CustomPaint paint = tester.widget<CustomPaint>(chartCanvas());
+  return (paint.painter! as VarietyCartesianPainter).geometry;
+}
 
 void main() {
   group('selection', () {
@@ -64,8 +73,25 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      controller.select(<VarietyHitResult>[]);
-      expect(controller.selected, isEmpty);
+
+      // Two taps, each aimed at the top of a different column, read off the
+      // geometry the chart is actually drawing with.
+      final VarietyCartesianGeometry geometry = chartGeometry(tester);
+      final Offset origin = tester.getTopLeft(chartCanvas());
+      await tester.tapAt(origin + geometry.pointPositions[0][0]);
+      await tester.pumpAndSettle();
+      expect(controller.selected, hasLength(1));
+
+      await tester.tapAt(origin + geometry.pointPositions[0][1]);
+      await tester.pumpAndSettle();
+      // The test used to clear the controller and assert the empty result, so
+      // it passed without a second point ever being collected.
+      expect(
+        controller.selected
+            .map((VarietyHitResult hit) => hit.pointIndex)
+            .toSet(),
+        <int>{0, 1},
+      );
     });
   });
 
@@ -293,7 +319,16 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(calls, greaterThan(0));
-      expect(tester.takeException(), isNull);
+      // What the callback returned is the caption the plot carries; counting
+      // the calls alone passed even when the text was thrown away.
+      final VarietyLabelsElement labels = chartGeometry(tester)
+          .elements
+          .whereType<VarietyLabelsElement>()
+          .first;
+      expect(
+        labels.labels.map((VarietyLabelItem label) => label.text),
+        contains('v=32.0'),
+      );
     });
 
     testWidgets('onAxisLabelTapped fires for a tick label',

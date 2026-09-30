@@ -77,7 +77,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  flutter_variety_chart: ^0.5.20
+  flutter_variety_chart: ^0.5.21
 ```
 
 Import it:

@@ -284,6 +284,27 @@ void main() {
         VarietyElementRenderer.runFor('Revenue', style).size,
       );
     });
+
+    test('a full cache is trimmed rather than emptied', () {
+      // Captions that each carry a colour of their own can hold more runs than
+      // the cache keeps. Emptying the whole map when it filled up made every
+      // caption of the rest of the frame pay for a fresh layout; dropping the
+      // oldest run keeps the newest ones, which are the ones about to be drawn.
+      const int limit = VarietyElementRenderer.runCacheLimit;
+      for (int i = 0; i < limit + 200; i++) {
+        VarietyElementRenderer.runFor(
+          'run-$i',
+          TextStyle(fontSize: 11, color: Color(0xFF000000 + i)),
+        );
+      }
+      final int kept = VarietyElementRenderer.cachedRunCount;
+      expect(kept, lessThanOrEqualTo(limit));
+      expect(
+        kept,
+        greaterThan(limit ~/ 2),
+        reason: 'the cache was emptied instead of trimmed, holding $kept runs',
+      );
+    });
   });
 
   group('dashes are batched into one path', () {

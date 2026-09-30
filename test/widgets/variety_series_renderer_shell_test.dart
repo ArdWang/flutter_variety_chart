@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_variety_chart/flutter_variety_chart.dart';
+// The painter is not part of the public surface, but a tap has to be aimed at a
+// point, and only the geometry knows where the points landed.
+import 'package:flutter_variety_chart/src/painters/variety_cartesian_painter.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../test_helpers.dart';
 
 void main() {
   final List<VarietyChartData> points = <VarietyChartData>[
@@ -12,7 +17,7 @@ void main() {
   ];
 
   Widget chart({
-    List<VarietyLineSeries> series = const <VarietyLineSeries>[],
+    List<VarietySeries> series = const <VarietySeries>[],
     VarietySelectionBehavior? selection,
   }) =>
       MaterialApp(
@@ -150,10 +155,10 @@ void main() {
       int perSeriesApplied = 0;
       await tester.pumpWidget(
         chart(
-          series: <VarietyLineSeries>[
-            VarietyLineSeries(
+          series: <VarietySeries>[
+            VarietyColumnSeries(
               name: 'a',
-              data: points,
+              data: monthly(),
               selectionBehavior: VarietySelectionBehavior(
                 enabled: true,
                 onSelectionChanged: (List<VarietyHitResult> hits) {
@@ -166,10 +171,26 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+
+      // The chart wide behaviour is off, so a selection can only arrive through
+      // the series' own. The test used to say in a comment that it never
+      // simulated a tap, and then assert the callback had not run.
+      final Finder canvas = find
+          .descendant(
+            of: find.byType(VarietyCartesianChart),
+            matching: find.byType(CustomPaint),
+          )
+          .first;
+      final VarietyCartesianGeometry geometry = (tester
+              .widget<CustomPaint>(canvas)
+              .painter! as VarietyCartesianPainter)
+          .geometry;
+      await tester.tapAt(
+        tester.getTopLeft(canvas) + geometry.pointPositions[0][0],
+      );
+      await tester.pumpAndSettle();
+      expect(perSeriesApplied, greaterThan(0));
       expect(tester.takeException(), isNull);
-      // We don't simulate a tap here; the test confirms the constructor and
-      // the per-series lookup compile and the chart builds cleanly.
-      expect(perSeriesApplied, 0);
     });
 
     testWidgets(

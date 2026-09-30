@@ -1,3 +1,30 @@
+## 0.5.21
+
+### Captions resolved once, and the markers the settings never reached
+
+Fixed
+
+* Every caption on a date category axis was worked out on its own, and working
+  one out means formatting every value the axis carries. Building the captions
+  was therefore quadratic in the number of categories: a recording of two
+  thousand instants cost millions of date formats to label. The pattern is
+  resolved once per axis now and each caption only formats its own value. The
+  captions themselves are unchanged.
+* The cache of laid-out text runs was emptied completely once it filled up, so
+  every caption after that point paid for a fresh layout — and a chart whose
+  captions each carry a colour of their own can fill it up by itself. The oldest
+  runs are dropped one at a time instead, which keeps the runs the rest of the
+  frame is about to ask for. `VarietyElementRenderer.cachedRunCount` reports how
+  many the cache is holding.
+* A step area and a hi lo series wrote the glyph, the diameter and the colour of
+  their markers into the geometry themselves, so `markerSettings` was ignored
+  twice over: it neither turned the markers on nor named what to draw. Both ask
+  the same way every other family asks now.
+* A spline area, a step area, a range area and a spline range area each declare
+  a marker diameter of five, and each fell through to the generic six.
+* The builders that place markers were passed a diameter none of them read; the
+  parameter is gone, so one place decides that now.
+
 ## 0.5.20
 
 ### The readings an indicator feeds itself, and the options nothing read

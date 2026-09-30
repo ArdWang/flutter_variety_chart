@@ -481,12 +481,22 @@ class VarietyElementRenderer {
   static final Map<(String, TextStyle, double), TextPainter> _runs =
       <(String, TextStyle, double), TextPainter>{};
 
-  /// How many runs are kept before the map is dropped and refilled.
+  /// How many runs are kept before the oldest ones are dropped.
   ///
   /// A chart of a few hundred categories with its labels turned upright keeps
   /// every caption it will ever draw well inside this, so the cache holds
-  /// across frames instead of being emptied in the middle of one.
+  /// across frames instead of being emptied in the middle of one. A chart whose
+  /// captions each carry a colour of their own, through
+  /// [VarietySeries.pointColorMapper] or a per-point colour, can pass it; the
+  /// oldest runs are then dropped one at a time, which is far cheaper than
+  /// throwing the whole cache away and laying every caption out again.
   static const int runCacheLimit = 2048;
+
+  /// How many runs the cache is holding right now.
+  ///
+  /// Exposed so a test can show that the cache stays inside its limit rather
+  /// than being emptied, and so an application can watch the cost of a chart.
+  static int get cachedRunCount => _runs.length;
 
   /// The cached run for [text], laid out to [maxWidth] when one is given.
   static TextPainter runFor(
@@ -494,19 +504,38 @@ class VarietyElementRenderer {
     TextStyle style, {
     double? maxWidth,
   }) {
-    if (_runs.length > runCacheLimit) {
-      _runs.clear();
-    }
     final double width = maxWidth ?? double.infinity;
-    return _runs.putIfAbsent(
-      (text, style, width),
-      () => TextPainter(
-        text: TextSpan(text: text, style: style),
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-        ellipsis: maxWidth == null ? null : '\u2026',
-      )..layout(maxWidth: width),
-    );
+    final (String, TextStyle, double) key = (text, style, width);
+    final TextPainter? cached = _runs[key];
+    if (cached != null) {
+      return cached;
+    }
+    // Only a miss can grow the map, so this is the only place that has to keep
+    // it inside the limit. Dropping a run on a hit would throw away a caption
+    // the same frame is about to ask for again.
+    if (_runs.length >= runCacheLimit) {
+      _dropOldestRuns();
+    }
+    final TextPainter painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+      ellipsis: maxWidth == null ? null : '\u2026',
+    )..layout(maxWidth: width);
+    _runs[key] = painter;
+    return painter;
+  }
+
+  /// Drops the oldest runs until the cache is back inside its limit.
+  ///
+  /// The map keeps its insertion order, so its first key is the oldest run and
+  /// removing it costs one hash lookup. Emptying the map instead used to throw
+  /// away the runs the rest of the frame was about to ask for, which made every
+  /// caption past the limit cost a fresh layout.
+  static void _dropOldestRuns() {
+    while (_runs.length >= runCacheLimit) {
+      _runs.remove(_runs.keys.first);
+    }
   }
 
   /// The size [text] takes at [style].
