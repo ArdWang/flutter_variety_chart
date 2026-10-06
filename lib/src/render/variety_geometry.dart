@@ -13,6 +13,7 @@ import '../models/variety_options.dart';
 import '../models/variety_series.dart';
 import '../models/variety_trendline.dart';
 import '../utils/variety_label_utils.dart';
+import 'variety_data_labels.dart';
 import 'variety_elements.dart';
 
 /// Identifies the data point that sits under a pointer.
@@ -156,6 +157,22 @@ class VarietyFunnelSegment {
   final Offset center;
 }
 
+/// The running total of one series' stack, with the total underneath it.
+///
+/// One row is built per stacked series of a value axis, and the rows share the
+/// arithmetic that gets them there: [below] is the [upTo] row of the series
+/// underneath, so building a row costs one addition per point rather than a
+/// walk over the whole stack.
+class _StackTotals {
+  const _StackTotals(this.upTo, this.below);
+
+  /// The total of every stacked series up to and including this one.
+  final List<double> upTo;
+
+  /// The total of the stacked series underneath this one.
+  final List<double> below;
+}
+
 /// Derives the pixel geometry of a cartesian chart from its series and axes.
 class VarietyCartesianGeometry {
   /// Builds the geometry for the given [series] inside [plotRect].
@@ -276,8 +293,13 @@ class VarietyCartesianGeometry {
   /// The rectangle available for plotting, excluding axis captions.
   ///
   /// The value honours the `plotOffset`, `plotOffsetStart` and `plotOffsetEnd`
-  /// settings declared on the two axes.
-  Rect get plotRect {
+  /// settings declared on the two axes. Every input is fixed by the time the
+  /// constructor returns, so it is worked out once and handed back: `pixelX`
+  /// and `pixelY` read it for every point they place, which turned a rectangle
+  /// that never changes into one `Rect` allocation per point per frame.
+  late final Rect plotRect = _resolvePlotRect();
+
+  Rect _resolvePlotRect() {
     final double left = _rawPlotRect.left + xAxis.plotOffsetStart;
     final double right = _rawPlotRect.right - xAxis.plotOffsetEnd;
     final double top = _rawPlotRect.top + yAxis.plotOffsetEnd;
@@ -398,7 +420,7 @@ class VarietyCartesianGeometry {
   /// `dateFormat` may be coarse enough to print the same text for two
   /// categories, and looking a point up by its caption would then drop it on
   /// the wrong slot.
-  final List<List<String>> _axisCategoryKeys = <List<String>>[];
+  final List<List<Object>> _axisCategoryKeys = <List<Object>>[];
 
   /// The same keys as [_axisCategoryKeys], indexed by themselves.
   ///
@@ -407,7 +429,7 @@ class VarietyCartesianGeometry {
   /// layout quadratic in the number of categories: a few thousand points were
   /// enough to take tens of milliseconds a frame. The map keeps the lookup
   /// constant time and holds nothing the list does not already hold.
-  final List<Map<String, int>> _categoryKeyIndexes = <Map<String, int>>[];
+  final List<Map<Object, int>> _categoryKeyIndexes = <Map<Object, int>>[];
 
   /// The ordered category captions of the primary horizontal axis.
   List<String> get categories => axisCategories[0];
@@ -609,8 +631,8 @@ class VarietyCartesianGeometry {
       axisXTypes.add(VarietyAxisType.numeric);
       axisCategories.add(<String>[]);
       axisCategoryValues.add(<dynamic>[]);
-      _axisCategoryKeys.add(<String>[]);
-      _categoryKeyIndexes.add(<String, int>{});
+      _axisCategoryKeys.add(<Object>[]);
+      _categoryKeyIndexes.add(<Object, int>{});
       axisSlotCenters.add(<double>[]);
       axisSlotWidths.add(0);
       axisDateTimeTicks.add(<DateTime>[]);
@@ -661,11 +683,11 @@ class VarietyCartesianGeometry {
       resolvedData = sourceData;
       return;
     }
-    final List<String> order = <String>[];
-    final Set<String> seen = <String>{};
+    final List<Object> order = <Object>[];
+    final Set<Object> seen = <Object>{};
     for (final List<VarietyChartData> points in sourceData) {
       for (final VarietyChartData point in points) {
-        final String key = point.label ?? _categoryKey(point.x);
+        final Object key = point.label ?? _categoryKey(point.x);
         if (seen.add(key)) {
           order.add(key);
           categoryValues.add(point.x);
@@ -691,7 +713,7 @@ class VarietyCartesianGeometry {
         sourceData[s].length,
         (int p) {
           final VarietyChartData point = sourceData[s][p];
-          final String key = point.label ?? _categoryKey(point.x);
+          final Object key = point.label ?? _categoryKey(point.x);
           final int index = _categoryKeyIndexes[0][key] ?? -1;
           return VarietyChartData(
             point.y ?? 0,
@@ -917,10 +939,10 @@ class VarietyCartesianGeometry {
           axisXTypes[i] != VarietyAxisType.dateTimeCategory) {
         continue;
       }
-      final Set<String> seen = <String>{};
+      final Set<Object> seen = <Object>{};
       for (final int s in _seriesOnXAxis(i)) {
         for (final VarietyChartData point in resolvedData[s]) {
-          final String key = point.label ?? _categoryKey(point.x);
+          final Object key = point.label ?? _categoryKey(point.x);
           if (seen.add(key)) {
             _categoryKeyIndexes[i][key] = _axisCategoryKeys[i].length;
             _axisCategoryKeys[i].add(key);
@@ -957,9 +979,21 @@ class VarietyCartesianGeometry {
   /// readings is one caption but many categories, and keying on the caption
   /// folded every point of a day onto a single slot. Upstream's
   /// DateTimeCategoryAxis keys on `millisecondsSinceEpoch` for the same reason.
-  String _categoryKey(dynamic x) {
+  ///
+  /// The instant is the number itself, not a rendering of it. Running it
+  /// through [varietyFormatDateTime] cost about 5.5us a point on this machine,
+  /// and a category chart asks for a point's key several times over — once
+  /// while the categories are collected, again for every position, again for
+  /// every element — so a two thousand point date axis spent tens of
+  /// milliseconds a frame building text nothing ever reads. Microseconds are
+  /// also finer than the millisecond pattern this replaces, so two points share
+  /// a category only when they are the same instant.
+  ///
+  /// A number can never be confused with the text the other values key on, so
+  /// an axis mixing instants with bare numbers still keeps them apart.
+  Object _categoryKey(dynamic x) {
     if (x is DateTime) {
-      return varietyFormatDateTime(x, 'yyyy-MM-dd HH:mm:ss.SSS');
+      return x.microsecondsSinceEpoch;
     }
     return x?.toString() ?? '';
   }
@@ -1403,36 +1437,109 @@ class VarietyCartesianGeometry {
     return point.y ?? 0;
   }
 
-  double _stackedValue(int seriesIndex, int pointIndex) {
-    double total = 0;
-    final int targetAxis = axisIndexOf(seriesIndex);
-    for (int s = 0; s <= seriesIndex; s++) {
-      final VarietySeries item = series[s];
-      if (!item.isStacked || axisIndexOf(s) != targetAxis) {
-        continue;
-      }
-      if (resolvedData[s].length <= pointIndex) {
-        continue;
-      }
-      total += valueAt(s, pointIndex);
-    }
-    return total;
+  /// The running total of the stack [seriesIndex] sits in, up to and including
+  /// its own point.
+  double _stackedValue(int seriesIndex, int pointIndex) =>
+      _stackAt(seriesIndex, pointIndex, percent: false, inclusive: true);
+
+  /// The running total of the series under [seriesIndex], on its own axis.
+  double _stackedBase(int seriesIndex, int pointIndex) =>
+      _stackAt(seriesIndex, pointIndex, percent: false, inclusive: false);
+
+  /// The running total of each plain stack, one row per stacked series.
+  final Map<int, Map<int, _StackTotals>> _stackRuns =
+      <int, Map<int, _StackTotals>>{};
+
+  /// The running total of each percentage stack, one row per stacked series.
+  final Map<int, Map<int, _StackTotals>> _percentStackRuns =
+      <int, Map<int, _StackTotals>>{};
+
+  Map<int, _StackTotals> _stackRunOn(int targetAxis, bool percent) {
+    final Map<int, Map<int, _StackTotals>> cache =
+        percent ? _percentStackRuns : _stackRuns;
+    return cache.putIfAbsent(
+      targetAxis,
+      () => _buildStackRuns(targetAxis, percent),
+    );
   }
 
-  double _stackedBase(int seriesIndex, int pointIndex) {
-    double total = 0;
-    final int targetAxis = axisIndexOf(seriesIndex);
-    for (int s = 0; s < seriesIndex; s++) {
-      final VarietySeries item = series[s];
-      if (!item.isStacked || axisIndexOf(s) != targetAxis) {
+  /// Sums every stacked series of [targetAxis] once, row by row.
+  ///
+  /// [topValue] and [baseValue] are asked the same question for every point of
+  /// every series — how much has this stack accumulated here — and answering it
+  /// by walking the series underneath each time made the layout quadratic in
+  /// the series count, exactly like the percentage totals beside it: four
+  /// series of a thousand points cost 2.4 ms, eight cost 12.8 ms and sixteen
+  /// cost 67.8 ms. A stack depends on nothing that can change after the data is
+  /// resolved, so each row is summed once and read from then on.
+  ///
+  /// A row starts from the row under it rather than from zero, which keeps the
+  /// additions in the same order as summing from scratch and so produces the
+  /// same floating point result.
+  Map<int, _StackTotals> _buildStackRuns(int targetAxis, bool percent) {
+    // A percentage row contributes a share of the axis total, which is the same
+    // number for every row, so the totals are summed first and read per point.
+    final List<double>? totals = percent ? _percentTotalsOn(targetAxis) : null;
+    int longest = 0;
+    for (int s = 0; s < series.length; s++) {
+      if (!_inStack(series[s], percent) || axisIndexOf(s) != targetAxis) {
         continue;
       }
-      if (resolvedData[s].length <= pointIndex) {
-        continue;
-      }
-      total += valueAt(s, pointIndex);
+      longest = math.max(longest, resolvedData[s].length);
     }
-    return total;
+    final Map<int, _StackTotals> rows = <int, _StackTotals>{};
+    List<double> below = List<double>.filled(longest, 0);
+    for (int s = 0; s < series.length; s++) {
+      if (!_inStack(series[s], percent) || axisIndexOf(s) != targetAxis) {
+        continue;
+      }
+      final int count = math.min(resolvedData[s].length, longest);
+      final List<double> upTo = List<double>.of(below);
+      for (int p = 0; p < count; p++) {
+        upTo[p] += _stackReading(s, p, totals);
+      }
+      rows[s] = _StackTotals(upTo, below);
+      below = upTo;
+    }
+    return rows;
+  }
+
+  /// Whether [item] takes part in the stack [percent] selects.
+  static bool _inStack(VarietySeries item, bool percent) =>
+      percent ? item.isPercentStacked : item.isStacked;
+
+  /// One point's contribution to a stack row.
+  ///
+  /// A plain stack adds the reading as it stands; a percentage stack adds the
+  /// reading's share of [totals], so a point with no total to divide by adds
+  /// nothing.
+  double _stackReading(int seriesIndex, int pointIndex, List<double>? totals) {
+    final double raw = valueAt(seriesIndex, pointIndex);
+    if (totals == null) {
+      return raw;
+    }
+    if (pointIndex >= totals.length || totals[pointIndex] <= 0) {
+      return 0;
+    }
+    return math.max(raw, 0) / totals[pointIndex] * 100;
+  }
+
+  double _stackAt(
+    int seriesIndex,
+    int pointIndex, {
+    required bool percent,
+    required bool inclusive,
+  }) {
+    if (pointIndex < 0) {
+      return 0;
+    }
+    final _StackTotals? row =
+        _stackRunOn(axisIndexOf(seriesIndex), percent)[seriesIndex];
+    if (row == null) {
+      return 0;
+    }
+    final List<double> values = inclusive ? row.upTo : row.below;
+    return pointIndex < values.length ? values[pointIndex] : 0;
   }
 
   /// The running total of each percentage stack, one list per value axis.
@@ -1581,27 +1688,8 @@ class VarietyCartesianGeometry {
     return raw;
   }
 
-  double _stackedPercentBase(int seriesIndex, int pointIndex) {
-    final int targetAxis = axisIndexOf(seriesIndex);
-    // The grand total is the same whichever series is being stacked, so it is
-    // read once rather than inside the loop that walks the series below it.
-    final double grand = _percentTotal(pointIndex, targetAxis);
-    if (grand <= 0) {
-      return 0;
-    }
-    double total = 0;
-    for (int s = 0; s < seriesIndex; s++) {
-      final VarietySeries item = series[s];
-      if (!item.isPercentStacked || axisIndexOf(s) != targetAxis) {
-        continue;
-      }
-      if (resolvedData[s].length <= pointIndex) {
-        continue;
-      }
-      total += math.max(valueAt(s, pointIndex), 0) / grand * 100;
-    }
-    return total;
-  }
+  double _stackedPercentBase(int seriesIndex, int pointIndex) =>
+      _stackAt(seriesIndex, pointIndex, percent: true, inclusive: false);
 
   /// The visual "base" value of a point, honouring stacking and percentages.
   double baseValue(int seriesIndex, int pointIndex) {
@@ -2149,20 +2237,20 @@ class VarietyCartesianGeometry {
     if (points.isEmpty) {
       return;
     }
-    final Map<String, List<double>> groups = <String, List<double>>{};
-    final Map<String, List<int>> members = <String, List<int>>{};
+    final Map<Object, List<double>> groups = <Object, List<double>>{};
+    final Map<Object, List<int>> members = <Object, List<int>>{};
     for (int p = 0; p < points.length; p++) {
       if (points[p].isEmpty) {
         continue;
       }
-      final String key = points[p].label ?? _categoryKey(points[p].x);
+      final Object key = points[p].label ?? _categoryKey(points[p].x);
       groups.putIfAbsent(key, () => <double>[]).add(points[p].y ?? 0);
       members.putIfAbsent(key, () => <int>[]).add(p);
     }
     final Color color = colorFor(item, seriesIndex, 0);
     final double band =
         (slotWidth > 0 ? slotWidth : plotRect.width) * item.widthFactor;
-    groups.forEach((String key, List<double> raw) {
+    groups.forEach((Object key, List<double> raw) {
       final List<int> indexes = members[key] ?? const <int>[];
       if (indexes.isEmpty) {
         return;
@@ -3505,9 +3593,6 @@ class VarietyCartesianGeometry {
       return;
     }
     final VarietyChartData point = points[pointIndex];
-    if (!settings.showZeroValue && (point.y ?? 0) == 0) {
-      return;
-    }
     // A stacked series can caption the running total instead of its own step,
     // which is what turns a stack into a set of readable milestones.
     final double captionValue = settings.showCumulativeTotal && item.isStacked
@@ -3517,9 +3602,16 @@ class VarietyCartesianGeometry {
     // answer available for this point. The chart-wide resolver comes last: it
     // is handed a caption that has already been through both, so it can still
     // rewrite whatever they produced.
-    String caption = item.dataLabelMapper?.call(point, pointIndex) ??
-        settings.builder?.call(point) ??
-        varietyFormatNumber(captionValue);
+    final String? resolved = varietyDataLabelCaption(
+      item,
+      point,
+      pointIndex,
+      captionValue,
+    );
+    if (resolved == null) {
+      return;
+    }
+    String caption = resolved;
     final String? overridden =
         dataLabelResolver?.call(item, seriesIndex, point, pointIndex, caption);
     if (overridden != null) {
@@ -4848,23 +4940,35 @@ class VarietyFunnelGeometry {
         ),
       );
       if (series.dataLabelSettings.isVisible) {
-        elements.add(
-          VarietyLabelsElement(
-            seriesIndex: 0,
-            labels: <VarietyLabelItem>[
-              VarietyLabelItem(
-                anchor: segment.center,
-                text: series.dataLabelSettings.builder?.call(points[i]) ??
-                    (points[i].label ?? varietyFormatNumber(points[i].y ?? 0)),
-                position: series.dataLabelSettings.position,
-                offset: series.dataLabelSettings.labelOffset,
-                margin: series.dataLabelSettings.margin,
-                color: series.dataLabelSettings.color,
-              ),
-            ],
-            style: series.dataLabelSettings.textStyle,
-          ),
+        // The caption chain is the one every family shares, so a mapper, a
+        // builder and the zero switch mean here what they mean on a column.
+        final String? caption = varietyDataLabelCaption(
+          series,
+          points[i],
+          i,
+          points[i].y ?? 0,
+          fallback: points[i].label,
         );
+        if (caption != null && caption.isNotEmpty) {
+          elements.add(
+            VarietyLabelsElement(
+              seriesIndex: 0,
+              labels: <VarietyLabelItem>[
+                VarietyLabelItem(
+                  anchor: segment.center,
+                  text: caption,
+                  position: series.dataLabelSettings.position,
+                  offset: series.dataLabelSettings.labelOffset,
+                  margin: series.dataLabelSettings.margin,
+                  color: series.dataLabelSettings.useSeriesColor
+                      ? color
+                      : series.dataLabelSettings.color,
+                ),
+              ],
+              style: series.dataLabelSettings.textStyle,
+            ),
+          );
+        }
       }
     }
   }

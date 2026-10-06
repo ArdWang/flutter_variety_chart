@@ -106,6 +106,35 @@ void main() {
       expect(geometry.categories, <String>['Jan', 'Feb']);
     });
 
+    test('two instants inside one millisecond keep their own slots', () {
+      // The key of an instant is the instant itself, so its precision is the
+      // precision of a DateTime. A key built by rendering the instant topped
+      // out at milliseconds and folded these two onto one slot.
+      final DateTime start = DateTime(2026, 9, 15, 11, 30, 1, 1);
+      final VarietyCartesianGeometry geometry = build(<VarietyChartData>[
+        VarietyChartData(start, 10),
+        VarietyChartData(start.add(const Duration(microseconds: 1)), 20),
+      ]);
+      expect(geometry.categories.length, 2);
+      final Set<double> drawn =
+          geometry.pointPositions[0].map((Offset p) => p.dx).toSet();
+      expect(drawn.length, 2, reason: 'points share a slot: $drawn');
+    });
+
+    test('a number that spells a timestamp is not that timestamp', () {
+      // An instant keys on the number of microseconds while every other value
+      // keys on its text, so a bare number equal to that count stays a
+      // category of its own however many digits it has.
+      final VarietyCartesianGeometry geometry = build(<VarietyChartData>[
+        VarietyChartData(
+          DateTime.fromMicrosecondsSinceEpoch(1757900000000000),
+          10,
+        ),
+        const VarietyChartData(1757900000000000, 20),
+      ]);
+      expect(geometry.categories.length, 2);
+    });
+
     test('the trackball lands on the tapped slot', () {
       final VarietyCartesianGeometry geometry = build(sameDay());
       final double aimed = geometry.pointPositions[0][1].dx;

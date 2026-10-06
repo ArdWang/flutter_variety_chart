@@ -1815,12 +1815,14 @@ class VarietyCartesianPainter extends CustomPainter {
       }
     }
     final bool showMarkers = ball == null || ball.showMarkers;
+    if (!showMarkers) {
+      // Nothing below draws the guide lines, so there is no point walking the
+      // highlight list to draw nothing.
+      return;
+    }
     final VarietySelectionBehavior? sel = selection;
     final bool styled = sel != null && sel.enabled && selected.isNotEmpty;
     for (final VarietyHitResult hit in highlights) {
-      if (!showMarkers) {
-        continue;
-      }
       Color color = hit.point.color ??
           hit.series.color ??
           varietyDefaultPalette[hit.seriesIndex % varietyDefaultPalette.length];

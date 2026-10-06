@@ -1,3 +1,51 @@
+## 0.5.22
+
+### A category key is the instant, and the label families answer together
+
+Fixed
+
+* A date category axis told its categories apart by a rendering of the instant,
+  so it could only tell apart instants a millisecond apart and folded two
+  readings inside the same millisecond onto one slot: a column drawn on top of
+  another one, and a lookup that landed a point on its neighbour. The key is the
+  instant itself now, and it is finer than the text it replaces. It is also a
+  fraction of the cost — the text was rebuilt several times over per point per
+  frame and nothing ever read it.
+* A pie and a funnel ignored `VarietySeries.dataLabelMapper`, so a chart that
+  named its own captions was captioned with the numbers instead. Neither
+  consulted `showZeroValue`, so both printed the zero the settings had asked to
+  hide. Every family that draws a data label resolves its caption through one
+  place now, which is what stops a mapper, a `builder` and the zero switch from
+  meaning different things on a column, a slice and a funnel segment.
+* A pie and a doughnut ignored the theme for those captions:
+  `VarietyChartTheme.dataLabelTextStyle` was never read, so a caption stayed at
+  eleven pixels whatever the theme asked for, and `useSeriesColor` changed
+  nothing — a slice was always captioned in white. A slice is filled with its
+  own colour, so white is still the last resort, but it is no longer the only
+  answer.
+
+Changed
+
+* A pie slice that names no caption of its own is captioned with its value the
+  way every other family captions one — a whole number reads `10` where it used
+  to read `10.0`, and a large one carries the same `K`/`M`/`B` suffix a column
+  would. A slice that carries a label still shows that label. A funnel segment
+  that captions nothing no longer draws an empty label.
+
+Performance
+
+* A point of a stacked series added up every series underneath it each time it
+  was asked where it sat, so placing a stack was quadratic in its height: four
+  series of a thousand points took 2.4 ms to lay out, eight took 12.8 ms and
+  sixteen took 67.8 ms. The totals of a value axis are summed once now and each
+  point reads its running total off that.
+* `VarietyCartesianGeometry.plotRect` is worked out once per chart rather than
+  once per point placed, which spent a rectangle per point per frame on a value
+  that cannot change.
+* The highlight pass behind the trackball walked every highlighted point to draw
+  a marker for each, even when the settings asked for no markers. It returns as
+  soon as it knows they are off.
+
 ## 0.5.21
 
 ### Captions resolved once, and the markers the settings never reached

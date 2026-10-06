@@ -6,7 +6,9 @@ import '../models/variety_chart_data.dart';
 import '../models/variety_enums.dart';
 import '../models/variety_series.dart';
 import '../render/variety_chart_theme.dart';
+import '../render/variety_data_labels.dart';
 import '../render/variety_geometry.dart';
+import 'variety_element_renderer.dart';
 
 /// Paints a circular chart: pie and doughnut slices plus radial bar rings.
 class VarietyCircularPainter extends CustomPainter {
@@ -112,19 +114,32 @@ class VarietyCircularPainter extends CustomPainter {
       if (!settings.isVisible) {
         continue;
       }
-      final String caption = settings.builder?.call(slice.point) ??
-          (slice.point.label ?? slice.point.y?.toString() ?? '');
-      if (caption.isEmpty) {
+      final String? resolved = varietyDataLabelCaption(
+        series,
+        slice.point,
+        slice.pointIndex,
+        slice.point.y ?? 0,
+        fallback: slice.point.label,
+      );
+      if (resolved == null || resolved.isEmpty) {
         continue;
       }
-      final TextStyle style =
-          (settings.textStyle ?? const TextStyle(fontSize: 11))
-              .copyWith(color: settings.color ?? Colors.white);
-      final TextPainter painter = TextPainter(
-        text: TextSpan(text: caption, style: style),
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-      )..layout();
+      final String caption = resolved;
+      // The chain the shared element renderer resolves its captions through, so
+      // a theme that grows or recolours its data labels reaches a slice as well
+      // as a column. A slice is filled with its own colour and the caption sits
+      // on top of it, which is why plain white is the last resort here rather
+      // than the plain label colour.
+      final TextStyle base = settings.textStyle ??
+          theme.dataLabelTextStyle ??
+          const TextStyle(fontSize: 11);
+      final TextStyle style = base.copyWith(
+        color: settings.color ??
+            (settings.useSeriesColor ? slice.color : null) ??
+            base.color ??
+            Colors.white,
+      );
+      final TextPainter painter = VarietyElementRenderer.runFor(caption, style);
       final double mid = slice.startAngle + slice.sweepAngle / 2;
       final bool outside = settings.position == VarietyLabelPosition.outside;
       final double distance = outside
