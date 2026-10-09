@@ -59,4 +59,59 @@ void main() {
     expect(canvasRect.contains(card.topLeft), isTrue);
     expect(canvasRect.contains(card.bottomRight), isTrue);
   });
+
+  testWidgets('a card taller than the chart is measured, not squeezed',
+      (WidgetTester tester) async {
+    // A chart shorter than the card used to hand its own height down as the
+    // card's maximum, which squeezed the card's Column into a RenderFlex
+    // overflow. The card is an overlay now, so only the width is bounded.
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: SizedBox(
+          width: 220,
+          height: 56,
+          child: Stack(
+            children: <Widget>[
+              Positioned.fill(
+                child: VarietyAnchoredCard(
+                  anchor: Offset(100, 28),
+                  child: _TallCard(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final Rect card = tester.getRect(find.byType(_TallCard));
+    // The natural 90, not the 56 the parent would have forced on it.
+    expect(card.width, 120);
+    expect(card.height, 90);
+    // 90 does not fit in 56, so the card is pushed to the top edge and cut
+    // off by the Stack rather than corrupting its own layout.
+    expect(card.topLeft, const Offset(40, 0));
+  });
+}
+
+/// Three fixed blocks, so the card's natural height is a known 90 and a
+/// squeezed layout cannot quietly agree with a measured one.
+class _TallCard extends StatelessWidget {
+  const _TallCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 120,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          SizedBox(height: 30),
+          SizedBox(height: 30),
+          SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
 }

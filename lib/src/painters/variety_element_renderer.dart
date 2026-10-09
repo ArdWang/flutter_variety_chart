@@ -39,10 +39,22 @@ typedef VarietyShaderFactory = Shader? Function(
 /// sparkline charts.
 class VarietyElementRenderer {
   /// Creates a renderer using the supplied [theme].
-  const VarietyElementRenderer(this.theme);
+  const VarietyElementRenderer(this.theme, {this.dataLabelHits});
 
   /// The resolved colours for this build.
   final VarietyChartTheme theme;
+
+  /// Where each painted data label ended up, when somebody is listening.
+  ///
+  /// Given at construction and grown while drawing, so one renderer can stay
+  /// `const` while still recording: what is captured is the list itself, not
+  /// the renderer's own state. The painter owns that list and empties it at
+  /// the start of every frame. Leaving this `null` costs nothing and records
+  /// nothing, which is what a chart nobody is asking costs.
+  ///
+  /// A caption that names no point — one the chart drew itself, or one
+  /// belonging to a family with no points to name — is left out.
+  final List<VarietyDataLabelHit>? dataLabelHits;
 
   /// Paints every element in order, skipping any series whose index is
   /// mapped to `false` in [visibleSeries].
@@ -227,25 +239,27 @@ class VarietyElementRenderer {
       ..style = PaintingStyle.stroke
       ..strokeWidth = element.borderWidth
       ..isAntiAlias = true;
-    final bool strokeOnly = isStrokeMarker(element.shape);
+    final VarietyMarkerShape elementShape = element.shape;
+    final bool strokeOnly = isStrokeMarker(elementShape);
     for (final VarietyMarker marker in element.markers) {
       final double size = marker.size ?? element.size;
       final Color color = marker.color ?? element.color;
+      final VarietyMarkerShape shape = marker.shape ?? elementShape;
       if (strokeOnly) {
         stroke
           ..color = color
           ..strokeWidth = math.max(size * 0.22, 1.4)
           ..strokeCap = StrokeCap.round;
-        _drawGlyph(canvas, element.shape, marker.center, size, stroke);
+        _drawGlyph(canvas, shape, marker.center, size, stroke);
         continue;
       }
       fill.color = color;
-      _drawGlyph(canvas, element.shape, marker.center, size, fill);
+      _drawGlyph(canvas, shape, marker.center, size, fill);
       if (element.border != null) {
         stroke
           ..color = element.border!
           ..strokeWidth = element.borderWidth;
-        _drawGlyph(canvas, element.shape, marker.center, size, stroke);
+        _drawGlyph(canvas, shape, marker.center, size, stroke);
       }
     }
   }
@@ -314,6 +328,20 @@ class VarietyElementRenderer {
       final TextPainter painter = layoutText(item.text, style);
       final Offset origin = anchorFor(painter, item) + item.shift;
       final Rect bounds = origin & painter.size;
+      // A caption that names a point leaves where it was painted behind, so a
+      // tap on it can be answered with that point. Nothing else asks for this,
+      // so it is only collected when somebody is listening.
+      final List<VarietyDataLabelHit>? hits = dataLabelHits;
+      if (hits != null && item.pointIndex != null) {
+        hits.add(
+          VarietyDataLabelHit(
+            seriesIndex: element.seriesIndex ?? 0,
+            pointIndex: item.pointIndex!,
+            text: item.text,
+            rect: bounds,
+          ),
+        );
+      }
       // The connector goes under the card so the card always reads cleanly
       // over the line it belongs to.
       drawConnector(canvas, item, bounds, alpha);

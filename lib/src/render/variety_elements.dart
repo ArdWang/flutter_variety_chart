@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
 import '../models/variety_enums.dart';
@@ -66,10 +67,45 @@ class VarietyPathElement extends VarietyElement {
   final Gradient? strokeGradient;
 }
 
+/// Where one painted data label ended up, and what it names.
+///
+/// A caption is a rectangle on the canvas and an address in the data: which
+/// series, which point, and what it printed. A tap inside [rect] is a tap on
+/// the point the caption is about, which is what a chart that offers the whole
+/// point as a target cannot say — the caption may well sit clear of it.
+@immutable
+class VarietyDataLabelHit {
+  /// Creates a data label hit record.
+  const VarietyDataLabelHit({
+    required this.seriesIndex,
+    required this.pointIndex,
+    required this.text,
+    required this.rect,
+  });
+
+  /// The series that owns the caption.
+  final int seriesIndex;
+
+  /// The point the caption names.
+  final int pointIndex;
+
+  /// The caption that was painted.
+  final String text;
+
+  /// The painted rectangle of the caption, card included.
+  final Rect rect;
+}
+
 /// A single marker glyph.
 class VarietyMarker {
   /// Creates a marker at [center].
-  const VarietyMarker(this.center, {this.color, this.size});
+  const VarietyMarker(
+    this.center, {
+    this.color,
+    this.size,
+    this.shape,
+    this.pointIndex,
+  });
 
   /// The centre of the glyph.
   final Offset center;
@@ -79,6 +115,20 @@ class VarietyMarker {
 
   /// An optional per-marker size override.
   final double? size;
+
+  /// An optional per-marker shape override.
+  ///
+  /// A set of markers otherwise shares the shape of its element, which is how
+  /// a series declares one. This is what lets a single point of that series be
+  /// drawn differently from its neighbours.
+  final VarietyMarkerShape? shape;
+
+  /// The point this marker stands for, when it stands for one.
+  ///
+  /// `null` for a glyph that is not a reading of its own: the mean of a box
+  /// plot, an outlier, an inner point. Those answer to their own settings and
+  /// are deliberately left out of anything that addresses them by point.
+  final int? pointIndex;
 }
 
 /// A set of markers that share one style.
@@ -241,6 +291,7 @@ class VarietyLabelItem {
     this.connectorWidth = 1.5,
     this.connectorColor,
     this.connectorType = VarietyConnectorType.line,
+    this.pointIndex,
   });
 
   /// The point the caption is anchored to.
@@ -294,6 +345,12 @@ class VarietyLabelItem {
 
   /// Whether the connector is straight or curved.
   final VarietyConnectorType connectorType;
+
+  /// The point this caption names, when it names one.
+  ///
+  /// Set for a caption standing on a data point, which is what a tap on the
+  /// caption has to be able to answer with.
+  final int? pointIndex;
 }
 
 /// A set of text captions that share one style.

@@ -1,3 +1,67 @@
+## 0.5.23
+
+### A chart that can be driven
+
+Three things a chart could not do before this: show a window somebody else
+chose, take a point while it is on screen, and let a caption or a marker be
+answered with. All three are the same gap seen from different sides — the chart
+was something an application *built* and then watched, never something it could
+talk to while it ran.
+
+Added
+
+* `VarietyRangeController`, and `VarietyAxis.rangeController` to hang one on an
+  axis. Pinning `start` and `end` replaces the range the axis would have derived
+  from its own points, and the chart records every window a gesture moves to
+  back onto the same controller, so reading it always answers with what is on
+  screen even if nothing was ever set on it. `dateTimeStart` and
+  `dateTimeEnd` read and write the ends as instants for an axis of dates.
+* Sharing one controller between two charts ties their windows together, which
+  is how a price chart and the volume chart beneath it stay on the same
+  sessions. Pinning one end leaves the other following the axis, so a series
+  that grows can still stretch a window nobody pinned.
+* `VarietyCartesianChartController` and `VarietyCartesianChart.controller`, and
+  its `updateDataSource`. Points are added, inserted, replaced or removed on the
+  list the series was built with — the caller's own list, so there is never a
+  second copy to fall out of step — and the chart repaints without replaying its
+  entrance animation and without losing whatever window the reader has zoomed or
+  panned to. This is what a chart fed one reading a second has wanted: it used
+  to be rebuilt, so the line redrew itself from nothing on every sample.
+* `VarietyAnimationType.realtime`, which keeps a chart from replaying its
+  entrance animation when its series are replaced. `load` and `linear` are
+  honoured now too — `load` eases out and `linear` advances evenly, where
+  before the choice was declared and never read.
+* `VarietyCartesianChart.onMarkerRender`, asked once per marker that stands for
+  a point. Answer with a colour, a size or a shape to draw that point
+  differently from its neighbours, or `null` to draw no marker at all. The
+  mean, the outliers and the inner points of a box plot are left alone: they
+  answer to their own options and stand for no reading to be asked about.
+* `VarietyCartesianChart.onDataLabelTapped`, which answers with the point the
+  caption names. A caption often sits clear of the point it belongs to, so a
+  chart that only offered the point itself left the caption dead.
+
+Changed
+
+* `VarietyRangeController` clamps a pinned end to what the data reaches rather
+  than refusing it: a window has to be a window onto something.
+
+Fixed
+
+* A tooltip card was measured with the height of the chart it floats over, so on
+  any chart shorter than the card the card's own column was squeezed and
+  reported a RenderFlex overflow: the striped band along the bottom, and content
+  that could not be read. A card is an overlay and is measured at its natural
+  size now, with only its width bounded. One that still cannot fit is pushed
+  against the edge of the chart and cut off there rather than being crushed into
+  a layout that cannot hold it.
+
+Covered by test/widgets/variety_range_controller_test.dart,
+test/widgets/variety_update_data_source_test.dart,
+test/render/variety_marker_and_label_callbacks_test.dart and
+test/widgets/variety_tooltip_anchor_test.dart. The example app grew a "Driving a
+chart" page showing two charts on one window, a reading a second, a marker that
+picks itself out and a caption that answers a tap.
+
 ## 0.5.22
 
 ### A category key is the instant, and the label families answer together

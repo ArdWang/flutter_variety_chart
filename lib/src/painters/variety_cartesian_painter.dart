@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../behaviors/variety_behaviors.dart';
+import '../behaviors/variety_interaction_details.dart';
 import '../models/variety_annotation.dart';
 import '../models/variety_axis.dart';
 import '../models/variety_enums.dart';
@@ -73,15 +74,35 @@ class VarietyCartesianPainter extends CustomPainter {
     this.selectionRectBorderColor,
     this.axisTooltip,
     this.axisLabelHits,
+    this.markerRenderer,
+    this.dataLabelHits,
   });
 
   /// The pre-computed layout shared with hit testing.
   final VarietyCartesianGeometry geometry;
 
+  /// Asks the application, once per marker, how that marker should be drawn.
+  ///
+  /// Answering `null` drops the marker. Only markers standing for a data point
+  /// are asked: the mean, the outliers and the inner points of a box plot
+  /// answer to their own options and have no point to be asked about.
+  final VarietyMarkerRenderDetails? Function(
+    VarietyMarkerRenderDetails details,
+  )? markerRenderer;
+
+  /// Where each painted data label ended up, for hit testing a tap on one.
+  ///
+  /// Emptied at the start of every frame. `null` records nothing, which is
+  /// what a chart whose caption taps nobody answers costs.
+  final List<VarietyDataLabelHit>? dataLabelHits;
+
   /// Shared default renderer used for non-element utilities such as
   /// [layoutText] and [drawLine]. Per-series overrides live in [_renderers].
   VarietyElementRenderer get _renderer =>
-      _sharedRenderer ??= VarietyElementRenderer(theme);
+      _sharedRenderer ??= VarietyElementRenderer(
+        theme,
+        dataLabelHits: dataLabelHits,
+      );
   VarietyElementRenderer? _sharedRenderer;
 
   /// Toggle per series index to honour [VarietySeries.initialIsVisible].
@@ -98,7 +119,7 @@ class VarietyCartesianPainter extends CustomPainter {
       final VarietySeries series = geometry.series[s];
       final VarietyElementRenderer renderer =
           series.onCreateRenderer?.call(theme, series) ??
-              VarietyElementRenderer(theme);
+              VarietyElementRenderer(theme, dataLabelHits: dataLabelHits);
       map[s] = renderer;
       try {
         series.onRendererCreated?.call(renderer, s);
@@ -176,6 +197,7 @@ class VarietyCartesianPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    dataLabelHits?.clear();
     // Both lists describe what is on screen *now*, so they are emptied at the
     // start of every frame. Appending to them instead let them grow without
     // bound across repaints, which both leaked and left stale rectangles
@@ -227,7 +249,7 @@ class VarietyCartesianPainter extends CustomPainter {
         final VarietyElementRenderer r = _renderers[key] ?? _renderer;
         final VarietySeries? series =
             el.seriesIndex != null ? geometry.series[el.seriesIndex!] : null;
-        r.paintWith(canvas, el, series);
+        r.paintWith(canvas, _resolvingMarkers(el, series), series);
       }
       if (dimmedSeries != null) {
         canvas.restore();
@@ -240,6 +262,88 @@ class VarietyCartesianPainter extends CustomPainter {
     _paintAnnotations(canvas, size);
     _paintHighlights(canvas);
     _paintSelectionRect(canvas);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Markers the application rewrites
+  // ---------------------------------------------------------------------------
+
+  /// Lets the application rewrite the markers of one element before they are
+  /// drawn.
+  ///
+  /// [element] comes back untouched when nobody is listening, when there is no
+  /// series to be asked about, or when none of its markers stands for a point:
+  /// asking about each one and rebuilding a list identical to the old one would
+  /// cost every frame what it costs to answer.
+  VarietyElement _resolvingMarkers(
+    VarietyElement element,
+    VarietySeries? series,
+  ) {
+    final VarietyMarkerRenderDetails? Function(VarietyMarkerRenderDetails)?
+        callback = markerRenderer;
+    if (callback == null ||
+        series == null ||
+        element is! VarietyMarkersElement) {
+      return element;
+    }
+    final int seriesIndex = element.seriesIndex ?? 0;
+    if (seriesIndex >= geometry.sourceData.length) {
+      return element;
+    }
+    final List<dynamic> points = geometry.sourceData[seriesIndex];
+    List<VarietyMarker>? rewritten;
+    for (int i = 0; i < element.markers.length; i++) {
+      final VarietyMarker marker = element.markers[i];
+      final int? pointIndex = marker.pointIndex;
+      if (pointIndex == null || pointIndex < 0 || pointIndex >= points.length) {
+        rewritten?.add(marker);
+        continue;
+      }
+      final VarietyMarkerRenderDetails? answer = callback(
+        VarietyMarkerRenderDetails(
+          series: series,
+          seriesIndex: seriesIndex,
+          point: points[pointIndex],
+          pointIndex: pointIndex,
+          color: marker.color ?? element.color,
+          size: marker.size ?? element.size,
+          shape: marker.shape ?? element.shape,
+        ),
+      );
+      // Answering `null` drops the marker, which is how one point of a line
+      // asks not to be marked without silencing the rest of its series.
+      if (answer == null) {
+        rewritten ??= List<VarietyMarker>.of(element.markers.sublist(0, i));
+        continue;
+      }
+      final VarietyMarker next = VarietyMarker(
+        marker.center,
+        color: answer.color,
+        size: answer.size,
+        shape: answer.shape,
+        pointIndex: pointIndex,
+      );
+      if (rewritten != null) {
+        rewritten.add(next);
+      } else if (next.color != marker.color ||
+          next.size != marker.size ||
+          next.shape != marker.shape) {
+        rewritten = List<VarietyMarker>.of(element.markers.sublist(0, i))
+          ..add(next);
+      }
+    }
+    if (rewritten == null) {
+      return element;
+    }
+    return VarietyMarkersElement(
+      seriesIndex: element.seriesIndex,
+      markers: rewritten,
+      size: element.size,
+      shape: element.shape,
+      color: element.color,
+      border: element.border,
+      borderWidth: element.borderWidth,
+    );
   }
 
   // ---------------------------------------------------------------------------

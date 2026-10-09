@@ -3,6 +3,7 @@ import 'package:flutter/painting.dart';
 
 import '../models/variety_axis.dart';
 import '../models/variety_chart_data.dart';
+import '../models/variety_enums.dart';
 import '../models/variety_series.dart';
 import '../render/variety_geometry.dart';
 
@@ -94,6 +95,91 @@ class VarietyTooltipDetails {
   /// Returns a copy of these details with a replacement value line.
   VarietyTooltipDetails withText(String value) =>
       VarietyTooltipDetails(hit: hit, header: header, text: value);
+}
+
+/// Details handed to the marker callback of a chart, one per marker about to
+/// be drawn.
+@immutable
+class VarietyMarkerRenderDetails {
+  /// Creates a marker description.
+  const VarietyMarkerRenderDetails({
+    required this.series,
+    required this.seriesIndex,
+    required this.point,
+    required this.pointIndex,
+    required this.color,
+    required this.size,
+    required this.shape,
+  });
+
+  /// The series that owns the marker.
+  final VarietySeries series;
+
+  /// The index of the owning series.
+  final int seriesIndex;
+
+  /// The point being marked.
+  final VarietyChartData point;
+
+  /// The index of the point.
+  final int pointIndex;
+
+  /// The colour the marker would be filled with.
+  final Color color;
+
+  /// The diameter the marker would be drawn at.
+  final double size;
+
+  /// The glyph the marker would be drawn as.
+  final VarietyMarkerShape shape;
+
+  /// Returns a copy of these details with replacements.
+  VarietyMarkerRenderDetails copyWith({
+    Color? color,
+    double? size,
+    VarietyMarkerShape? shape,
+  }) =>
+      VarietyMarkerRenderDetails(
+        series: series,
+        seriesIndex: seriesIndex,
+        point: point,
+        pointIndex: pointIndex,
+        color: color ?? this.color,
+        size: size ?? this.size,
+        shape: shape ?? this.shape,
+      );
+}
+
+/// Details handed to the data label tap callback of a chart.
+@immutable
+class VarietyDataLabelTapDetails {
+  /// Creates a data label tap description.
+  const VarietyDataLabelTapDetails({
+    required this.series,
+    required this.seriesIndex,
+    required this.point,
+    required this.pointIndex,
+    required this.text,
+    required this.position,
+  });
+
+  /// The series that owns the caption.
+  final VarietySeries series;
+
+  /// The index of the owning series.
+  final int seriesIndex;
+
+  /// The point the caption names.
+  final VarietyChartData point;
+
+  /// The index of that point.
+  final int pointIndex;
+
+  /// The caption that was tapped.
+  final String text;
+
+  /// Where the tap landed, in chart coordinates.
+  final Offset position;
 }
 
 /// Details handed to the legend tap callback of a chart.

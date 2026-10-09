@@ -416,4 +416,11 @@ enum VarietyAnimationType {
 
   /// The animation advances linearly.
   linear,
+
+  /// The animation runs once and is not replayed when the series change.
+  ///
+  /// A chart whose points arrive on a timer replaces its series every frame,
+  /// and a line that draws itself from nothing at that rate never settles.
+  /// Choosing this keeps the first draw and updates the rest in place.
+  realtime,
 }

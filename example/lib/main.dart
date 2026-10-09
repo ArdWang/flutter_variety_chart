@@ -8,6 +8,7 @@ import 'pages/financial_page.dart';
 import 'pages/indicators_page.dart';
 import 'pages/interaction_page.dart';
 import 'pages/line_area_page.dart';
+import 'pages/live_page.dart';
 import 'pages/misc_page.dart';
 import 'pages/spark_page.dart';
 import 'pages/stacked_page.dart';
@@ -113,6 +114,12 @@ class HomePage extends StatelessWidget {
         'Funnel, pyramid and compact charts',
         Icons.filter_alt,
         (BuildContext context) => const MiscPage(),
+      ),
+      _Demo(
+        'Driving a chart',
+        'A shared axis window, a reading a second, and callbacks',
+        Icons.stream,
+        (BuildContext context) => const LivePage(),
       ),
     ];
     return Scaffold(

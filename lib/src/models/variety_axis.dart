@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+import '../behaviors/variety_range_controller.dart';
 import 'variety_enums.dart';
 import 'variety_options.dart';
 
@@ -329,6 +330,7 @@ class VarietyAxis {
     this.initialZoomFactor = 1,
     this.initialZoomPosition = 0,
     this.visible = true,
+    this.rangeController,
   });
 
   /// How the values are interpreted. When `null` the chart picks a default:
@@ -521,6 +523,19 @@ class VarietyAxis {
   /// Whether the axis is laid out at all.
   final bool visible;
 
+  /// Drives the visible range of this axis from outside the chart.
+  ///
+  /// Pinning [VarietyRangeController.start] and
+  /// [VarietyRangeController.end] replaces the range the axis would have
+  /// derived from its own points, and the chart records every window a
+  /// gesture moves to back onto the same controller. Sharing one controller
+  /// between two charts ties their windows together, which is how a price
+  /// chart and the volume chart beneath it stay on the same sessions.
+  ///
+  /// `null` leaves the axis deciding its own range, which is what an axis
+  /// with no controller has always done.
+  final VarietyRangeController? rangeController;
+
   /// Returns a copy of this axis with the supplied fields replaced.
   VarietyAxis copyWith({
     VarietyAxisType? type,
@@ -633,6 +648,7 @@ class VarietyAxis {
       initialZoomFactor: initialZoomFactor ?? this.initialZoomFactor,
       initialZoomPosition: initialZoomPosition ?? this.initialZoomPosition,
       visible: visible ?? this.visible,
+      rangeController: rangeController ?? this.rangeController,
     );
   }
 }

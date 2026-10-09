@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 
 import '../behaviors/variety_behaviors.dart';
 import '../behaviors/variety_interaction_details.dart';
+import '../behaviors/variety_range_controller.dart';
 import '../models/variety_annotation.dart';
 import '../models/variety_axis.dart';
 import '../models/variety_chart_data.dart';
@@ -20,8 +21,10 @@ import '../models/variety_series.dart';
 import '../painters/variety_cartesian_painter.dart';
 import '../painters/variety_element_renderer.dart';
 import '../render/variety_chart_theme.dart';
+import '../render/variety_elements.dart';
 import '../render/variety_geometry.dart';
 import '../utils/variety_label_utils.dart';
+import 'variety_chart_controller.dart';
 import 'variety_chart_title.dart';
 import 'variety_legend.dart';
 import 'variety_tooltip.dart';
@@ -78,6 +81,10 @@ class VarietyCartesianChart extends StatefulWidget {
     this.onChartTouchInteractionUp,
     this.onPlotAreaSwipe,
     this.loadMoreIndicatorBuilder,
+    this.controller,
+    this.animationType = VarietyAnimationType.load,
+    this.onMarkerRender,
+    this.onDataLabelTapped,
   });
 
   /// The series plotted by the chart.
@@ -194,6 +201,54 @@ class VarietyCartesianChart extends StatefulWidget {
 
   /// Lets an application drive and observe the selection programmatically.
   final VarietySelectionController? selectionController;
+
+  /// Drives the chart's data from outside it.
+  ///
+  /// Handing the chart a [VarietyCartesianChartController] lets points be
+  /// added, replaced or removed through
+  /// [VarietyCartesianChartController.updateDataSource] rather than by
+  /// rebuilding the widget. Nothing else moves when that happens: the entrance
+  /// animation does not play again, and whatever window the reader has zoomed
+  /// or panned to is kept.
+  ///
+  /// `null` leaves the chart rebuilt from its arguments, which is what a chart
+  /// whose data arrive already whole wants.
+  final VarietyCartesianChartController? controller;
+
+  /// How the entrance animation advances.
+  ///
+  /// [VarietyAnimationType.load] follows an ease curve and is the default.
+  /// [VarietyAnimationType.linear] advances evenly, which is what a chart
+  /// counting up rather than drawing itself wants.
+  /// [VarietyAnimationType.realtime] does not replay the entrance once the
+  /// series have been replaced, so a chart whose points are refreshed on a
+  /// timer animates once and then simply updates.
+  final VarietyAnimationType animationType;
+
+  /// Asks how each marker should be drawn, once per point that carries one.
+  ///
+  /// Return the details unchanged to draw what the series asked for, change
+  /// [VarietyMarkerRenderDetails.color], `size` or `shape` to draw something
+  /// else, or return `null` to draw no marker at all for that point. A point
+  /// that calls attention to itself — a reading outside a band, the last
+  /// sample of a stream — can do so without touching the series' own
+  /// `markerSettings`.
+  ///
+  /// Only markers standing for a data point are asked about. The mean, the
+  /// outliers and the inner points of a box plot answer to their own options,
+  /// and they stand for no single reading to be asked about.
+  final VarietyMarkerRenderDetails? Function(
+    VarietyMarkerRenderDetails details,
+  )? onMarkerRender;
+
+  /// Called when a data label is tapped.
+  ///
+  /// A caption often sits clear of the point it names, so a chart that only
+  /// offers the point itself leaves the caption dead. This answers with the
+  /// point, the series and the caption that was tapped. Returning from here
+  /// consumes the tap: nothing downstream — selection, the trackball — sees
+  /// it.
+  final void Function(VarietyDataLabelTapDetails details)? onDataLabelTapped;
 
   /// Lets an application rewrite, or suppress, a tooltip before it is shown.
   ///
@@ -317,6 +372,9 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   List<VarietyHitResult> _selected = const <VarietyHitResult>[];
   final Set<int> _hiddenSeries = <int>{};
   final List<VarietyAxisLabelHit> _labelHits = <VarietyAxisLabelHit>[];
+  // Where each data label was painted last frame, for taps on a caption. Only
+  // filled when something is listening for those taps.
+  final List<VarietyDataLabelHit> _dataLabelHits = <VarietyDataLabelHit>[];
   bool _revealed = false;
   bool _initialSelectionSeeded = false;
   // The end of the axis the last pan ran out at, and whether that has already
@@ -358,6 +416,14 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   (double, double)? _zoomY;
   VarietyCartesianGeometry? _display;
 
+  // The window this chart last wrote onto each axis' range controller.
+  //
+  // Comparing against these is how the chart tells a range somebody else
+  // pinned from the echo of its own: applying its own coming back would undo
+  // the gesture or the scroll that produced it.
+  (double, double)? _publishedXRange;
+  (double, double)? _publishedYRange;
+
   // Magnification captured for each axis when the current pinch began, the
   // counterpart of the magnification captured when the pinch began.
   double? _startScaleX;
@@ -396,6 +462,106 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     ];
   }
 
+  /// The range controllers this chart's two primary axes are bound to.
+  ///
+  /// One controller shared between both axes of a chart, or between two
+  /// charts, appears here once per axis; `ChangeNotifier` keeps one
+  /// registration per listener regardless.
+  Iterable<VarietyRangeController?> _rangeControllersOf(
+    VarietyAxis x,
+    VarietyAxis y,
+  ) =>
+      <VarietyRangeController?>[x.rangeController, y.rangeController];
+
+  Iterable<VarietyRangeController?> get _rangeControllers =>
+      _rangeControllersOf(widget.primaryXAxis, widget.primaryYAxis);
+
+  /// Repaints when somebody outside moved the axis window.
+  ///
+  /// The repaint is put off until the frame that is being built is finished:
+  /// a controller is written from inside a layout, and marking this dirty from
+  /// there is not allowed. The chart that wrote it is already showing it, so
+  /// nothing is out of date in the meantime.
+  void _onRangeControllerChanged() {
+    if (!mounted) {
+      return;
+    }
+    scheduleMicrotask(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  /// Applies one announced data change and repaints.
+  ///
+  /// The change lands on the list the series was built with, which is the list
+  /// the application owns: adding here and adding there are the same list, so
+  /// there is never a second copy to fall out of step.
+  ///
+  /// What this deliberately does not do is restart the entrance animation or
+  /// touch the zoom state. A chart fed one reading a second that redrew itself
+  /// from nothing each time would be unreadable, and losing the window would
+  /// throw the reader out of whatever they had zoomed in to inspect.
+  void _onDataSourceChanged() {
+    if (!mounted) {
+      return;
+    }
+    final VarietyDataSourceChange? change = widget.controller?.pendingChange;
+    if (change != null) {
+      _applyDataSourceChange(change);
+    }
+    setState(() {});
+  }
+
+  /// Writes [change] into the data list of the series it names.
+  ///
+  /// An index the caller got wrong is ignored rather than thrown: a stray
+  /// removal or insertion is a mistake in one frame of a live chart, and
+  /// losing the whole chart over it would be worse.
+  void _applyDataSourceChange(VarietyDataSourceChange change) {
+    final List<VarietySeries> all = widget.series;
+    if (change.seriesIndex < 0 || change.seriesIndex >= all.length) {
+      return;
+    }
+    final List<VarietyChartData> data = all[change.seriesIndex].data;
+    final List<VarietyChartData> points =
+        change.points ?? const <VarietyChartData>[];
+    switch (change.type) {
+      case VarietyDataChangeType.append:
+        data.addAll(points);
+        break;
+      case VarietyDataChangeType.insert:
+        final int at = (change.index ?? data.length).clamp(0, data.length);
+        data.insertAll(at, points);
+        break;
+      case VarietyDataChangeType.replace:
+        final int from = change.index ?? 0;
+        for (int i = 0; i < points.length; i++) {
+          final int target = from + i;
+          if (target < 0 || target >= data.length) {
+            break;
+          }
+          data[target] = points[i];
+        }
+        break;
+      case VarietyDataChangeType.remove:
+        final Set<int> targets = <int>{
+          ...?change.indexes,
+          if (change.index != null) change.index!,
+        };
+        // Highest first, so taking one out does not move the ones above it.
+        final List<int> descending = targets
+            .where((int i) => i >= 0 && i < data.length)
+            .toList()
+          ..sort((int a, int b) => b.compareTo(a));
+        for (final int target in descending) {
+          data.removeAt(target);
+        }
+        break;
+    }
+  }
+
   /// Whether the series should be painted for the current rendering mode.
   bool get _paintsSeries =>
       widget.renderingMode == VarietyRenderingMode.onLoading || _revealed;
@@ -417,6 +583,10 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   void initState() {
     super.initState();
     widget.selectionController?.addListener(_syncSelectionFromController);
+    widget.controller?.addListener(_onDataSourceChanged);
+    for (final VarietyRangeController? controller in _rangeControllers) {
+      controller?.addListener(_onRangeControllerChanged);
+    }
     _selected =
         widget.selectionController?.selected ?? const <VarietyHitResult>[];
     _applyInitialZoom();
@@ -455,13 +625,24 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   @override
   void didUpdateWidget(covariant VarietyCartesianChart oldWidget) {
     super.didUpdateWidget(oldWidget);
+    for (final VarietyRangeController? controller in _rangeControllersOf(
+      oldWidget.primaryXAxis,
+      oldWidget.primaryYAxis,
+    )) {
+      controller?.removeListener(_onRangeControllerChanged);
+    }
+    for (final VarietyRangeController? controller in _rangeControllers) {
+      controller?.addListener(_onRangeControllerChanged);
+    }
+    oldWidget.controller?.removeListener(_onDataSourceChanged);
+    widget.controller?.addListener(_onDataSourceChanged);
     if (oldWidget.series != widget.series ||
         oldWidget.animationDuration != widget.animationDuration ||
         oldWidget.series.length != widget.series.length) {
       _hit = null;
       _trackballHits = const <VarietyHitResult>[];
       _trackballSlot = null;
-      if (widget.enableAnimation && _shouldAnimate) {
+      if (widget.enableAnimation && _shouldAnimate && _replaysEntrance) {
         _controller
           ..reset()
           ..forward();
@@ -474,6 +655,10 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   @override
   void dispose() {
     widget.selectionController?.removeListener(_syncSelectionFromController);
+    widget.controller?.removeListener(_onDataSourceChanged);
+    for (final VarietyRangeController? controller in _rangeControllers) {
+      controller?.removeListener(_onRangeControllerChanged);
+    }
     _trackballHideTimer?.cancel();
     _tooltipDelayTimer?.cancel();
     _controller.dispose();
@@ -602,7 +787,29 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     }
   }
 
-  double get _progress => widget.enableAnimation ? _controller.value : 1.0;
+  /// How far the entrance animation has run.
+  ///
+  /// The `load` curve eases out, which is what a chart drawing itself wants;
+  /// `linear` hands the raw progress through so a chart that counts up does so
+  /// evenly. `realtime` is not answered here but in [didUpdateWidget], which
+  /// is where a series being replaced would otherwise start the whole thing
+  /// again.
+  double get _progress {
+    if (!widget.enableAnimation) {
+      return 1.0;
+    }
+    final double value = _controller.value;
+    return widget.animationType == VarietyAnimationType.linear
+        ? value
+        : Curves.linearToEaseOut.transform(value);
+  }
+
+  /// Whether replacing the series should replay the entrance animation.
+  ///
+  /// A chart refreshed on a timer is replacing its series every frame, and a
+  /// line that redraws itself from nothing at that rate never settles.
+  bool get _replaysEntrance =>
+      widget.animationType != VarietyAnimationType.realtime;
 
   @override
   Widget build(BuildContext context) {
@@ -792,6 +999,9 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
             selectionRectBorderColor:
                 widget.zoomPanBehavior?.selectionRectBorderColor,
             axisTooltip: _activeAxisTooltip,
+            markerRenderer: widget.onMarkerRender,
+            dataLabelHits:
+                widget.onDataLabelTapped == null ? null : _dataLabelHits,
           ),
         );
         // Gesture recognisers are only attached when the behaviour that needs them
@@ -955,13 +1165,37 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     _baseXMin = base.xMinimum;
     _baseXMax = base.xMaximum;
     _applyAutoScrolling();
-    _zoomX = _windowFor(_baseXMin, _baseXMax, _xZoomPosition, _xZoomFactor);
+    _zoomX = _reconcileRange(
+      controller: widget.primaryXAxis.rangeController,
+      baseMin: _baseXMin,
+      baseMax: _baseXMax,
+      window: _windowFor(_baseXMin, _baseXMax, _xZoomPosition, _xZoomFactor),
+      published: _publishedXRange,
+      apply: (double start, double end) {
+        _xZoomFactor = (end - start) / (_baseXMax - _baseXMin);
+        _xZoomPosition = (start - _baseXMin) / (_baseXMax - _baseXMin);
+      },
+    );
+    _publishedXRange =
+        widget.primaryXAxis.rangeController == null ? null : _zoomX;
     // Each value axis reads its own `anchorRangeToVisiblePoints`, so the window
     // only has to be handed over for the axis to fit itself to it.
     final VarietyCartesianGeometry yRange = _yRangeBase(base, plotRect);
     _baseYMin = yRange.yMinimum;
     _baseYMax = yRange.yMaximum;
-    _zoomY = _windowFor(_baseYMin, _baseYMax, _yZoomPosition, _yZoomFactor);
+    _zoomY = _reconcileRange(
+      controller: widget.primaryYAxis.rangeController,
+      baseMin: _baseYMin,
+      baseMax: _baseYMax,
+      window: _windowFor(_baseYMin, _baseYMax, _yZoomPosition, _yZoomFactor),
+      published: _publishedYRange,
+      apply: (double start, double end) {
+        _yZoomFactor = (end - start) / (_baseYMax - _baseYMin);
+        _yZoomPosition = (start - _baseYMin) / (_baseYMax - _baseYMin);
+      },
+    );
+    _publishedYRange =
+        widget.primaryYAxis.rangeController == null ? null : _zoomY;
     final VarietyCartesianGeometry display = VarietyCartesianGeometry(
       series: _items,
       xAxis: widget.primaryXAxis,
@@ -1016,6 +1250,68 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     _xZoomPosition = fromStart ? 0 : 1 - factor;
     _autoScrolledFactor = _xZoomFactor;
     _autoScrolledPosition = _xZoomPosition;
+  }
+
+  /// The window one axis should show once its range controller has had its
+  /// say.
+  ///
+  /// A range controller is a two-way channel: a window pinned on it replaces
+  /// the one the chart would otherwise have derived, and every window the
+  /// chart settles on is recorded back onto it, so reading the controller
+  /// always answers with what is on screen. Sharing one controller between two
+  /// charts is what ties their windows together.
+  ///
+  /// Whether the controller has something to say is decided against
+  /// [published], the window this chart last recorded onto it. A range it
+  /// already knows is its own window coming back, and applying that would undo
+  /// the gesture or the scroll that produced it. An axis with no controller,
+  /// or one whose points leave it no room, keeps the window it had.
+  ///
+  /// An end nobody pinned stays free and goes on following the axis, so a
+  /// series that grows can still stretch it. A free end is what `null` means
+  /// on the controller, and it is recorded back as one.
+  (double, double)? _reconcileRange({
+    required VarietyRangeController? controller,
+    required double baseMin,
+    required double baseMax,
+    required (double, double)? window,
+    required (double, double)? published,
+    required void Function(double start, double end) apply,
+  }) {
+    if (controller == null) {
+      return window;
+    }
+    final double span = baseMax - baseMin;
+    if (!span.isFinite || span <= 0) {
+      return window;
+    }
+    final double low = window?.$1 ?? baseMin;
+    final double high = window?.$2 ?? baseMax;
+    if (controller.isPinned) {
+      final bool fromElsewhere = published == null ||
+          (controller.start != null && controller.start != published.$1) ||
+          (controller.end != null && controller.end != published.$2);
+      if (fromElsewhere) {
+        final double start = (controller.start ?? low).clamp(baseMin, baseMax);
+        final double end = (controller.end ?? high).clamp(baseMin, baseMax);
+        // A window narrower than a point has nothing to show, and a pinned end
+        // outside what the data reaches is asked for something impossible: both
+        // keep the window the chart already had.
+        if (end > start) {
+          apply(start, end);
+          return (start, end);
+        }
+      }
+      controller.setRange(
+        controller.start == null ? null : low,
+        controller.end == null ? null : high,
+      );
+      return (low, high);
+    }
+    // Nothing is pinned, so this chart answers and every chart sharing the
+    // controller follows: a gesture here is a gesture on all of them.
+    controller.setRange(low, high);
+    return (low, high);
   }
 
   /// The geometry the value axes take their range from.
@@ -1355,6 +1651,35 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
           );
           return;
         }
+      }
+    }
+    final void Function(VarietyDataLabelTapDetails)? captionCallback =
+        widget.onDataLabelTapped;
+    if (captionCallback != null && _dataLabelHits.isNotEmpty) {
+      for (final VarietyDataLabelHit label in _dataLabelHits) {
+        if (!label.rect.inflate(4).contains(position)) {
+          continue;
+        }
+        final int index = label.seriesIndex;
+        if (index >= geometry.series.length ||
+            index >= geometry.sourceData.length) {
+          continue;
+        }
+        final List<VarietyChartData> points = geometry.sourceData[index];
+        if (label.pointIndex < 0 || label.pointIndex >= points.length) {
+          continue;
+        }
+        captionCallback(
+          VarietyDataLabelTapDetails(
+            series: geometry.series[index],
+            seriesIndex: index,
+            point: points[label.pointIndex],
+            pointIndex: label.pointIndex,
+            text: label.text,
+            position: position,
+          ),
+        );
+        return;
       }
     }
     final VarietyHitResult? probe = geometry.hitTest(position);

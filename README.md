@@ -77,7 +77,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  flutter_variety_chart: ^0.5.22
+  flutter_variety_chart: ^0.5.23
 ```
 
 Import it:
@@ -426,6 +426,81 @@ VarietyCartesianChart(
       const Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()),
 )
 ```
+
+## Driving a running chart
+
+A chart can be told what to show, fed new points, and asked about what it drew,
+without being rebuilt.
+
+### Two charts, one window
+
+A `VarietyRangeController` on an axis replaces the range the axis would have
+derived, and every window a gesture moves to is recorded back onto it. Sharing
+one between two charts keeps them on the same sessions:
+
+```dart
+final VarietyRangeController shared = VarietyRangeController();
+
+VarietyCartesianChart(
+  primaryXAxis: VarietyAxis(rangeController: shared),
+  series: <VarietySeries>[VarietyCandleSeries(data: prices)],
+)
+VarietyCartesianChart(
+  primaryXAxis: VarietyAxis(rangeController: shared),
+  series: <VarietySeries>[VarietyColumnSeries(data: volumes)],
+)
+
+// Move both at once, or read back what the reader is looking at:
+shared.setDateTimeRange(DateTime(2026, 1, 5), DateTime(2026, 1, 20));
+```
+
+Pin one end and leave the other alone — `setRange(20, null)` — and the free end
+goes on following the axis, so a series that grows can still stretch it.
+
+### A reading a second
+
+`updateDataSource` puts points into the list the series was built with — the
+caller's own list, so there is never a second copy to fall out of step — and
+repaints without replaying the entrance animation and without losing the window:
+
+```dart
+final VarietyCartesianChartController chart = VarietyCartesianChartController();
+final List<VarietyChartData> readings = <VarietyChartData>[];
+
+VarietyCartesianChart(
+  controller: chart,
+  animationType: VarietyAnimationType.realtime,
+  primaryXAxis: const VarietyAxis(autoScrollingDelta: 20),
+  series: <VarietySeries>[VarietyLineSeries(data: readings)],
+)
+
+readings.add(VarietyChartData(next, value));
+chart.updateDataSource();
+```
+
+`insert`, `replace` and `remove` are the same call with a
+`VarietyDataChangeType` and an index.
+
+### A marker and a caption that answer back
+
+`onMarkerRender` is asked once per marker standing for a point. Answer with a
+colour, a size or a shape, or `null` to draw no marker at all:
+
+```dart
+VarietyCartesianChart(
+  onMarkerRender: (VarietyMarkerRenderDetails details) =>
+      (details.point.y ?? 0) > 27
+          ? details.copyWith(
+              color: const Color(0xFFD32F2F),
+              shape: VarietyMarkerShape.square,
+            )
+          : details,
+  series: <VarietySeries>[VarietyLineSeries(data: temperatures)],
+)
+```
+
+`onDataLabelTapped` answers with the point a caption names, which is worth
+having because a caption often sits clear of the point it belongs to.
 
 ## Upgrading from 0.5.14
 

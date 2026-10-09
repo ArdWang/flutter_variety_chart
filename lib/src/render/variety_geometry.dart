@@ -1994,6 +1994,7 @@ class VarietyCartesianGeometry {
         VarietyMarker(
           Offset(pointPositions[seriesIndex][p].dx, topPixel(seriesIndex, p)),
           color: _markerColorOf(item),
+          pointIndex: p,
         ),
       );
     }
@@ -2996,7 +2997,7 @@ class VarietyCartesianGeometry {
       }
       markers.add(
         VarietyMarker(pointPositions[seriesIndex][p],
-            color: colorFor(item, seriesIndex, p)),
+            color: colorFor(item, seriesIndex, p), pointIndex: p),
       );
       _addDataLabel(item, seriesIndex, p, pointPositions[seriesIndex][p], null);
     }
@@ -3099,9 +3100,10 @@ class VarietyCartesianGeometry {
       } else if (item is VarietyHiLoSeries &&
           _showsMarkers(item) &&
           _markerWanted(seriesIndex, p)) {
-        markers
-            .add(VarietyMarker(Offset(x, high), color: _markerColorOf(item)));
-        markers.add(VarietyMarker(Offset(x, low), color: _markerColorOf(item)));
+        markers.add(VarietyMarker(Offset(x, high),
+            color: _markerColorOf(item), pointIndex: p));
+        markers.add(VarietyMarker(Offset(x, low),
+            color: _markerColorOf(item), pointIndex: p));
       }
       _addDataLabel(item, seriesIndex, p, Offset(x, high), null);
     }
@@ -3158,10 +3160,14 @@ class VarietyCartesianGeometry {
     final int axisIndex = axisIndexOf(seriesIndex);
     final List<Offset> upper = <Offset>[];
     final List<Offset> lower = <Offset>[];
+    // Which point each bound belongs to, kept alongside rather than recovered
+    // afterwards: the point itself is what a marker has to be able to name.
+    final List<int> shown = <int>[];
     for (int p = 0; p < points.length; p++) {
       if (points[p].isEmpty) {
         continue;
       }
+      shown.add(p);
       final double x = pointPositions[seriesIndex][p].dx;
       final double high =
           animateY(pixelYOn(axisIndex, points[p].highValue), axisIndex);
@@ -3194,8 +3200,11 @@ class VarietyCartesianGeometry {
       return;
     }
     final List<VarietyMarker> markers = <VarietyMarker>[];
-    for (final Offset point in <Offset>[...upper, ...lower]) {
-      markers.add(VarietyMarker(point));
+    for (int i = 0; i < upper.length; i++) {
+      markers.add(VarietyMarker(upper[i], pointIndex: shown[i]));
+    }
+    for (int i = 0; i < lower.length; i++) {
+      markers.add(VarietyMarker(lower[i], pointIndex: shown[i]));
     }
     elements.add(
       VarietyMarkersElement(
@@ -3301,6 +3310,7 @@ class VarietyCartesianGeometry {
         VarietyMarker(
           _markerAnchor(item, anchor),
           color: _markerColorOf(item),
+          pointIndex: p,
         ),
       );
     }
@@ -3370,6 +3380,7 @@ class VarietyCartesianGeometry {
           VarietyMarker(
             _markerAnchor(item, anchor),
             color: override ?? colorFor(item, seriesIndex, p),
+            pointIndex: p,
           ),
         );
       }
@@ -3638,6 +3649,7 @@ class VarietyCartesianGeometry {
             borderWidth: settings.borderWidth,
             borderRadius: settings.borderRadius,
             angle: settings.angle,
+            pointIndex: pointIndex,
             shift: settings.offset,
             opacity: settings.opacity,
             connectorLength: settings.connectorLineSettings?.length ?? 0,
@@ -4963,6 +4975,7 @@ class VarietyFunnelGeometry {
                   color: series.dataLabelSettings.useSeriesColor
                       ? color
                       : series.dataLabelSettings.color,
+                  pointIndex: i,
                 ),
               ],
               style: series.dataLabelSettings.textStyle,

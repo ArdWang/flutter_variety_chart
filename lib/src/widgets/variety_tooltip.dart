@@ -411,7 +411,16 @@ class RenderVarietyAnchoredCard extends RenderProxyBox {
     if (child == null) {
       return;
     }
-    child.layout(constraints.loosen(), parentUsesSize: true);
+    // The card is an overlay, so only the width is passed down: the height is
+    // left unbounded and the card is measured at its natural size. Handing the
+    // parent's height down instead squeezed the card's own Column, which
+    // reported a RenderFlex overflow on every chart shorter than the card.
+    // Placement below clamps an oversized card back into the parent, where the
+    // Stack cuts it off, rather than corrupting the card's own layout.
+    child.layout(
+      BoxConstraints(maxWidth: constraints.maxWidth),
+      parentUsesSize: true,
+    );
     final Size cardSize = child.size;
     double left = _anchor.dx - cardSize.width / 2;
     left = left.clamp(0.0, math.max(size.width - cardSize.width, 0.0));

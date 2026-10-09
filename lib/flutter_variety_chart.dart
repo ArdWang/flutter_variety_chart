@@ -45,6 +45,7 @@ export 'src/models/variety_trendline.dart';
 // Behaviours
 export 'src/behaviors/variety_behaviors.dart';
 export 'src/behaviors/variety_interaction_details.dart';
+export 'src/behaviors/variety_range_controller.dart';
 
 // Analysis
 export 'src/analysis/variety_regression.dart'
@@ -74,6 +75,7 @@ export 'src/painters/variety_element_renderer.dart'
     show VarietyElementRenderer, VarietyRendererFactory, VarietyShaderFactory;
 export 'src/painters/variety_spark_painter.dart' show VarietySparkPainter;
 export 'src/widgets/variety_cartesian_chart.dart';
+export 'src/widgets/variety_chart_controller.dart';
 export 'src/widgets/variety_chart_title.dart';
 export 'src/widgets/variety_circular_chart.dart';
 export 'src/widgets/variety_funnel_chart.dart';
