@@ -236,7 +236,10 @@ void main() {
       ).paint(canvas, const Size(300, 200));
       expect(canvas.circles.length, 4);
       for (final Color colour in canvas.circles) {
-        expect(colour, seriesColor);
+        // Colour compares its float components, which a round trip through
+        // `withValues` can nudge in the last place: compare the bytes that
+        // are actually painted.
+        expect(colour.toARGB32(), seriesColor.toARGB32());
       }
     });
   });
@@ -267,7 +270,7 @@ void main() {
         ),
       );
 
-      VarietyCartesianPainter painter = painterOf(tester);
+      final VarietyCartesianPainter painter = painterOf(tester);
       expect(painter.dataLabelHits, isNotEmpty);
       painter.dataLabelHits!.sort(
         (VarietyDataLabelHit a, VarietyDataLabelHit b) =>

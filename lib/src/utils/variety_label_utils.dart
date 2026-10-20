@@ -181,6 +181,7 @@ String? _matchToken(String pattern, int index) {
     'm',
     'ss',
     's',
+    'SSSSSS',
     'SSS',
     'a',
   ];
@@ -234,6 +235,10 @@ String _applyToken(DateTime value, String token) {
       return value.second.toString();
     case 'SSS':
       return value.millisecond.toString().padLeft(3, '0');
+    case 'SSSSSS':
+      return (value.millisecond * 1000 + value.microsecond)
+          .toString()
+          .padLeft(6, '0');
     case 'a':
       return value.hour < 12 ? 'AM' : 'PM';
     default:

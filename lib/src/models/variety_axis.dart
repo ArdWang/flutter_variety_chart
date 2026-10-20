@@ -648,7 +648,9 @@ class VarietyAxis {
       initialZoomFactor: initialZoomFactor ?? this.initialZoomFactor,
       initialZoomPosition: initialZoomPosition ?? this.initialZoomPosition,
       visible: visible ?? this.visible,
-      rangeController: rangeController ?? this.rangeController,
+      // `copyWith` has no `rangeController` parameter: a controller is the
+      // channel a chart is driven through, not a value to copy.
+      rangeController: rangeController,
     );
   }
 }

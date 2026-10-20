@@ -247,7 +247,10 @@ void main() {
       ).first;
       // The first slice prints "30" of its own or "Visitors" when it has one,
       // and the longer caption is wider whichever font the test surface uses.
-      expect(labels.width, greaterThan(values.width));
+      // The paragraph is laid out against an unbounded width, so
+      // `Paragraph.width` is infinite for both; what the text actually
+      // occupies is `longestLine`.
+      expect(labels.longestLine, greaterThan(values.longestLine));
     });
 
     test('are drawn in the theme data label style', () {

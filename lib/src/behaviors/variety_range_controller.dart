@@ -42,7 +42,7 @@ class VarietyRangeController extends ChangeNotifier {
         _end = end;
 
   static double? _microsOf(DateTime? value) =>
-      value == null ? null : value.microsecondsSinceEpoch.toDouble();
+      value?.microsecondsSinceEpoch.toDouble();
 
   static DateTime? _dateOf(double? value) =>
       value == null ? null : DateTime.fromMicrosecondsSinceEpoch(value.round());

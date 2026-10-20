@@ -27,13 +27,21 @@ VarietyAxis countingAxis({VarietyRangeController? controller}) => VarietyAxis(
       showAxisLine: false,
     );
 
+/// The value axis, silent and left to follow the window.
+///
+/// It reports its own range on the same `onActualRangeChanged` callback, and
+/// with `anchorRangeToVisiblePoints` on it refits to the points the horizontal
+/// window shows — so a test watching the horizontal axis has to skip it.
+const VarietyAxis silentValueAxis =
+    VarietyAxis(showAxisLine: false, showLabels: false);
+
 VarietyCartesianChart countingChart({
   VarietyRangeController? controller,
   void Function(VarietyRangeChangedDetails)? onRange,
 }) =>
     VarietyCartesianChart(
       primaryXAxis: countingAxis(controller: controller),
-      primaryYAxis: const VarietyAxis(showAxisLine: false, showLabels: false),
+      primaryYAxis: silentValueAxis,
       enableAnimation: false,
       onActualRangeChanged: onRange,
       series: <VarietySeries>[VarietyLineSeries(name: 'n', data: counts())],
@@ -112,7 +120,9 @@ void main() {
             onRange: (
               VarietyRangeChangedDetails details,
             ) {
-              latest = details;
+              if (!identical(details.axis, silentValueAxis)) {
+                latest = details;
+              }
             })),
       );
       expect(latest, isNull, reason: 'nothing has changed yet');
@@ -136,7 +146,9 @@ void main() {
             onRange: (
               VarietyRangeChangedDetails details,
             ) {
-              latest = details;
+              if (!identical(details.axis, silentValueAxis)) {
+                latest = details;
+              }
             })),
       );
       // Nobody can look at -20 of nothing: the window is clamped back onto the
@@ -160,12 +172,13 @@ void main() {
         host(
           VarietyCartesianChart(
             primaryXAxis: countingAxis(controller: controller),
-            primaryYAxis:
-                const VarietyAxis(showAxisLine: false, showLabels: false),
+            primaryYAxis: silentValueAxis,
             controller: data,
             enableAnimation: false,
             onActualRangeChanged: (VarietyRangeChangedDetails details) {
-              latest = details;
+              if (!identical(details.axis, silentValueAxis)) {
+                latest = details;
+              }
             },
             series: <VarietySeries>[
               VarietyLineSeries(name: 'n', data: source),
@@ -207,7 +220,9 @@ void main() {
                       onRange: (
                         VarietyRangeChangedDetails details,
                       ) {
-                        upper.add(details);
+                        if (!identical(details.axis, silentValueAxis)) {
+                          upper.add(details);
+                        }
                       })),
               Expanded(
                   child: countingChart(
@@ -215,7 +230,9 @@ void main() {
                       onRange: (
                         VarietyRangeChangedDetails details,
                       ) {
-                        lower.add(details);
+                        if (!identical(details.axis, silentValueAxis)) {
+                          lower.add(details);
+                        }
                       })),
             ],
           ),

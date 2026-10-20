@@ -68,18 +68,23 @@ void main() {
     await tester.pumpWidget(
       const Directionality(
         textDirection: TextDirection.ltr,
-        child: SizedBox(
-          width: 220,
-          height: 56,
-          child: Stack(
-            children: <Widget>[
-              Positioned.fill(
-                child: VarietyAnchoredCard(
-                  anchor: Offset(100, 28),
-                  child: _TallCard(),
+        // Centred, because the test surface hands its child a tight 800x600:
+        // a bare SizedBox would be forced back to that size and the card would
+        // never meet the 56 pixel edge this test is about.
+        child: Center(
+          child: SizedBox(
+            width: 220,
+            height: 56,
+            child: Stack(
+              children: <Widget>[
+                Positioned.fill(
+                  child: VarietyAnchoredCard(
+                    anchor: Offset(100, 28),
+                    child: _TallCard(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -91,7 +96,10 @@ void main() {
     expect(card.height, 90);
     // 90 does not fit in 56, so the card is pushed to the top edge and cut
     // off by the Stack rather than corrupting its own layout.
-    expect(card.topLeft, const Offset(40, 0));
+    expect(
+        card.topLeft,
+        tester.getTopLeft(find.byType(VarietyAnchoredCard)) +
+            const Offset(40, 0));
   });
 }
 

@@ -144,8 +144,11 @@ void main() {
   group('a derived reading is not the bar it came from', () {
     // The candle points this library is given put the price in `close` and
     // leave `y` at zero, which is what the series tests use too.
+    // Thirty readings are not enough for the default 26 period MACD and its
+    // nine period signal line: the signal window would still contain the
+    // undefined opening of the MACD line, which correctly leaves it undefined.
     List<VarietyChartData> bars() => List<VarietyChartData>.generate(
-          30,
+          40,
           (int i) => VarietyChartData(
             i,
             0,

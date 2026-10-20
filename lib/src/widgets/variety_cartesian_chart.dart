@@ -339,23 +339,36 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   /// A delayed series owns the tail of the same timeline: with a delay worth
   /// half the total it is only half risen when the chart finishes, which is
   /// what makes a set of series read as a sequence instead of one block.
+  ///
+  /// The delay is taken out of the *raw* timeline before the easing curve is
+  /// applied, not out of the eased progress. Subtracting a linear offset from
+  /// an eased value let a series with a five hundred millisecond delay begin
+  /// rising a third of the way through its wait, because the curve is already
+  /// well above the linear value at that point.
   List<double> get _seriesProgress {
-    final double global = _progress;
+    final double raw = widget.enableAnimation ? _controller.value : 1.0;
     final Duration total = _timelineDuration();
     final List<double> out = <double>[];
     for (int i = 0; i < _items.length; i++) {
+      // `animate: false` is this series' own decision: it is drawn finished
+      // while the others are still rising. It used to mean only "the chart
+      // animates unless every series opts out".
+      if (!_items[i].animate) {
+        out.add(1);
+        continue;
+      }
       final Duration delay = _items[i].animationDelay;
       if (delay <= Duration.zero || total <= Duration.zero) {
-        out.add(global);
+        out.add(_eased(raw));
         continue;
       }
       final double start =
           (delay.inMicroseconds / total.inMicroseconds).clamp(0.0, 1.0);
       if (start >= 1) {
-        out.add(global >= 1 ? 1 : 0);
+        out.add(raw >= 1 ? 1 : 0);
         continue;
       }
-      out.add(((global - start) / (1 - start)).clamp(0.0, 1.0));
+      out.add(_eased(((raw - start) / (1 - start)).clamp(0.0, 1.0)));
     }
     return out;
   }
@@ -415,14 +428,6 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   (double, double)? _zoomX;
   (double, double)? _zoomY;
   VarietyCartesianGeometry? _display;
-
-  // The window this chart last wrote onto each axis' range controller.
-  //
-  // Comparing against these is how the chart tells a range somebody else
-  // pinned from the echo of its own: applying its own coming back would undo
-  // the gesture or the scroll that produced it.
-  (double, double)? _publishedXRange;
-  (double, double)? _publishedYRange;
 
   // Magnification captured for each axis when the current pinch began, the
   // counterpart of the magnification captured when the pinch began.
@@ -642,6 +647,14 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       _hit = null;
       _trackballHits = const <VarietyHitResult>[];
       _trackballSlot = null;
+      // A series may declare a longer rise than the chart's own
+      // `animationDuration`, and the two used to be read once in `initState`
+      // and never again: a chart handed a slower series kept the old timeline
+      // and finished drawing before that series had begun.
+      final Duration timeline = _timelineDuration();
+      if (_controller.duration != timeline) {
+        _controller.duration = timeline;
+      }
       if (widget.enableAnimation && _shouldAnimate && _replaysEntrance) {
         _controller
           ..reset()
@@ -779,11 +792,31 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     );
   }
 
-  void _applySelection(List<VarietyHitResult> next) {
+  /// Applies a new selection and tells the behaviour that asked for it.
+  ///
+  /// The callback is part of the same behaviour that decided the selection, so
+  /// a series carrying its own `selectionBehavior` reports through that one
+  /// rather than through the chart wide fallback. Reporting happens after the
+  /// frame because a handler is free to call `setState` itself, and doing that
+  /// while the chart is building is what the deferred seeding of
+  /// `initialSelectedDataIndexes` already avoids.
+  void _applySelection(
+    List<VarietyHitResult> next, {
+    VarietySelectionBehavior? behavior,
+  }) {
     setState(() => _selected = next);
     if (widget.selectionController != null &&
         widget.selectionController!.selected != next) {
       widget.selectionController!.select(next);
+    }
+    final void Function(List<VarietyHitResult> selected)? report =
+        behavior?.onSelectionChanged;
+    if (report != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          report(next);
+        }
+      });
     }
   }
 
@@ -794,15 +827,14 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   /// evenly. `realtime` is not answered here but in [didUpdateWidget], which
   /// is where a series being replaced would otherwise start the whole thing
   /// again.
-  double get _progress {
-    if (!widget.enableAnimation) {
-      return 1.0;
-    }
-    final double value = _controller.value;
-    return widget.animationType == VarietyAnimationType.linear
-        ? value
-        : Curves.linearToEaseOut.transform(value);
-  }
+  double get _progress =>
+      widget.enableAnimation ? _eased(_controller.value) : 1.0;
+
+  /// Applies the curve the chart asked for to a raw 0..1 timeline position.
+  double _eased(double value) =>
+      widget.animationType == VarietyAnimationType.linear
+          ? value
+          : Curves.linearToEaseOut.transform(value);
 
   /// Whether replacing the series should replay the entrance animation.
   ///
@@ -1170,14 +1202,11 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       baseMin: _baseXMin,
       baseMax: _baseXMax,
       window: _windowFor(_baseXMin, _baseXMax, _xZoomPosition, _xZoomFactor),
-      published: _publishedXRange,
       apply: (double start, double end) {
         _xZoomFactor = (end - start) / (_baseXMax - _baseXMin);
         _xZoomPosition = (start - _baseXMin) / (_baseXMax - _baseXMin);
       },
     );
-    _publishedXRange =
-        widget.primaryXAxis.rangeController == null ? null : _zoomX;
     // Each value axis reads its own `anchorRangeToVisiblePoints`, so the window
     // only has to be handed over for the axis to fit itself to it.
     final VarietyCartesianGeometry yRange = _yRangeBase(base, plotRect);
@@ -1188,14 +1217,11 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       baseMin: _baseYMin,
       baseMax: _baseYMax,
       window: _windowFor(_baseYMin, _baseYMax, _yZoomPosition, _yZoomFactor),
-      published: _publishedYRange,
       apply: (double start, double end) {
         _yZoomFactor = (end - start) / (_baseYMax - _baseYMin);
         _yZoomPosition = (start - _baseYMin) / (_baseYMax - _baseYMin);
       },
     );
-    _publishedYRange =
-        widget.primaryYAxis.rangeController == null ? null : _zoomY;
     final VarietyCartesianGeometry display = VarietyCartesianGeometry(
       series: _items,
       xAxis: widget.primaryXAxis,
@@ -1261,11 +1287,16 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
   /// always answers with what is on screen. Sharing one controller between two
   /// charts is what ties their windows together.
   ///
-  /// Whether the controller has something to say is decided against
-  /// [published], the window this chart last recorded onto it. A range it
-  /// already knows is its own window coming back, and applying that would undo
-  /// the gesture or the scroll that produced it. An axis with no controller,
-  /// or one whose points leave it no room, keeps the window it had.
+  /// A pinned end is re-applied on every frame rather than only when the
+  /// controller is seen to change. The window the chart keeps between frames is
+  /// a normalised (factor, position) pair, so the same pair names different
+  /// values once the data grows: a low end pinned at 4 drifted to 4.9 when one
+  /// point was appended past the old maximum. The pinned value is the reader's
+  /// decision and has to keep meaning itself; the free end is recomputed from
+  /// the current window, which is what lets it go on following the data.
+  ///
+  /// An axis with no controller, or one whose points leave it no room, keeps
+  /// the window it had.
   ///
   /// An end nobody pinned stays free and goes on following the axis, so a
   /// series that grows can still stretch it. A free end is what `null` means
@@ -1275,7 +1306,6 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     required double baseMin,
     required double baseMax,
     required (double, double)? window,
-    required (double, double)? published,
     required void Function(double start, double end) apply,
   }) {
     if (controller == null) {
@@ -1288,24 +1318,17 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
     final double low = window?.$1 ?? baseMin;
     final double high = window?.$2 ?? baseMax;
     if (controller.isPinned) {
-      final bool fromElsewhere = published == null ||
-          (controller.start != null && controller.start != published.$1) ||
-          (controller.end != null && controller.end != published.$2);
-      if (fromElsewhere) {
-        final double start = (controller.start ?? low).clamp(baseMin, baseMax);
-        final double end = (controller.end ?? high).clamp(baseMin, baseMax);
-        // A window narrower than a point has nothing to show, and a pinned end
-        // outside what the data reaches is asked for something impossible: both
-        // keep the window the chart already had.
-        if (end > start) {
-          apply(start, end);
-          return (start, end);
-        }
+      final double start = (controller.start ?? low).clamp(baseMin, baseMax);
+      final double end = (controller.end ?? high).clamp(baseMin, baseMax);
+      // A window narrower than a point has nothing to show, and a pinned end
+      // outside what the data reaches is asked for something impossible: both
+      // keep the window the chart already had. Nothing is written back, so a
+      // clamp applied here cannot travel to another chart sharing the
+      // controller and come back as a different window.
+      if (end > start) {
+        apply(start, end);
+        return (start, end);
       }
-      controller.setRange(
-        controller.start == null ? null : low,
-        controller.end == null ? null : high,
-      );
       return (low, high);
     }
     // Nothing is pinned, so this chart answers and every chart sharing the
@@ -1352,10 +1375,16 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
 
   EdgeInsets _insetsFor(VarietyCartesianGeometry probe) {
     final TextStyle yStyle = _tickLabelStyle(probe.yAxis);
+    // The painter places a value label one `labelOffset` away from the axis
+    // line, so the room reserved for it has to include that offset. It used to
+    // be a hard coded 12 (the default offset plus a four pixel margin), which
+    // cropped every label as soon as the offset was raised.
+    final double yOffset = math.max(probe.yAxis.labelOffset, 0.0);
+    final double xOffset = math.max(probe.xAxis.labelOffset, 0.0);
     double left = 10;
     for (final double tick in probe.yTicks) {
       final String caption = probe.secondaryTickLabel(tick);
-      left = math.max(left, _textSize(caption, yStyle).width + 12);
+      left = math.max(left, _textSize(caption, yStyle).width + yOffset + 4);
     }
     if ((probe.yAxis.title ?? '').isNotEmpty) {
       left += 18;
@@ -1368,18 +1397,19 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       // one sample is the whole answer. Measuring every caption of a chart
       // with two thousand categories cost about seventy milliseconds a frame,
       // against the twenty-odd captions that are actually painted.
-      bottom = math.max(bottom, _textSize('0', xStyle).height + 8);
+      bottom = math.max(bottom, _textSize('0', xStyle).height + xOffset);
     } else if (probe.xAxisType == VarietyAxisType.category ||
         probe.xAxisType == VarietyAxisType.dateTimeCategory) {
       for (final String caption in probe.categories) {
-        bottom =
-            math.max(bottom, _rotatedHeight(caption, xStyle, rotation) + 8);
+        bottom = math.max(
+            bottom, _rotatedHeight(caption, xStyle, rotation) + xOffset);
       }
     } else if (probe.xAxisType == VarietyAxisType.dateTime) {
       for (final DateTime tick in probe.dateTimeTicks) {
         bottom = math.max(
           bottom,
-          _rotatedHeight(probe.dateTimeTickLabel(tick), xStyle, rotation) + 8,
+          _rotatedHeight(probe.dateTimeTickLabel(tick), xStyle, rotation) +
+              xOffset,
         );
       }
     } else {
@@ -1388,8 +1418,8 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
       for (final double value in probe.xNumericTicks) {
         final String caption = probe.xAxis.labelFormatter?.call(value) ??
             varietyFormatNumber(value);
-        bottom =
-            math.max(bottom, _rotatedHeight(caption, xStyle, rotation) + 8);
+        bottom = math.max(
+            bottom, _rotatedHeight(caption, xStyle, rotation) + xOffset);
       }
     }
     if (probe.xAxis.labelIntersectAction ==
@@ -1691,7 +1721,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
         selection.selectionType != VarietySelectionType.none) {
       final VarietyHitResult? hit = geometry.hitTest(position);
       if (hit == null) {
-        _applySelection(const <VarietyHitResult>[]);
+        _applySelection(const <VarietyHitResult>[], behavior: selection);
       } else if (selection.selectionType == VarietySelectionType.series) {
         _applySelection(
           List<VarietyHitResult>.generate(
@@ -1704,11 +1734,12 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
               position: geometry.pointPositions[hit.seriesIndex][i],
             ),
           ),
+          behavior: selection,
         );
       } else if (selection.selectionType == VarietySelectionType.cluster) {
         // Every series' nearest point at the tapped slot, so one x position
         // can be highlighted across the whole stack.
-        _applySelection(geometry.hitsAtSlot(hit.position));
+        _applySelection(geometry.hitsAtSlot(hit.position), behavior: selection);
       } else {
         final bool alreadySelected = _selected.contains(hit);
         if (selection.enableMultiSelection) {
@@ -1719,11 +1750,11 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
             // so a selection cannot be lost by an accidental extra touch.
             if (selection.toggleSelection) {
               next.remove(hit);
-              _applySelection(next);
+              _applySelection(next, behavior: selection);
             }
           } else {
             next.add(hit);
-            _applySelection(next);
+            _applySelection(next, behavior: selection);
           }
         } else if (alreadySelected && !selection.toggleSelection) {
           // Keep what is already selected.
@@ -1732,6 +1763,7 @@ class VarietyCartesianChartState extends State<VarietyCartesianChart>
             alreadySelected
                 ? const <VarietyHitResult>[]
                 : <VarietyHitResult>[hit],
+            behavior: selection,
           );
         }
       }

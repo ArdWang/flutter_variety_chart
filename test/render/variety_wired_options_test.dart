@@ -281,7 +281,14 @@ void main() {
         geometry: geometry,
         theme: base,
         annotations: <VarietyAnnotation>[
-          VarietyAnnotation.horizontalLine(y: 30, region: region),
+          // A rule is dashed by default, and a dashed line reaches the canvas
+          // as a path rather than a line, so these two checks ask for a solid
+          // one: what is under test is the span, not the pattern.
+          VarietyAnnotation.horizontalLine(
+            y: 30,
+            region: region,
+            dashArray: const <double>[],
+          ),
         ],
       ).paint(recorder, surface);
 

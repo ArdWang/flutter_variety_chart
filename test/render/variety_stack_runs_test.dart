@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_variety_chart/flutter_variety_chart.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -96,14 +95,17 @@ void main() {
       expect(geometry.topValue(0, 2), closeTo(30, 1e-9));
       expect(geometry.baseValue(1, 2), closeTo(30, 1e-9));
       expect(geometry.baseValue(2, 2), closeTo(30, 1e-9));
-      // A series with no reading in a slot has no top of its own there.
+      // A series with no reading in a slot has no top of its own there. The
+      // third series stops after its first point, so asking it for a later
+      // slot is out of bounds and answers 0; the stack it sits in is still
+      // reported by baseValue above.
       expect(geometry.topValue(1, 2), closeTo(0, 1e-9));
       expect(geometry.topValue(2, 2), closeTo(0, 1e-9));
+      expect(geometry.topValue(2, 1), closeTo(0, 1e-9));
       // The earlier slots carry every series that gets there.
       expect(geometry.baseValue(2, 0), closeTo(11, 1e-9));
       expect(geometry.topValue(2, 0), closeTo(111, 1e-9));
       expect(geometry.baseValue(2, 1), closeTo(22, 1e-9));
-      expect(geometry.topValue(2, 1), closeTo(22, 1e-9));
     });
 
     test('a series that is not stacked sits out of the stack', () {

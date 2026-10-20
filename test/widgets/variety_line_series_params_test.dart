@@ -74,9 +74,11 @@ void main() {
           sortingOrder: VarietySortingOrder.ascending,
         ),
       ]);
+      // Without a mapper the key is x, and these points arrive in x order, so
+      // ascending leaves them where they were.
       expect(
         plain.resolvedData.single.map((VarietyChartData p) => p.y),
-        <double?>[2, 4, 6, 8, 9],
+        <double?>[4, 9, 6, 8, 2],
       );
     });
 

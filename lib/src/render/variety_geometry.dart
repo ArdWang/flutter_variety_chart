@@ -1038,6 +1038,14 @@ class VarietyCartesianGeometry {
   /// A date only pattern prints the same caption for every point of a day,
   /// which reads as if they shared a slot. The ladder walks towards finer
   /// patterns until each category gets a caption of its own.
+  ///
+  /// The ladder is first taken from the span the axis covers, which is the
+  /// coarsest pattern that can still describe it. A recording of two thousand
+  /// readings a second apart spans half an hour, so that ladder stops at
+  /// minutes and every one of the thirty-four minutes repeats — the span says
+  /// how wide the axis is, not how close two points can be. When the span's
+  /// own ladder cannot tell them apart the search drops to the gap between
+  /// neighbours, which is what actually has to be resolved.
   String _autoCategoryDateFormat(VarietyAxis axis) {
     final int index = xAxes.indexOf(axis);
     final List<dynamic> values =
@@ -1047,9 +1055,29 @@ class VarietyCartesianGeometry {
     if (times.isEmpty) {
       return 'dd MMM';
     }
-    final List<String> ladder = _formatLadder(
-      _autoIntervalType(times.last.difference(times.first).abs()),
-    );
+    final Duration span = times.last.difference(times.first).abs();
+    final List<String> ladder = _formatLadder(_autoIntervalType(span));
+    final String? coarse = _firstUniquePattern(times, ladder);
+    if (coarse != null) {
+      return coarse;
+    }
+    // Two instants closer together than the span's ladder can resolve need a
+    // finer pattern; the mean gap is the finest one that is still guaranteed
+    // to have a value per point.
+    final Duration gap = times.length > 1
+        ? Duration(
+            microseconds: (span.inMicroseconds / (times.length - 1)).round(),
+          )
+        : Duration.zero;
+    final String? fine =
+        _firstUniquePattern(times, _formatLadder(_captionTypeForGap(gap)));
+    return fine ?? 'yyyy-MM-dd HH:mm:ss.SSSSSS';
+  }
+
+  /// The first pattern of [ladder] that gives every instant of [times] its own
+  /// caption, or `null` when the ladder cannot tell them apart.
+  static String? _firstUniquePattern(
+      List<DateTime> times, List<String> ladder) {
     for (final String pattern in ladder) {
       final Set<String> seen = <String>{};
       bool unique = true;
@@ -1063,7 +1091,28 @@ class VarietyCartesianGeometry {
         return pattern;
       }
     }
-    return ladder.last;
+    return null;
+  }
+
+  /// The coarsest interval type that still separates two instants [gap] apart.
+  ///
+  /// This is the caption counterpart of [_autoIntervalType]: that one reads
+  /// how wide an axis is, this one reads how close its points are, and only
+  /// the second answers whether a caption can be unique.
+  static VarietyDateTimeIntervalType _captionTypeForGap(Duration gap) {
+    if (gap.inMicroseconds >= Duration.microsecondsPerDay) {
+      return VarietyDateTimeIntervalType.days;
+    }
+    if (gap.inMicroseconds >= Duration.microsecondsPerHour) {
+      return VarietyDateTimeIntervalType.hours;
+    }
+    if (gap.inMicroseconds >= Duration.microsecondsPerMinute) {
+      return VarietyDateTimeIntervalType.minutes;
+    }
+    if (gap.inMicroseconds >= Duration.microsecondsPerSecond) {
+      return VarietyDateTimeIntervalType.seconds;
+    }
+    return VarietyDateTimeIntervalType.milliseconds;
   }
 
   void _resolveRanges() {
@@ -2633,8 +2682,39 @@ class VarietyCartesianGeometry {
         : base.withValues(alpha: base.a * item.opacity);
   }
 
+  /// The outline colour a rectangular series asked for.
+  ///
+  /// A bar and a column are the same rectangle turned a quarter turn, and both
+  /// reach the canvas through one builder; asking only about columns left the
+  /// bar's `borderColor` and `borderWidth` declared and never drawn.
+  Color? _borderColorOf(VarietySeries item) {
+    if (item is VarietyColumnSeries) {
+      return item.borderColor;
+    }
+    if (item is VarietyBarSeries) {
+      return item.borderColor;
+    }
+    return null;
+  }
+
+  double _borderWidthOf(VarietySeries item) {
+    if (item is VarietyColumnSeries) {
+      return item.borderWidth;
+    }
+    if (item is VarietyBarSeries) {
+      return item.borderWidth;
+    }
+    return 0;
+  }
+
   double _cornerRadiusOf(VarietySeries item) {
     if (item is VarietyColumnSeries) {
+      return item.cornerRadius;
+    }
+    // A bar is a column laid on its side and shares this builder, so its
+    // corner radius has to be read here too: it was declared, documented and
+    // never asked for.
+    if (item is VarietyBarSeries) {
       return item.cornerRadius;
     }
     if (item is VarietyRangeColumnSeries) {
@@ -2792,8 +2872,8 @@ class VarietyCartesianGeometry {
           rects: <Rect>[normalized],
           color: fill,
           radius: radius,
-          border: item is VarietyColumnSeries ? item.borderColor : null,
-          borderWidth: item is VarietyColumnSeries ? item.borderWidth : 0,
+          border: _borderColorOf(item),
+          borderWidth: _borderWidthOf(item),
         ),
       );
       _addDataLabel(item, seriesIndex, p, normalized.center, normalized.top);
@@ -3333,16 +3413,33 @@ class VarietyCartesianGeometry {
   void _buildLine(int seriesIndex, VarietyLineSeries item) {
     final List<VarietyChartData> points = resolvedData[seriesIndex];
     final List<Offset> run = <Offset>[];
+    final List<Offset> baseRun = <Offset>[];
     final Color color = colorFor(item, seriesIndex, 0);
+    // `fillOpacity` promises the area under the line is filled. The builder
+    // used to stroke the run and drop the promise: the value was read only to
+    // place the top of a stacked run, so a plain line asking for a fill drew
+    // nothing extra.
+    final bool filled = item.fillOpacity > 0;
     void flush() {
       if (run.length < 2) {
         run.clear();
+        baseRun.clear();
         return;
+      }
+      final Path path = _joinPath(run, item.lineStyle, item.splineType);
+      if (filled) {
+        for (int i = baseRun.length - 1; i >= 0; i--) {
+          path.lineTo(baseRun[i].dx, baseRun[i].dy);
+        }
+        path.close();
       }
       elements.add(
         VarietyPathElement(
           seriesIndex: seriesIndex,
-          path: _joinPath(run, item.lineStyle, item.splineType),
+          path: path,
+          fillColor: filled ? color : null,
+          fillOpacity: item.fillOpacity,
+          fillGradient: filled ? item.gradient : null,
           strokeColor: color,
           strokeWidth: item.strokeWidth,
           dashPattern: item.dashPattern,
@@ -3350,6 +3447,7 @@ class VarietyCartesianGeometry {
         ),
       );
       run.clear();
+      baseRun.clear();
     }
 
     for (int p = 0; p < points.length; p++) {
@@ -3360,6 +3458,20 @@ class VarietyCartesianGeometry {
       final Offset point =
           Offset(pointPositions[seriesIndex][p].dx, topPixel(seriesIndex, p));
       run.add(point);
+      if (filled) {
+        // A stacked line fills back to the row under it, everything else back
+        // to the axis, which is what the area series beside it already does.
+        final int lineAxis = axisIndexOf(seriesIndex);
+        baseRun.add(
+          Offset(
+            point.dx,
+            item.isStacked
+                ? animateY(
+                    pixelYOn(lineAxis, baseValue(seriesIndex, p)), lineAxis)
+                : baselineYOn(lineAxis),
+          ),
+        );
+      }
       _addDataLabel(item, seriesIndex, p, point, null);
     }
     flush();

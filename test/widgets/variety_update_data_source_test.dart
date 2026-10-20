@@ -131,7 +131,7 @@ void main() {
     await tester.pump();
     expect(source.length, 8);
     expect(source.first.x, 1);
-    expect(source.last.x, 8);
+    expect(source.last.x, 9);
   });
 
   testWidgets('an index nobody has is ignored rather than thrown', (

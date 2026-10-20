@@ -1,3 +1,47 @@
+## 0.5.24
+
+### What the options promised, the canvas now does
+
+Nine things a chart accepted and then ignored. Every one of them was a value
+the caller set, the documentation described, and the drawing code never asked
+for — the failure mode this library has had to hunt most often, because it is
+silent: nothing throws, nothing is missing, the picture just does not change.
+
+Fixed
+
+- **A delayed series no longer starts early.** `animationDelay` was subtracted
+  from the eased progress instead of from the raw timeline, so a series waiting
+  500 ms had already risen a quarter of the way when 300 ms had passed. The
+  delay is now taken out before the curve is applied.
+- **A series can stretch the entrance.** A series declaring a longer
+  `animationDuration` than the chart kept the chart's timeline, because the
+  controller's duration was read once in `initState` and never again.
+- **A pinned end stays where it was pinned.** `VarietyRangeController` windows
+  are remembered as a normalised position, so a low end pinned at 4 drifted to
+  4.9 as soon as a point was appended past the old maximum. A pinned end is
+  re-applied every frame; a free end still follows the data.
+- **Selection reports itself.** `selectionBehavior.onSelectionChanged` was
+  called when a selection was seeded and never when one was tapped, so a
+  series-level behaviour could not observe anything.
+- **A bar draws its corner radius and outline.** `VarietyBarSeries` shares the
+  column builder, and only columns were asked for `cornerRadius`,
+  `borderColor` and `borderWidth`.
+- **A line honours `fillOpacity`.** The value was read only to place the top of
+  a stacked run, so a plain line asking for a fill drew the same stroke as one
+  without it.
+- **`labelOffset` is included in the room reserved for axis labels.** The inset
+  was a hard coded 12, which cropped every caption as soon as the offset was
+  raised above the default.
+- **`animate: false` is per series.** It used to mean only "the chart animates
+  unless every series opts out", so one series asking to stand still was
+  ignored while the others rose.
+- **Category captions over a long run stay unique.** The caption pattern was
+  chosen from the span the axis covers, which for two thousand readings a
+  second apart stops at minutes: thirty-four captions for two thousand slots.
+  When the span's ladder cannot separate two instants the search drops to the
+  gap between neighbours, and a microsecond token (`SSSSSS`) is available for
+  the last resort.
+
 ## 0.5.23
 
 ### A chart that can be driven
